@@ -9,6 +9,8 @@
 
   # https://devenv.sh/languages/
   languages.go.enable = true;
+  languages.javascript.enable = true;
+  languages.javascript.package = pkgs.nodejs_20;
 
   # https://devenv.sh/processes/
   # processes.dev.exec = "${lib.getExe pkgs.watchexec} -n -- ls -la";
