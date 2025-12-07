@@ -42,3 +42,7 @@ devenv.local.yaml
 # pre-commit
 .pre-commit-config.yaml
 server
+
+# Docs Node.js dependencies
+docs/node_modules/
+docs/package-lock.json
