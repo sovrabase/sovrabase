@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/ketsuna-org/sovrabase/internal/models"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 	"github.com/ketsuna-org/sovrabase/internal/models/user"
 )
 
@@ -42,11 +42,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags User
 // @Accept json
 // @Produce json
-// @Param request body models.RefreshTokenRequest true "Refresh token"
+// @Param request body requests.RefreshTokenRequest true "Refresh token"
 // @Success 200 {object} user.LoginResponse
 // @Router /auth/refresh [post]
 func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.RefreshTokenRequest
+	var req requests.RefreshTokenRequest
 	_ = req
 	// TODO: Implement token refresh logic
 	response := user.LoginResponse{
@@ -84,11 +84,11 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 // @Security Bearer
 // @Accept json
 // @Produce json
-// @Param request body models.UpdateUserRequest true "User update data"
+// @Param request body requests.UpdateUserRequest true "User update data"
 // @Success 200 {object} user.User
 // @Router /user [patch]
 func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateUserRequest
+	var req requests.UpdateUserRequest
 	_ = req
 	// TODO: Implement update user logic
 	w.Header().Set("Content-Type", "application/json")
@@ -119,11 +119,11 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags User
 // @Accept json
 // @Produce json
-// @Param request body models.RegisterRequest true "Registration data"
+// @Param request body requests.RegisterRequest true "Registration data"
 // @Success 200 {object} user.LoginResponse
 // @Router /auth/register [post]
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.RegisterRequest
+	var req requests.RegisterRequest
 	_ = req
 	// TODO: Implement registration logic
 	response := user.LoginResponse{

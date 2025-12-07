@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/ketsuna-org/sovrabase/internal/models"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 )
 
 // GetWebhooksHandler gets all webhooks for a project
@@ -25,11 +25,11 @@ func GetWebhooksHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.CreateWebhookRequest true "Webhook creation data"
+// @Param request body requests.CreateWebhookRequest true "Webhook creation data"
 // @Success 200
 // @Router /project/{id}/webhooks [post]
 func CreateWebhookHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateWebhookRequest
+	var req requests.CreateWebhookRequest
 	_ = req
 	// TODO: Implement create webhook logic
 	w.WriteHeader(http.StatusOK)
@@ -56,11 +56,11 @@ func GetWebhookHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param webhook_id path string true "Webhook ID"
-// @Param request body models.UpdateWebhookRequest true "Webhook update data"
+// @Param request body requests.UpdateWebhookRequest true "Webhook update data"
 // @Success 200
 // @Router /project/{id}/webhooks/{webhook_id} [patch]
 func UpdateWebhookHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateWebhookRequest
+	var req requests.UpdateWebhookRequest
 	_ = req
 	// TODO: Implement update webhook logic
 	w.WriteHeader(http.StatusOK)

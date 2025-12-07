@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/ketsuna-org/sovrabase/internal/models"
 	"github.com/ketsuna-org/sovrabase/internal/models/project"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 )
 
 // CreateProjectHandler creates a new project
@@ -15,11 +15,11 @@ import (
 // @Security Bearer
 // @Accept json
 // @Produce json
-// @Param request body models.CreateProjectRequest true "Project creation data"
+// @Param request body requests.CreateProjectRequest true "Project creation data"
 // @Success 200 {object} project.Project
 // @Router /project [post]
 func CreateProjectHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateProjectRequest
+	var req requests.CreateProjectRequest
 	_ = req
 	// TODO: Implement project creation logic
 	w.WriteHeader(http.StatusOK)
@@ -44,11 +44,11 @@ func GetProjectHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.UpdateProjectRequest true "Project update data"
+// @Param request body requests.UpdateProjectRequest true "Project update data"
 // @Success 200 {object} project.Project
 // @Router /project/{id} [patch]
 func UpdateProjectHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateProjectRequest
+	var req requests.UpdateProjectRequest
 	_ = req
 	// TODO: Implement project update logic
 	w.WriteHeader(http.StatusOK)
@@ -85,11 +85,11 @@ func GetProjectMembersHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.AddProjectMemberRequest true "Member data"
+// @Param request body requests.AddProjectMemberRequest true "Member data"
 // @Success 200
 // @Router /project/{id}/members [post]
 func AddProjectMemberHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.AddProjectMemberRequest
+	var req requests.AddProjectMemberRequest
 	_ = req
 	// TODO: Implement add member logic
 	w.WriteHeader(http.StatusOK)
@@ -103,11 +103,11 @@ func AddProjectMemberHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param user_id path string true "User ID"
-// @Param request body models.UpdateProjectMemberRequest true "Member update data"
+// @Param request body requests.UpdateProjectMemberRequest true "Member update data"
 // @Success 200
 // @Router /project/{id}/members/{user_id} [patch]
 func UpdateProjectMemberHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateProjectMemberRequest
+	var req requests.UpdateProjectMemberRequest
 	_ = req
 	// TODO: Implement update member logic
 	w.WriteHeader(http.StatusOK)
@@ -162,11 +162,11 @@ func GetAPIKeysHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.CreateAPIKeyRequest true "API Key creation data"
+// @Param request body requests.CreateAPIKeyRequest true "API Key creation data"
 // @Success 200 {object} project.APIKey
 // @Router /project/{id}/api-keys [post]
 func CreateAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateAPIKeyRequest
+	var req requests.CreateAPIKeyRequest
 	_ = req
 	// TODO: Implement API key creation logic
 	w.Header().Set("Content-Type", "application/json")
@@ -185,11 +185,11 @@ func CreateAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param key_id path string true "API Key ID"
-// @Param request body models.UpdateAPIKeyRequest true "API Key update data"
+// @Param request body requests.UpdateAPIKeyRequest true "API Key update data"
 // @Success 200 {object} project.APIKey
 // @Router /project/{id}/api-keys/{key_id} [patch]
 func UpdateAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateAPIKeyRequest
+	var req requests.UpdateAPIKeyRequest
 	_ = req
 	// TODO: Implement API key update logic
 	w.Header().Set("Content-Type", "application/json")
@@ -242,11 +242,11 @@ func ListRolesHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.CreateRoleRequest true "Role creation data"
+// @Param request body requests.CreateRoleRequest true "Role creation data"
 // @Success 200
 // @Router /project/{id}/roles [post]
 func CreateRoleHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateRoleRequest
+	var req requests.CreateRoleRequest
 	_ = req
 	// TODO: Implement create role logic
 	w.WriteHeader(http.StatusOK)
@@ -273,11 +273,11 @@ func GetRoleHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param role_id path string true "Role ID"
-// @Param request body models.UpdateRoleRequest true "Role update data"
+// @Param request body requests.UpdateRoleRequest true "Role update data"
 // @Success 200
 // @Router /project/{id}/roles/{role_id} [patch]
 func UpdateRoleHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateRoleRequest
+	var req requests.UpdateRoleRequest
 	_ = req
 	// TODO: Implement update role logic
 	w.WriteHeader(http.StatusOK)

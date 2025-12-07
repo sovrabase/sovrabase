@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/ketsuna-org/sovrabase/internal/models"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 )
 
 // GetOrganizationsHandler gets all organizations
@@ -23,11 +23,11 @@ func GetOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 // @Security Bearer
 // @Accept json
 // @Produce json
-// @Param request body models.CreateOrganizationRequest true "Organization creation data"
+// @Param request body requests.CreateOrganizationRequest true "Organization creation data"
 // @Success 200
 // @Router /organization [post]
 func CreateOrganizationHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateOrganizationRequest
+	var req requests.CreateOrganizationRequest
 	_ = req
 	// TODO: Implement create organization logic
 	w.WriteHeader(http.StatusOK)
@@ -40,11 +40,11 @@ func CreateOrganizationHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Organization ID"
-// @Param request body models.UpdateOrganizationRequest true "Organization update data"
+// @Param request body requests.UpdateOrganizationRequest true "Organization update data"
 // @Success 200
 // @Router /organization/{id} [patch]
 func UpdateOrganizationHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateOrganizationRequest
+	var req requests.UpdateOrganizationRequest
 	_ = req
 	// TODO: Implement update organization logic
 	w.WriteHeader(http.StatusOK)
@@ -81,11 +81,11 @@ func GetOrganizationMembersHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Organization ID"
-// @Param request body models.AddOrganizationMemberRequest true "Member data"
+// @Param request body requests.AddOrganizationMemberRequest true "Member data"
 // @Success 200
 // @Router /organization/{id}/members [post]
 func AddOrganizationMemberHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.AddOrganizationMemberRequest
+	var req requests.AddOrganizationMemberRequest
 	_ = req
 	// TODO: Implement add member logic
 	w.WriteHeader(http.StatusOK)
@@ -99,11 +99,11 @@ func AddOrganizationMemberHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Organization ID"
 // @Param user_id path string true "User ID"
-// @Param request body models.UpdateOrganizationMemberRequest true "Member update data"
+// @Param request body requests.UpdateOrganizationMemberRequest true "Member update data"
 // @Success 200
 // @Router /organization/{id}/members/{user_id} [patch]
 func UpdateOrganizationMemberHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateOrganizationMemberRequest
+	var req requests.UpdateOrganizationMemberRequest
 	_ = req
 	// TODO: Implement update member logic
 	w.WriteHeader(http.StatusOK)
@@ -141,11 +141,11 @@ func GetOrganizationInvitationsHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Organization ID"
-// @Param request body models.CreateOrganizationInvitationRequest true "Invitation data"
+// @Param request body requests.CreateOrganizationInvitationRequest true "Invitation data"
 // @Success 200
 // @Router /organization/{id}/invitations [post]
 func CreateOrganizationInvitationHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateOrganizationInvitationRequest
+	var req requests.CreateOrganizationInvitationRequest
 	_ = req
 	// TODO: Implement create invitation logic
 	w.WriteHeader(http.StatusOK)

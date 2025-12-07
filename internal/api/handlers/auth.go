@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/ketsuna-org/sovrabase/internal/models"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 )
 
 // CreateAuthProviderHandler creates an auth provider for a project
@@ -13,11 +13,11 @@ import (
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.CreateAuthProviderRequest true "Auth provider data"
+// @Param request body requests.CreateAuthProviderRequest true "Auth provider data"
 // @Success 200
 // @Router /project/{id}/auth/providers [post]
 func CreateAuthProviderHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateAuthProviderRequest
+	var req requests.CreateAuthProviderRequest
 	_ = req
 	// TODO: Implement auth provider creation logic
 	w.WriteHeader(http.StatusOK)
@@ -29,11 +29,11 @@ func CreateAuthProviderHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.ProjectSignupRequest true "Signup data"
+// @Param request body requests.ProjectSignupRequest true "Signup data"
 // @Success 200
 // @Router /project/{id}/auth/signup [post]
 func ProjectSignupHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.ProjectSignupRequest
+	var req requests.ProjectSignupRequest
 	_ = req
 	// TODO: Implement project signup logic
 	w.WriteHeader(http.StatusOK)
@@ -45,11 +45,11 @@ func ProjectSignupHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.ProjectLoginRequest true "Login data"
+// @Param request body requests.ProjectLoginRequest true "Login data"
 // @Success 200
 // @Router /project/{id}/auth/login [post]
 func ProjectLoginHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.ProjectLoginRequest
+	var req requests.ProjectLoginRequest
 	_ = req
 	// TODO: Implement project login logic
 	w.WriteHeader(http.StatusOK)
@@ -98,11 +98,11 @@ func DeleteProjectUserHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param provider path string true "Provider Name"
-// @Param request body models.OAuthCallbackRequest true "OAuth callback data"
+// @Param request body requests.OAuthCallbackRequest true "OAuth callback data"
 // @Success 200
 // @Router /project/{id}/auth/providers/{provider}/callback [post]
 func OAuthCallbackHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.OAuthCallbackRequest
+	var req requests.OAuthCallbackRequest
 	_ = req
 	// TODO: Implement OAuth callback logic
 	w.WriteHeader(http.StatusOK)

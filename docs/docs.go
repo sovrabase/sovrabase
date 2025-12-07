@@ -39,13 +39,16 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateUserRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateUserRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.CreateUserResponse"
+                        }
                     }
                 }
             }
@@ -63,7 +66,13 @@ const docTemplate = `{
                 "summary": "Get overall metric usage of the server",
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/responses.AdminMetric"
+                            }
+                        }
                     }
                 }
             }
@@ -81,7 +90,13 @@ const docTemplate = `{
                 "summary": "Return the list of organisation created on the server",
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/responses.Organisation"
+                            }
+                        }
                     }
                 }
             }
@@ -99,7 +114,13 @@ const docTemplate = `{
                 "summary": "Get a list of all projects created on the Server",
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/responses.Project"
+                            }
+                        }
                     }
                 }
             }
@@ -117,7 +138,13 @@ const docTemplate = `{
                 "summary": "Get all registered Users !",
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/responses.User"
+                            }
+                        }
                     }
                 }
             }
@@ -201,7 +228,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.RefreshTokenRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.RefreshTokenRequest"
                         }
                     }
                 ],
@@ -234,7 +261,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.RegisterRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.RegisterRequest"
                         }
                     }
                 ],
@@ -288,7 +315,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateOrganizationRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateOrganizationRequest"
                         }
                     }
                 ],
@@ -355,7 +382,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateOrganizationRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateOrganizationRequest"
                         }
                     }
                 ],
@@ -422,7 +449,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateOrganizationInvitationRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateOrganizationInvitationRequest"
                         }
                     }
                 ],
@@ -523,7 +550,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.AddOrganizationMemberRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.AddOrganizationMemberRequest"
                         }
                     }
                 ],
@@ -604,7 +631,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateOrganizationMemberRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateOrganizationMemberRequest"
                         }
                     }
                 ],
@@ -682,7 +709,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateProjectRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateProjectRequest"
                         }
                     }
                 ],
@@ -777,7 +804,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateProjectRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateProjectRequest"
                         }
                     }
                 ],
@@ -856,7 +883,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateAPIKeyRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateAPIKeyRequest"
                         }
                     }
                 ],
@@ -940,7 +967,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateAPIKeyRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateAPIKeyRequest"
                         }
                     }
                 ],
@@ -980,7 +1007,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.ProjectLoginRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.ProjectLoginRequest"
                         }
                     }
                 ],
@@ -1049,7 +1076,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateAuthProviderRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateAuthProviderRequest"
                         }
                     }
                 ],
@@ -1093,7 +1120,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.OAuthCallbackRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.OAuthCallbackRequest"
                         }
                     }
                 ],
@@ -1130,7 +1157,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.ProjectSignupRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.ProjectSignupRequest"
                         }
                     }
                 ],
@@ -1298,7 +1325,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateCollectionRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateCollectionRequest"
                         }
                     }
                 ],
@@ -1470,7 +1497,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.BatchDeleteRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.BatchDeleteRequest"
                         }
                     }
                 ],
@@ -1565,7 +1592,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateIndexRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateIndexRequest"
                         }
                     }
                 ],
@@ -1669,7 +1696,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.InsertDataRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.InsertDataRequest"
                         }
                     }
                 ],
@@ -1725,7 +1752,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.QueryCollectionRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.QueryCollectionRequest"
                         }
                     }
                 ],
@@ -1781,7 +1808,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpsertDataRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpsertDataRequest"
                         }
                     }
                 ],
@@ -1936,7 +1963,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateDocumentRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateDocumentRequest"
                         }
                     }
                 ],
@@ -2003,7 +2030,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateDatabaseRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateDatabaseRequest"
                         }
                     }
                 ],
@@ -2116,7 +2143,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateDatabaseRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateDatabaseRequest"
                         }
                     }
                 ],
@@ -2197,7 +2224,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateDatabaseBackupRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateDatabaseBackupRequest"
                         }
                     }
                 ],
@@ -2246,7 +2273,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.RestoreDatabaseRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.RestoreDatabaseRequest"
                         }
                     }
                 ],
@@ -2313,7 +2340,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateFunctionRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateFunctionRequest"
                         }
                     }
                 ],
@@ -2426,7 +2453,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateFunctionRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateFunctionRequest"
                         }
                     }
                 ],
@@ -2475,7 +2502,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.InvokeFunctionRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.InvokeFunctionRequest"
                         }
                     }
                 ],
@@ -2603,7 +2630,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.AddProjectMemberRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.AddProjectMemberRequest"
                         }
                     }
                 ],
@@ -2684,7 +2711,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateProjectMemberRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateProjectMemberRequest"
                         }
                     }
                 ],
@@ -2800,7 +2827,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateChannelRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateChannelRequest"
                         }
                     }
                 ],
@@ -2883,7 +2910,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.BroadcastMessageRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.BroadcastMessageRequest"
                         }
                     }
                 ],
@@ -2966,7 +2993,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.TrackPresenceRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.TrackPresenceRequest"
                         }
                     }
                 ],
@@ -3067,7 +3094,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateRoleRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateRoleRequest"
                         }
                     }
                 ],
@@ -3180,7 +3207,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateRoleRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateRoleRequest"
                         }
                     }
                 ],
@@ -3247,7 +3274,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateStorageBucketRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateStorageBucketRequest"
                         }
                     }
                 ],
@@ -3431,7 +3458,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.BatchDeleteFilesRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.BatchDeleteFilesRequest"
                         }
                     }
                 ],
@@ -3565,7 +3592,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateFileMetadataRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateFileMetadataRequest"
                         }
                     }
                 ],
@@ -3766,7 +3793,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.CreateWebhookRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.CreateWebhookRequest"
                         }
                     }
                 ],
@@ -3879,7 +3906,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateWebhookRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateWebhookRequest"
                         }
                     }
                 ],
@@ -3936,7 +3963,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.UpdateUserRequest"
+                            "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateUserRequest"
                         }
                     }
                 ],
@@ -3952,756 +3979,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_ketsuna-org_sovrabase_internal_models.AddOrganizationMemberRequest": {
-            "type": "object",
-            "required": [
-                "role",
-                "user_id"
-            ],
-            "properties": {
-                "role": {
-                    "type": "string",
-                    "example": "member"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.AddProjectMemberRequest": {
-            "type": "object",
-            "required": [
-                "role",
-                "user_id"
-            ],
-            "properties": {
-                "role": {
-                    "type": "string",
-                    "example": "developer"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.BatchDeleteFilesRequest": {
-            "type": "object",
-            "required": [
-                "file_ids"
-            ],
-            "properties": {
-                "file_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.BatchDeleteRequest": {
-            "type": "object",
-            "required": [
-                "ids"
-            ],
-            "properties": {
-                "ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.BroadcastMessageRequest": {
-            "type": "object",
-            "required": [
-                "message"
-            ],
-            "properties": {
-                "message": {}
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateAPIKeyRequest": {
-            "type": "object",
-            "required": [
-                "description",
-                "name"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "example": "Key for production environment"
-                },
-                "expires_at": {
-                    "type": "string",
-                    "example": "2025-12-31T23:59:59Z"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Production Key"
-                },
-                "permissions": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "read",
-                        "write"
-                    ]
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateAuthProviderRequest": {
-            "type": "object",
-            "required": [
-                "auth_url",
-                "client_id",
-                "client_secret",
-                "name",
-                "redirect_uris",
-                "revokation_url",
-                "token_url"
-            ],
-            "properties": {
-                "auth_url": {
-                    "type": "string",
-                    "example": "https://accounts.google.com/o/oauth2/auth"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "client_secret": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "google"
-                },
-                "redirect_uris": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "https://myapp.com/callback"
-                    ]
-                },
-                "revokation_url": {
-                    "type": "string",
-                    "example": "https://oauth2.googleapis.com/revoke"
-                },
-                "token_url": {
-                    "type": "string",
-                    "example": "https://oauth2.googleapis.com/token"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateChannelRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "chat_room"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateDatabaseBackupRequest": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "example": "Daily backup"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateDatabaseRequest": {
-            "type": "object",
-            "required": [
-                "engine",
-                "name"
-            ],
-            "properties": {
-                "engine": {
-                    "type": "string",
-                    "example": "postgres"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "my_database"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateFunctionRequest": {
-            "type": "object",
-            "required": [
-                "code",
-                "name",
-                "runtime"
-            ],
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "my_function"
-                },
-                "runtime": {
-                    "type": "string",
-                    "example": "nodejs"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateIndexRequest": {
-            "type": "object",
-            "required": [
-                "fields",
-                "name"
-            ],
-            "properties": {
-                "fields": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "name": {
-                    "type": "string",
-                    "example": "idx_email"
-                },
-                "unique": {
-                    "type": "boolean",
-                    "example": true
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateOrganizationInvitationRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "role"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "user@example.com"
-                },
-                "role": {
-                    "type": "string",
-                    "example": "member"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateOrganizationRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "My Organization"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateProjectRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "capabilities": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "database",
-                        "storage",
-                        "auth"
-                    ]
-                },
-                "name": {
-                    "type": "string",
-                    "example": "My Project"
-                },
-                "org_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateRoleRequest": {
-            "type": "object",
-            "required": [
-                "name",
-                "permissions"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "developer"
-                },
-                "permissions": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "read",
-                        "write"
-                    ]
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateStorageBucketRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "images"
-                },
-                "public": {
-                    "type": "boolean",
-                    "example": false
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateUserRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "username"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "john@example.com"
-                },
-                "password": {
-                    "type": "string",
-                    "example": "password123"
-                },
-                "roles": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "user",
-                        "admin"
-                    ]
-                },
-                "username": {
-                    "type": "string",
-                    "example": "john_doe"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.CreateWebhookRequest": {
-            "type": "object",
-            "required": [
-                "events",
-                "url"
-            ],
-            "properties": {
-                "active": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "events": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "user.created",
-                        "user.updated"
-                    ]
-                },
-                "url": {
-                    "type": "string",
-                    "example": "https://example.com/webhook"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.InsertDataRequest": {
-            "type": "object",
-            "required": [
-                "data"
-            ],
-            "properties": {
-                "data": {}
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.InvokeFunctionRequest": {
-            "type": "object",
-            "properties": {
-                "args": {
-                    "type": "object",
-                    "additionalProperties": true
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.OAuthCallbackRequest": {
-            "type": "object",
-            "required": [
-                "code"
-            ],
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "state": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.ProjectLoginRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "user@example.com"
-                },
-                "password": {
-                    "type": "string",
-                    "example": "password123"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.ProjectMember": {
-            "type": "object",
-            "properties": {
-                "role": {
-                    "type": "string",
-                    "example": "developer"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "john_doe"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.ProjectSignupRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "user@example.com"
-                },
-                "password": {
-                    "type": "string",
-                    "example": "password123"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "john_doe"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.QueryCollectionRequest": {
-            "type": "object",
-            "properties": {
-                "filter": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "limit": {
-                    "type": "integer",
-                    "example": 10
-                },
-                "offset": {
-                    "type": "integer",
-                    "example": 0
-                },
-                "sort": {
-                    "type": "object",
-                    "additionalProperties": true
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.RefreshTokenRequest": {
-            "type": "object",
-            "required": [
-                "refresh_token"
-            ],
-            "properties": {
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.RegisterRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password",
-                "username"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "john@example.com"
-                },
-                "password": {
-                    "type": "string",
-                    "example": "securepassword123"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "john_doe"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.RestoreDatabaseRequest": {
-            "type": "object",
-            "required": [
-                "backup_id"
-            ],
-            "properties": {
-                "backup_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.TrackPresenceRequest": {
-            "type": "object",
-            "required": [
-                "user_id"
-            ],
-            "properties": {
-                "data": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateAPIKeyRequest": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "example": "Updated description"
-                },
-                "expires_at": {
-                    "type": "string",
-                    "example": "2026-12-31T23:59:59Z"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Updated Key"
-                },
-                "permissions": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "read"
-                    ]
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateCollectionRequest": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "updated_collection"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateDatabaseRequest": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "updated_database"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateDocumentRequest": {
-            "type": "object",
-            "required": [
-                "data"
-            ],
-            "properties": {
-                "data": {
-                    "type": "object",
-                    "additionalProperties": true
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateFileMetadataRequest": {
-            "type": "object",
-            "required": [
-                "metadata"
-            ],
-            "properties": {
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateFunctionRequest": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "updated_function"
-                },
-                "runtime": {
-                    "type": "string",
-                    "example": "python"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateOrganizationMemberRequest": {
-            "type": "object",
-            "required": [
-                "role"
-            ],
-            "properties": {
-                "role": {
-                    "type": "string",
-                    "example": "admin"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateOrganizationRequest": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "Updated Organization"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateProjectMemberRequest": {
-            "type": "object",
-            "required": [
-                "role"
-            ],
-            "properties": {
-                "role": {
-                    "type": "string",
-                    "example": "admin"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateProjectRequest": {
-            "type": "object",
-            "properties": {
-                "capabilities": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "cors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "members": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models.ProjectMember"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Updated Project"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateRoleRequest": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "senior_developer"
-                },
-                "permissions": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "read",
-                        "write",
-                        "delete"
-                    ]
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateUserRequest": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "john@example.com"
-                },
-                "password": {
-                    "type": "string",
-                    "example": "newpassword123"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "john_doe"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpdateWebhookRequest": {
-            "type": "object",
-            "properties": {
-                "active": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "events": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "user.created"
-                    ]
-                },
-                "url": {
-                    "type": "string",
-                    "example": "https://example.com/webhook"
-                }
-            }
-        },
-        "github_com_ketsuna-org_sovrabase_internal_models.UpsertDataRequest": {
-            "type": "object",
-            "required": [
-                "data"
-            ],
-            "properties": {
-                "data": {}
-            }
-        },
         "github_com_ketsuna-org_sovrabase_internal_models_project.APIKey": {
             "type": "object",
             "properties": {
@@ -4757,6 +4034,756 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.AddOrganizationMemberRequest": {
+            "type": "object",
+            "required": [
+                "role",
+                "user_id"
+            ],
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "example": "member"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.AddProjectMemberRequest": {
+            "type": "object",
+            "required": [
+                "role",
+                "user_id"
+            ],
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "example": "developer"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.BatchDeleteFilesRequest": {
+            "type": "object",
+            "required": [
+                "file_ids"
+            ],
+            "properties": {
+                "file_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.BatchDeleteRequest": {
+            "type": "object",
+            "required": [
+                "ids"
+            ],
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.BroadcastMessageRequest": {
+            "type": "object",
+            "required": [
+                "message"
+            ],
+            "properties": {
+                "message": {}
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateAPIKeyRequest": {
+            "type": "object",
+            "required": [
+                "description",
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "Key for production environment"
+                },
+                "expires_at": {
+                    "type": "string",
+                    "example": "2025-12-31T23:59:59Z"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Production Key"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "read",
+                        "write"
+                    ]
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateAuthProviderRequest": {
+            "type": "object",
+            "required": [
+                "auth_url",
+                "client_id",
+                "client_secret",
+                "name",
+                "redirect_uris",
+                "revokation_url",
+                "token_url"
+            ],
+            "properties": {
+                "auth_url": {
+                    "type": "string",
+                    "example": "https://accounts.google.com/o/oauth2/auth"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "client_secret": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "google"
+                },
+                "redirect_uris": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "https://myapp.com/callback"
+                    ]
+                },
+                "revokation_url": {
+                    "type": "string",
+                    "example": "https://oauth2.googleapis.com/revoke"
+                },
+                "token_url": {
+                    "type": "string",
+                    "example": "https://oauth2.googleapis.com/token"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateChannelRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "chat_room"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateDatabaseBackupRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "Daily backup"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateDatabaseRequest": {
+            "type": "object",
+            "required": [
+                "engine",
+                "name"
+            ],
+            "properties": {
+                "engine": {
+                    "type": "string",
+                    "example": "postgres"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "my_database"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateFunctionRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "name",
+                "runtime"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "my_function"
+                },
+                "runtime": {
+                    "type": "string",
+                    "example": "nodejs"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateIndexRequest": {
+            "type": "object",
+            "required": [
+                "fields",
+                "name"
+            ],
+            "properties": {
+                "fields": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "name": {
+                    "type": "string",
+                    "example": "idx_email"
+                },
+                "unique": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateOrganizationInvitationRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "role"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "role": {
+                    "type": "string",
+                    "example": "member"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateOrganizationRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "My Organization"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateProjectRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "capabilities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "database",
+                        "storage",
+                        "auth"
+                    ]
+                },
+                "name": {
+                    "type": "string",
+                    "example": "My Project"
+                },
+                "org_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateRoleRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "permissions"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "developer"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "read",
+                        "write"
+                    ]
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateStorageBucketRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "images"
+                },
+                "public": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateUserRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "username"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "password123"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "user",
+                        "admin"
+                    ]
+                },
+                "username": {
+                    "type": "string",
+                    "example": "john_doe"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.CreateWebhookRequest": {
+            "type": "object",
+            "required": [
+                "events",
+                "url"
+            ],
+            "properties": {
+                "active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "events": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "user.created",
+                        "user.updated"
+                    ]
+                },
+                "url": {
+                    "type": "string",
+                    "example": "https://example.com/webhook"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.InsertDataRequest": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {}
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.InvokeFunctionRequest": {
+            "type": "object",
+            "properties": {
+                "args": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.OAuthCallbackRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.ProjectLoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "password123"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.ProjectMember": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "example": "developer"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "john_doe"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.ProjectSignupRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "password123"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "john_doe"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.QueryCollectionRequest": {
+            "type": "object",
+            "properties": {
+                "filter": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "sort": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.RefreshTokenRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "securepassword123"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "john_doe"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.RestoreDatabaseRequest": {
+            "type": "object",
+            "required": [
+                "backup_id"
+            ],
+            "properties": {
+                "backup_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.TrackPresenceRequest": {
+            "type": "object",
+            "required": [
+                "user_id"
+            ],
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateAPIKeyRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "Updated description"
+                },
+                "expires_at": {
+                    "type": "string",
+                    "example": "2026-12-31T23:59:59Z"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Updated Key"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "read"
+                    ]
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateCollectionRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "updated_collection"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateDatabaseRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "updated_database"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateDocumentRequest": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateFileMetadataRequest": {
+            "type": "object",
+            "required": [
+                "metadata"
+            ],
+            "properties": {
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateFunctionRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "updated_function"
+                },
+                "runtime": {
+                    "type": "string",
+                    "example": "python"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateOrganizationMemberRequest": {
+            "type": "object",
+            "required": [
+                "role"
+            ],
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "example": "admin"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateOrganizationRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "Updated Organization"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateProjectMemberRequest": {
+            "type": "object",
+            "required": [
+                "role"
+            ],
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "example": "admin"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateProjectRequest": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "cors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_ketsuna-org_sovrabase_internal_models_requests.ProjectMember"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Updated Project"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateRoleRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "senior_developer"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "read",
+                        "write",
+                        "delete"
+                    ]
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateUserRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "newpassword123"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "john_doe"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpdateWebhookRequest": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "events": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "user.created"
+                    ]
+                },
+                "url": {
+                    "type": "string",
+                    "example": "https://example.com/webhook"
+                }
+            }
+        },
+        "github_com_ketsuna-org_sovrabase_internal_models_requests.UpsertDataRequest": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {}
+            }
+        },
         "github_com_ketsuna-org_sovrabase_internal_models_user.LoginRequest": {
             "type": "object",
             "required": [
@@ -4803,6 +4830,341 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.AdminMetric": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "metric": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "responses.AnalyticsCapability": {
+            "type": "object",
+            "properties": {
+                "anonymous": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "monitors_requests": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "responses.AuthCapability": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "mfa_enabled": {
+                    "type": "string"
+                },
+                "providers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/responses.AuthProvider"
+                    }
+                },
+                "session_timeout": {
+                    "type": "integer"
+                }
+            }
+        },
+        "responses.AuthProvider": {
+            "type": "object",
+            "properties": {
+                "auth_url": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "client_secret": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "redirect_uris": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "revokation_url": {
+                    "type": "string"
+                },
+                "token_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.ComplianceSettings": {
+            "type": "object",
+            "properties": {
+                "hipaa": {
+                    "type": "boolean"
+                },
+                "rgpd": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "responses.CreateUserResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/responses.CreateUserResponseData"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.CreateUserResponseData": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "password": {
+                    "description": "Only set if password was not provided in request",
+                    "type": "string"
+                }
+            }
+        },
+        "responses.DatabaseCapability": {
+            "type": "object",
+            "properties": {
+                "backup_enabled": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "engines": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "max_connections": {
+                    "type": "integer"
+                }
+            }
+        },
+        "responses.FunctionsCapability": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "max_execution_time": {
+                    "type": "integer"
+                },
+                "memory_limit_mb": {
+                    "type": "integer"
+                },
+                "runtime": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.OrgSettings": {
+            "type": "object",
+            "properties": {
+                "compliance": {
+                    "$ref": "#/definitions/responses.ComplianceSettings"
+                },
+                "multi_tenant": {
+                    "type": "boolean"
+                },
+                "region": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.Organisation": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "members_count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "projects_count": {
+                    "type": "integer"
+                },
+                "settings": {
+                    "$ref": "#/definitions/responses.OrgSettings"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.Project": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "$ref": "#/definitions/responses.ProjectCapabilities"
+                },
+                "cors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/responses.ProjectMember"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.ProjectCapabilities": {
+            "type": "object",
+            "properties": {
+                "analytics": {
+                    "$ref": "#/definitions/responses.AnalyticsCapability"
+                },
+                "auth": {
+                    "$ref": "#/definitions/responses.AuthCapability"
+                },
+                "database": {
+                    "$ref": "#/definitions/responses.DatabaseCapability"
+                },
+                "functions": {
+                    "$ref": "#/definitions/responses.FunctionsCapability"
+                },
+                "realtime": {
+                    "$ref": "#/definitions/responses.RealtimeCapability"
+                },
+                "storage": {
+                    "$ref": "#/definitions/responses.StorageCapability"
+                }
+            }
+        },
+        "responses.ProjectMember": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/responses.User"
+                }
+            }
+        },
+        "responses.RealtimeCapability": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "max_connections": {
+                    "type": "integer"
+                },
+                "protocols": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "responses.StorageCapability": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "max_size_gb": {
+                    "type": "integer"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "public_access": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "responses.User": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "updated_at": {
                     "type": "string"

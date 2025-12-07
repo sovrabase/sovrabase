@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/ketsuna-org/sovrabase/internal/models"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 )
 
 // RealtimeConnectionHandler establishes a realtime websocket connection
@@ -36,11 +36,11 @@ func ListChannelsHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.CreateChannelRequest true "Channel creation data"
+// @Param request body requests.CreateChannelRequest true "Channel creation data"
 // @Success 200
 // @Router /project/{id}/realtime/channels [post]
 func CreateChannelHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateChannelRequest
+	var req requests.CreateChannelRequest
 	_ = req
 	// TODO: Implement create channel logic
 	w.WriteHeader(http.StatusOK)
@@ -67,11 +67,11 @@ func DeleteChannelHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param channel_id path string true "Channel ID"
-// @Param request body models.BroadcastMessageRequest true "Broadcast message data"
+// @Param request body requests.BroadcastMessageRequest true "Broadcast message data"
 // @Success 200
 // @Router /project/{id}/realtime/channels/{channel_id}/broadcast [post]
 func BroadcastMessageHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.BroadcastMessageRequest
+	var req requests.BroadcastMessageRequest
 	_ = req
 	// TODO: Implement broadcast message logic
 	w.WriteHeader(http.StatusOK)
@@ -98,11 +98,11 @@ func GetPresenceHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param channel path string true "Channel Name"
-// @Param request body models.TrackPresenceRequest true "Presence tracking data"
+// @Param request body requests.TrackPresenceRequest true "Presence tracking data"
 // @Success 200
 // @Router /project/{id}/realtime/presence/{channel}/track [post]
 func TrackPresenceHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.TrackPresenceRequest
+	var req requests.TrackPresenceRequest
 	_ = req
 	// TODO: Implement track presence logic
 	w.WriteHeader(http.StatusOK)

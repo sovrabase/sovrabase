@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/ketsuna-org/sovrabase/internal/models"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 )
 
 // CreateDatabaseHandler creates a new database for a project
@@ -13,11 +13,11 @@ import (
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.CreateDatabaseRequest true "Database creation data"
+// @Param request body requests.CreateDatabaseRequest true "Database creation data"
 // @Success 200
 // @Router /project/{id}/databases [post]
 func CreateDatabaseHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateDatabaseRequest
+	var req requests.CreateDatabaseRequest
 	_ = req
 	// TODO: Implement database creation logic
 	w.WriteHeader(http.StatusOK)
@@ -31,11 +31,11 @@ func CreateDatabaseHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
-// @Param request body models.UpdateDatabaseRequest true "Database update data"
+// @Param request body requests.UpdateDatabaseRequest true "Database update data"
 // @Success 200
 // @Router /project/{id}/databases/{db_id} [patch]
 func UpdateDatabaseHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateDatabaseRequest
+	var req requests.UpdateDatabaseRequest
 	_ = req
 	// TODO: Implement database update logic
 	w.WriteHeader(http.StatusOK)
@@ -62,11 +62,11 @@ func GetDatabaseBackupsHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
-// @Param request body models.CreateDatabaseBackupRequest true "Backup creation data"
+// @Param request body requests.CreateDatabaseBackupRequest true "Backup creation data"
 // @Success 200
 // @Router /project/{id}/databases/{db_id}/backup [post]
 func CreateDatabaseBackupHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateDatabaseBackupRequest
+	var req requests.CreateDatabaseBackupRequest
 	_ = req
 	// TODO: Implement backup creation logic
 	w.WriteHeader(http.StatusOK)
@@ -80,11 +80,11 @@ func CreateDatabaseBackupHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
-// @Param request body models.RestoreDatabaseRequest true "Restore data"
+// @Param request body requests.RestoreDatabaseRequest true "Restore data"
 // @Success 200
 // @Router /project/{id}/databases/{db_id}/restore [post]
 func RestoreDatabaseHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.RestoreDatabaseRequest
+	var req requests.RestoreDatabaseRequest
 	_ = req
 	// TODO: Implement database restore logic
 	w.WriteHeader(http.StatusOK)
@@ -113,11 +113,11 @@ func GetCollectionHandler(w http.ResponseWriter, r *http.Request) {
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
 // @Param collection path string true "Collection Name"
-// @Param request body models.InsertDataRequest true "Data to insert"
+// @Param request body requests.InsertDataRequest true "Data to insert"
 // @Success 200
 // @Router /project/{id}/data/{db_id}/{collection}/insert [post]
 func InsertDataHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.InsertDataRequest
+	var req requests.InsertDataRequest
 	_ = req
 	// TODO: Implement insert data logic
 	w.WriteHeader(http.StatusOK)
@@ -147,11 +147,11 @@ func DeleteDocumentHandler(w http.ResponseWriter, r *http.Request) {
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
 // @Param collection path string true "Collection Name"
-// @Param request body models.BatchDeleteRequest true "IDs to delete"
+// @Param request body requests.BatchDeleteRequest true "IDs to delete"
 // @Success 200
 // @Router /project/{id}/data/{db_id}/{collection}/delete [post]
 func BatchDeleteHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.BatchDeleteRequest
+	var req requests.BatchDeleteRequest
 	_ = req
 	// TODO: Implement batch delete logic
 	w.WriteHeader(http.StatusOK)
@@ -207,11 +207,11 @@ func RollbackTransactionHandler(w http.ResponseWriter, r *http.Request) {
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
 // @Param collection path string true "Collection Name"
-// @Param request body models.QueryCollectionRequest true "Query parameters"
+// @Param request body requests.QueryCollectionRequest true "Query parameters"
 // @Success 200
 // @Router /project/{id}/data/{db_id}/{collection}/query [post]
 func QueryCollectionHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.QueryCollectionRequest
+	var req requests.QueryCollectionRequest
 	_ = req
 	// TODO: Implement query logic
 	w.WriteHeader(http.StatusOK)
@@ -226,11 +226,11 @@ func QueryCollectionHandler(w http.ResponseWriter, r *http.Request) {
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
 // @Param collection path string true "Collection Name"
-// @Param request body models.UpsertDataRequest true "Data to upsert"
+// @Param request body requests.UpsertDataRequest true "Data to upsert"
 // @Success 200
 // @Router /project/{id}/data/{db_id}/{collection}/upsert [post]
 func UpsertDataHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpsertDataRequest
+	var req requests.UpsertDataRequest
 	_ = req
 	// TODO: Implement upsert logic
 	w.WriteHeader(http.StatusOK)
@@ -261,11 +261,11 @@ func GetDocumentHandler(w http.ResponseWriter, r *http.Request) {
 // @Param db_id path string true "Database ID"
 // @Param collection path string true "Collection Name"
 // @Param doc_id path string true "Document ID"
-// @Param request body models.UpdateDocumentRequest true "Document update data"
+// @Param request body requests.UpdateDocumentRequest true "Document update data"
 // @Success 200
 // @Router /project/{id}/data/{db_id}/{collection}/{doc_id} [patch]
 func UpdateDocumentHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateDocumentRequest
+	var req requests.UpdateDocumentRequest
 	_ = req
 	// TODO: Implement update document logic
 	w.WriteHeader(http.StatusOK)
@@ -293,11 +293,11 @@ func ListCollectionsHandler(w http.ResponseWriter, r *http.Request) {
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
 // @Param collection path string true "Collection Name"
-// @Param request body models.UpdateCollectionRequest true "Collection update data"
+// @Param request body requests.UpdateCollectionRequest true "Collection update data"
 // @Success 200
 // @Router /project/{id}/data/{db_id}/collections/{collection} [patch]
 func UpdateCollectionHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateCollectionRequest
+	var req requests.UpdateCollectionRequest
 	_ = req
 	// TODO: Implement update collection logic
 	w.WriteHeader(http.StatusOK)
@@ -340,11 +340,11 @@ func ListIndexesHandler(w http.ResponseWriter, r *http.Request) {
 // @Param id path string true "Project ID"
 // @Param db_id path string true "Database ID"
 // @Param collection path string true "Collection Name"
-// @Param request body models.CreateIndexRequest true "Index creation data"
+// @Param request body requests.CreateIndexRequest true "Index creation data"
 // @Success 200
 // @Router /project/{id}/data/{db_id}/{collection}/indexes [post]
 func CreateIndexHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateIndexRequest
+	var req requests.CreateIndexRequest
 	_ = req
 	// TODO: Implement create index logic
 	w.WriteHeader(http.StatusOK)

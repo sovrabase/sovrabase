@@ -17,6 +17,12 @@ type CORSConfig struct {
 func CORSMiddleware(config *CORSConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Ne bloque pas la documentation Swagger pour faciliter le debug.
+			if strings.HasPrefix(r.URL.Path, "/docs") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			// Récupérer le Host header
 			host := r.Host
 
@@ -43,11 +49,22 @@ func CORSMiddleware(config *CORSConfig) func(http.Handler) http.Handler {
 			}
 
 			// Vérification 2: CORS - vérifier les origins autorisées
-			// Si aucune restriction CORS n'est configurée, on autorise tout
+			// Si aucune restriction CORS n'est configurée, on autorise tout et on reflète l'origine pour permettre les cookies.
 			if len(config.AllowedOrigins) == 0 {
 				if origin != "" {
-					log.Printf("⚠️  No CORS origins configured, allowing all origins")
+					w.Header().Set("Vary", "Origin")
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+					w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+					w.Header().Set("Access-Control-Allow-Credentials", "true")
+					w.Header().Set("Access-Control-Max-Age", "3600")
+
+					if r.Method == http.MethodOptions {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
 				}
+
 				log.Printf("✅ Allowed request from: %s (origin: %s)", host, origin)
 				next.ServeHTTP(w, r)
 				return
@@ -78,6 +95,7 @@ func CORSMiddleware(config *CORSConfig) func(http.Handler) http.Handler {
 				}
 
 				// Définir les headers CORS appropriés
+				w.Header().Set("Vary", "Origin")
 				w.Header().Set("Access-Control-Allow-Origin", matchedOrigin)
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")

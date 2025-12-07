@@ -1,4 +1,4 @@
-package models
+package requests
 
 // RegisterRequest represents a user registration request
 type RegisterRequest struct {
@@ -284,16 +284,4 @@ type BroadcastMessageRequest struct {
 type TrackPresenceRequest struct {
 	UserID string                 `json:"user_id" binding:"required"`
 	Data   map[string]interface{} `json:"data,omitempty"`
-}
-
-// CreateUserResponse represents the response when creating a user
-type CreateUserResponse struct {
-	Message string                 `json:"message"`
-	Data    CreateUserResponseData `json:"data"`
-}
-
-// CreateUserResponseData represents the data in create user response
-type CreateUserResponseData struct {
-	ID       string `json:"id"`
-	Password string `json:"password,omitempty"` // Only set if password was not provided in request
 }

@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/ketsuna-org/sovrabase/internal/models"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 )
 
 // ListFunctionsHandler lists all functions in a project
@@ -25,11 +25,11 @@ func ListFunctionsHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.CreateFunctionRequest true "Function creation data"
+// @Param request body requests.CreateFunctionRequest true "Function creation data"
 // @Success 200
 // @Router /project/{id}/functions [post]
 func CreateFunctionHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateFunctionRequest
+	var req requests.CreateFunctionRequest
 	_ = req
 	// TODO: Implement create function logic
 	w.WriteHeader(http.StatusOK)
@@ -56,11 +56,11 @@ func GetFunctionHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param function_id path string true "Function ID"
-// @Param request body models.UpdateFunctionRequest true "Function update data"
+// @Param request body requests.UpdateFunctionRequest true "Function update data"
 // @Success 200
 // @Router /project/{id}/functions/{function_id} [patch]
 func UpdateFunctionHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateFunctionRequest
+	var req requests.UpdateFunctionRequest
 	_ = req
 	// TODO: Implement update function logic
 	w.WriteHeader(http.StatusOK)
@@ -87,11 +87,11 @@ func DeleteFunctionHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param function_id path string true "Function ID"
-// @Param request body models.InvokeFunctionRequest true "Function invocation arguments"
+// @Param request body requests.InvokeFunctionRequest true "Function invocation arguments"
 // @Success 200
 // @Router /project/{id}/functions/{function_id}/invoke [post]
 func InvokeFunctionHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.InvokeFunctionRequest
+	var req requests.InvokeFunctionRequest
 	_ = req
 	// TODO: Implement invoke function logic
 	w.WriteHeader(http.StatusOK)

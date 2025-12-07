@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/ketsuna-org/sovrabase/internal/models"
+	"github.com/ketsuna-org/sovrabase/internal/models/requests"
 )
 
 // GetStorageBucketsHandler gets all storage buckets
@@ -25,11 +25,11 @@ func GetStorageBucketsHandler(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Project ID"
-// @Param request body models.CreateStorageBucketRequest true "Bucket creation data"
+// @Param request body requests.CreateStorageBucketRequest true "Bucket creation data"
 // @Success 200
 // @Router /project/{id}/storage/buckets [post]
 func CreateStorageBucketHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateStorageBucketRequest
+	var req requests.CreateStorageBucketRequest
 	_ = req
 	// TODO: Implement create bucket logic
 	w.WriteHeader(http.StatusOK)
@@ -152,11 +152,11 @@ func CreatePublicURLHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id path string true "Project ID"
 // @Param bucket_id path string true "Bucket ID"
-// @Param request body models.BatchDeleteFilesRequest true "File IDs to delete"
+// @Param request body requests.BatchDeleteFilesRequest true "File IDs to delete"
 // @Success 200
 // @Router /project/{id}/storage/buckets/{bucket_id}/files/delete-batch [post]
 func BatchDeleteFilesHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.BatchDeleteFilesRequest
+	var req requests.BatchDeleteFilesRequest
 	_ = req
 	// TODO: Implement batch delete files logic
 	w.WriteHeader(http.StatusOK)
@@ -171,11 +171,11 @@ func BatchDeleteFilesHandler(w http.ResponseWriter, r *http.Request) {
 // @Param id path string true "Project ID"
 // @Param bucket_id path string true "Bucket ID"
 // @Param file_id path string true "File ID"
-// @Param request body models.UpdateFileMetadataRequest true "Metadata update data"
+// @Param request body requests.UpdateFileMetadataRequest true "Metadata update data"
 // @Success 200
 // @Router /project/{id}/storage/buckets/{bucket_id}/files/{file_id} [patch]
 func UpdateFileMetadataHandler(w http.ResponseWriter, r *http.Request) {
-	var req models.UpdateFileMetadataRequest
+	var req requests.UpdateFileMetadataRequest
 	_ = req
 	// TODO: Implement update file metadata logic
 	w.WriteHeader(http.StatusOK)
