@@ -1,4 +1,4 @@
-.PHONY: build run test clean proto docs
+.PHONY: build run test clean docs
 
 build:
 	go build -o bin/server ./cmd/server
@@ -8,12 +8,6 @@ run:
 
 test:
 	go test ./... -v
-
-proto:
-	protoc \
-  --go_out=pkg --go_opt=paths=source_relative \
-  --go-grpc_out=pkg --go-grpc_opt=paths=source_relative \
-  proto/*.proto
 
 clean:
 	rm -rf bin/*
