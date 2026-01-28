@@ -1,0 +1,9 @@
+basePath: /
+host: localhost:9056
+info:
+  contact: {}
+  description: This is the Sovrabase API server.
+  title: Sovrabase API
+  version: "1.0"
+paths: {}
+swagger: "2.0"
