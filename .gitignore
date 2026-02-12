@@ -46,4 +46,6 @@ server
 # Docs Node.js dependencies
 docs/node_modules/
 docs/package-lock.json
-bin/
+bin/# pixi environments
+.pixi/*
+!.pixi/config.toml

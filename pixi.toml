@@ -1,0 +1,11 @@
+[workspace]
+authors = ["garder500 <jeremy27.clara22@gmail.com>"]
+channels = ["conda-forge"]
+name = "sovrabase"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+go = ">=1.25.2,<1.26"
