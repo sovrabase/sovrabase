@@ -97,6 +97,59 @@ curl -X GET http://localhost:8080/api/project/v1/products \
 | **Hébergement** | Cloud (US/Global) | Self-hostable (NodeJS lourd) | **Self-hostable (Go binaire léger)** |
 | **Performance** | Variable (Cold starts) | Moyenne | **Haute (Compilé, Connection Pooling)** |
 
+## 🔐 Configuration V1 (Core Foundations)
+
+### Clé maitre obligatoire
+
+Le chiffrement des DSN est actif par defaut. Vous devez fournir une cle 32 bytes via variable d'environnement:
+
+```bash
+export SOVRABASE_MASTER_KEY="0123456789abcdef0123456789abcdef"
+```
+
+Formats acceptes:
+- 32 bytes brut (chaine de 32 caracteres)
+- 64 caracteres hex
+- base64 d'une cle de 32 bytes
+
+### Choix du metadata store (SQLite ou PostgreSQL)
+
+Par defaut, Sovrabase utilise SQLite (`metadata_store.driver=sqlite`).
+Vous pouvez basculer en PostgreSQL:
+
+```yaml
+metadata_store:
+  driver: "postgres"
+  postgres:
+    dsn: "postgres://user:password@host:5432/sovrabase?sslmode=disable"
+```
+
+Overrides d'environnement disponibles:
+- `SOVRABASE_METADATA_DRIVER`
+- `SOVRABASE_METADATA_SQLITE_PATH`
+- `SOVRABASE_METADATA_POSTGRES_DSN`
+
+### Mode managed DB via Docker
+
+Deux modes reseau sont supportes:
+- `host_port`: publication automatique de ports sur l'hote
+- `network`: reseau Docker dedie, DSN resolu via nom de conteneur
+
+Config:
+
+```yaml
+provisioning:
+  docker:
+    mode: "host_port" # ou "network"
+    host_address: "127.0.0.1"
+    network_name: "sovrabase-managed"
+```
+
+Overrides d'environnement:
+- `SOVRABASE_DOCKER_MODE`
+- `SOVRABASE_DOCKER_HOST_ADDRESS`
+- `SOVRABASE_DOCKER_NETWORK_NAME`
+
 ## 🛠️ Stack Technique
 
 Construit pour la robustesse et la maintenabilité par une équipe réduite.
