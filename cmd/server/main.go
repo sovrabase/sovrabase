@@ -22,9 +22,11 @@ import (
 
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/core/adapters"
+	coreauth "github.com/ketsuna-org/sovrabase/internal/core/auth"
 	"github.com/ketsuna-org/sovrabase/internal/core/connections"
 	"github.com/ketsuna-org/sovrabase/internal/core/provisioning"
 	"github.com/ketsuna-org/sovrabase/internal/core/security"
+	"github.com/ketsuna-org/sovrabase/internal/httpapi"
 	mongoadapter "github.com/ketsuna-org/sovrabase/internal/infra/adapters/mongo"
 	postgresadapter "github.com/ketsuna-org/sovrabase/internal/infra/adapters/postgres"
 	dockerprovider "github.com/ketsuna-org/sovrabase/internal/infra/provisioning/docker"
@@ -65,6 +67,20 @@ func main() {
 	}
 	if err := metadataStore.Migrate(startupCtx); err != nil {
 		logger.Fatalf("metadata migration failed: %v", err)
+	}
+
+	jwtSecret, err := resolveRequiredSecret(cfg.Auth.JWTSecretEnv)
+	if err != nil {
+		logger.Fatalf("jwt secret error: %v", err)
+	}
+
+	authService, err := coreauth.NewService(coreauth.ServiceDeps{
+		Store:     metadataStore,
+		JWTSecret: jwtSecret,
+		TokenTTL:  24 * time.Hour,
+	})
+	if err != nil {
+		logger.Fatalf("auth service init error: %v", err)
 	}
 
 	targetAdapters, err := adapters.NewRegistry(
@@ -116,26 +132,27 @@ func main() {
 	}
 	_ = service
 
+	bootstrapRequired, err := authService.GetConfigState(startupCtx)
+	if err != nil {
+		logger.Fatalf("bootstrap state check failed: %v", err)
+	}
+	if bootstrapRequired {
+		logger.Printf("no admin user configured. bootstrap required via POST /config")
+	} else {
+		logger.Printf("admin bootstrap already configured. login available via POST /auth/login")
+	}
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-
-	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-
-		if err := metadataStore.Ping(ctx); err != nil {
-			http.Error(w, "metadata store unavailable", http.StatusServiceUnavailable)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ready"))
-	})
+	if err := httpapi.RegisterRoutes(mux, httpapi.Dependencies{
+		Config:                  cfg,
+		AuthService:             authService,
+		MetadataPinger:          metadataStore,
+		Logger:                  logger,
+		EncryptionKeyConfigured: true,
+		JWTSigningKeyConfigured: true,
+	}); err != nil {
+		logger.Fatalf("register routes failed: %v", err)
+	}
 
 	address := net.JoinHostPort(cfg.Server.Host, strconv.Itoa(cfg.Server.Port))
 	server := &http.Server{
@@ -161,6 +178,18 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Printf("http shutdown error: %v", err)
 	}
+}
+
+func resolveRequiredSecret(envName string) (string, error) {
+	name := envName
+	if name == "" {
+		return "", errors.New("secret env variable name is required")
+	}
+	value := os.Getenv(name)
+	if value == "" {
+		return "", fmt.Errorf("missing required secret env %q", name)
+	}
+	return value, nil
 }
 
 func openMetadataStore(cfg config.Config) (*sqlstore.Store, error) {

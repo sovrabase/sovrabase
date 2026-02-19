@@ -112,6 +112,34 @@ Formats acceptes:
 - 64 caracteres hex
 - base64 d'une cle de 32 bytes
 
+### Secret JWT obligatoire
+
+L'authentification admin utilise un secret dedie:
+
+```bash
+export SOVRABASE_JWT_SECRET="change-me-in-production"
+```
+
+La variable est obligatoire au demarrage.
+
+### Flux bootstrap admin (`/config`)
+
+Au premier demarrage, si aucun admin n'existe:
+- `GET /config` retourne `bootstrap_required=true`
+- `POST /config` cree le premier admin et renvoie un JWT
+
+Une fois initialise:
+- `GET /config` retourne `bootstrap_required=false`
+- utilisez `POST /auth/login` pour vous connecter
+
+Exemple bootstrap:
+
+```bash
+curl -X POST http://localhost:8080/config \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"very-strong-password"}'
+```
+
 ### Choix du metadata store (SQLite ou PostgreSQL)
 
 Par defaut, Sovrabase utilise SQLite (`metadata_store.driver=sqlite`).

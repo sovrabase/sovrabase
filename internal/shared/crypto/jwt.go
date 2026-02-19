@@ -35,11 +35,20 @@ func CheckPassword(password, hash string) bool {
 
 // Générateur de Token unique
 func GenerateToken(userID string, tType TokenType, secret string) (string, error) {
+	return GenerateTokenWithRole(userID, "", tType, secret, 24*time.Hour)
+}
+
+func GenerateTokenWithRole(userID, role string, tType TokenType, secret string, ttl time.Duration) (string, error) {
+	if ttl <= 0 {
+		ttl = 24 * time.Hour
+	}
+
 	claims := Claims{
 		UserID: userID,
 		Type:   tType,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

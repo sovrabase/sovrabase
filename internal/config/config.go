@@ -19,6 +19,7 @@ type Config struct {
 	Server       ServerConfig       `yaml:"server"`
 	Metadata     MetadataStore      `yaml:"metadata_store"`
 	Core         CoreConfig         `yaml:"core"`
+	Auth         AuthConfig         `yaml:"auth"`
 	Provisioning ProvisioningConfig `yaml:"provisioning"`
 }
 
@@ -45,6 +46,10 @@ type CoreConfig struct {
 	MasterKeyEnv string `yaml:"master_key_env"`
 	CacheTTL     string `yaml:"cache_ttl"`
 	Sweep        string `yaml:"sweep_interval"`
+}
+
+type AuthConfig struct {
+	JWTSecretEnv string `yaml:"jwt_secret_env"`
 }
 
 type ProvisioningConfig struct {
@@ -81,6 +86,9 @@ func Default() Config {
 			MasterKeyEnv: "SOVRABASE_MASTER_KEY",
 			CacheTTL:     "15m",
 			Sweep:        "1m",
+		},
+		Auth: AuthConfig{
+			JWTSecretEnv: "SOVRABASE_JWT_SECRET",
 		},
 		Provisioning: ProvisioningConfig{
 			DefaultProvider: "docker",
@@ -157,6 +165,9 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.Core.MasterKeyEnv) == "" {
 		return errors.New("core.master_key_env is required")
 	}
+	if strings.TrimSpace(c.Auth.JWTSecretEnv) == "" {
+		return errors.New("auth.jwt_secret_env is required")
+	}
 
 	cacheTTL, err := c.CacheTTLDuration()
 	if err != nil {
@@ -230,5 +241,8 @@ func applyEnvOverrides(cfg *Config) {
 		if port, err := strconv.Atoi(value); err == nil {
 			cfg.Server.Port = port
 		}
+	}
+	if value := os.Getenv("SOVRABASE_AUTH_JWT_SECRET_ENV"); value != "" {
+		cfg.Auth.JWTSecretEnv = value
 	}
 }

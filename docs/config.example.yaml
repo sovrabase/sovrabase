@@ -14,6 +14,9 @@ core:
   cache_ttl: "15m"
   sweep_interval: "1m"
 
+auth:
+  jwt_secret_env: "SOVRABASE_JWT_SECRET"
+
 provisioning:
   default_provider: "docker"
   docker:
