@@ -28,6 +28,7 @@ type Dependencies struct {
 	AuthService             coreauth.Service
 	MetadataPinger          MetadataPinger
 	Logger                  Logger
+	JWTSecret               string
 	EncryptionKeyConfigured bool
 	JWTSigningKeyConfigured bool
 }
@@ -44,6 +45,9 @@ func RegisterRoutes(mux *http.ServeMux, deps Dependencies) error {
 	}
 	if deps.Logger == nil {
 		return errors.New("logger is required")
+	}
+	if deps.JWTSecret == "" {
+		return errors.New("jwt secret is required")
 	}
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -82,6 +86,13 @@ func RegisterRoutes(mux *http.ServeMux, deps Dependencies) error {
 		}
 		handleAuthLogin(w, r, deps)
 	})
+
+	mux.HandleFunc(adminPrefix+"/", requireAdminJWT(func(w http.ResponseWriter, r *http.Request) {
+		handleAdminAPI(w, r, deps)
+	}, deps))
+	mux.HandleFunc(adminPrefix, requireAdminJWT(func(w http.ResponseWriter, r *http.Request) {
+		handleAdminAPI(w, r, deps)
+	}, deps))
 
 	return nil
 }

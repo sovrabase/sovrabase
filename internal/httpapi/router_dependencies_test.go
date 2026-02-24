@@ -55,6 +55,7 @@ func TestRegisterRoutesDependencies(t *testing.T) {
 				AuthService:             &fakeAuthService{},
 				MetadataPinger:          fakePinger{},
 				Logger:                  &fakeLogger{},
+				JWTSecret:               "test-secret",
 				EncryptionKeyConfigured: true,
 				JWTSigningKeyConfigured: true,
 			},

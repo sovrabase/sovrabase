@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -53,4 +54,21 @@ func GenerateTokenWithRole(userID, role string, tType TokenType, secret string, 
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
+}
+
+func ParseToken(tokenRaw, secret string) (Claims, error) {
+	parsed, err := jwt.ParseWithClaims(tokenRaw, &Claims{}, func(token *jwt.Token) (any, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, errors.New("unexpected jwt signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil {
+		return Claims{}, err
+	}
+	claims, ok := parsed.Claims.(*Claims)
+	if !ok || !parsed.Valid {
+		return Claims{}, errors.New("invalid jwt claims")
+	}
+	return *claims, nil
 }

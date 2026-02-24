@@ -57,6 +57,7 @@ func TestPostConfigStatuses(t *testing.T) {
 				AuthService:             authSvc,
 				MetadataPinger:          fakePinger{err: nil},
 				Logger:                  &fakeLogger{},
+				JWTSecret:               "test-secret",
 				EncryptionKeyConfigured: true,
 				JWTSigningKeyConfigured: true,
 			})
@@ -133,6 +134,7 @@ func TestPostAuthLoginStatuses(t *testing.T) {
 				AuthService:             authSvc,
 				MetadataPinger:          fakePinger{err: nil},
 				Logger:                  &fakeLogger{},
+				JWTSecret:               "test-secret",
 				EncryptionKeyConfigured: true,
 				JWTSigningKeyConfigured: true,
 			})

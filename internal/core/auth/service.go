@@ -21,6 +21,31 @@ type Service interface {
 	GetConfigState(ctx context.Context) (bootstrapRequired bool, err error)
 	BootstrapFirstAdmin(ctx context.Context, email, password string) (AuthResult, error)
 	Login(ctx context.Context, email, password string) (AuthResult, error)
+	CreateAdmin(ctx context.Context, actorUserID, email, password string) (User, error)
+	CreateUser(ctx context.Context, input CreateUserInput) (User, error)
+	ListUsers(ctx context.Context, actorUserID string) ([]User, error)
+	GetUser(ctx context.Context, actorUserID, userID string) (User, error)
+	UpdateUser(ctx context.Context, input UpdateUserInput) (User, error)
+	DeleteUser(ctx context.Context, actorUserID, userID string) error
+
+	CreateRole(ctx context.Context, input CreateRoleInput) (RoleRecord, error)
+	ListRoles(ctx context.Context, actorUserID string) ([]RoleRecord, error)
+	GetRole(ctx context.Context, actorUserID, roleID string) (RoleRecord, error)
+	UpdateRole(ctx context.Context, input UpdateRoleInput) (RoleRecord, error)
+	DeleteRole(ctx context.Context, actorUserID, roleID string) error
+
+	CreateScope(ctx context.Context, input CreateScopeInput) (ScopeRecord, error)
+	ListScopes(ctx context.Context, actorUserID string) ([]ScopeRecord, error)
+	GetScope(ctx context.Context, actorUserID, scopeID string) (ScopeRecord, error)
+	UpdateScope(ctx context.Context, input UpdateScopeInput) (ScopeRecord, error)
+	DeleteScope(ctx context.Context, actorUserID, scopeID string) error
+
+	AssignRoleToUser(ctx context.Context, actorUserID, userID, roleID string) error
+	RemoveRoleFromUser(ctx context.Context, actorUserID, userID, roleID string) error
+	AssignScopeToRole(ctx context.Context, actorUserID, roleID, scopeID string) error
+	RemoveScopeFromRole(ctx context.Context, actorUserID, roleID, scopeID string) error
+
+	Authorize(ctx context.Context, actorUserID, scope string) error
 }
 
 type ServiceDeps struct {
@@ -174,4 +199,22 @@ func validatePassword(password string) error {
 		return fmt.Errorf("%w: password must be at least %d characters", ErrInvalidInput, minPasswordLength)
 	}
 	return nil
+}
+
+func validateRole(role UserRole) error {
+	switch role {
+	case UserRoleAdmin, UserRoleUser, UserRoleSvc:
+		return nil
+	default:
+		return fmt.Errorf("%w: unsupported role", ErrInvalidInput)
+	}
+}
+
+func validateAccountType(accountType AccountType) error {
+	switch accountType {
+	case AccountTypeAdmin, AccountTypeEndUser, AccountTypeService:
+		return nil
+	default:
+		return fmt.Errorf("%w: unsupported account_type", ErrInvalidInput)
+	}
 }

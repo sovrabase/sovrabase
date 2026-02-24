@@ -77,7 +77,7 @@ func runServerLifecycle(ctx context.Context, cfg config.Config, logger *log.Logg
 		return err
 	}
 
-	handler, err := buildHTTPHandler(cfg, authService, metadataStore, logger)
+	handler, err := buildHTTPHandler(cfg, authService, metadataStore, logger, jwtSecret)
 	if err != nil {
 		return err
 	}
@@ -237,13 +237,14 @@ func logBootstrapState(ctx context.Context, authService coreauth.Service, logger
 	return nil
 }
 
-func buildHTTPHandler(cfg config.Config, authService coreauth.Service, metadataStore *sqlstore.Store, logger *log.Logger) (http.Handler, error) {
+func buildHTTPHandler(cfg config.Config, authService coreauth.Service, metadataStore *sqlstore.Store, logger *log.Logger, jwtSecret string) (http.Handler, error) {
 	mux := http.NewServeMux()
 	if err := httpapi.RegisterRoutes(mux, httpapi.Dependencies{
 		Config:                  cfg,
 		AuthService:             authService,
 		MetadataPinger:          metadataStore,
 		Logger:                  logger,
+		JWTSecret:               jwtSecret,
 		EncryptionKeyConfigured: true,
 		JWTSigningKeyConfigured: true,
 	}); err != nil {

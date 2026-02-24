@@ -28,6 +28,7 @@ func TestGetConfigBootstrapRequired(t *testing.T) {
 		AuthService:             authSvc,
 		MetadataPinger:          fakePinger{err: nil},
 		Logger:                  logger,
+		JWTSecret:               "test-secret",
 		EncryptionKeyConfigured: true,
 		JWTSigningKeyConfigured: true,
 	})
@@ -87,6 +88,7 @@ func TestGetConfigConfigured(t *testing.T) {
 		AuthService:             authSvc,
 		MetadataPinger:          fakePinger{err: nil},
 		Logger:                  &fakeLogger{},
+		JWTSecret:               "test-secret",
 		EncryptionKeyConfigured: true,
 		JWTSigningKeyConfigured: true,
 	})
@@ -134,6 +136,90 @@ func (f *fakeAuthService) BootstrapFirstAdmin(context.Context, string, string) (
 
 func (f *fakeAuthService) Login(context.Context, string, string) (coreauth.AuthResult, error) {
 	return f.loginResult, f.loginErr
+}
+
+func (f *fakeAuthService) CreateAdmin(context.Context, string, string, string) (coreauth.User, error) {
+	return coreauth.User{}, nil
+}
+
+func (f *fakeAuthService) CreateUser(context.Context, coreauth.CreateUserInput) (coreauth.User, error) {
+	return coreauth.User{}, nil
+}
+
+func (f *fakeAuthService) ListUsers(context.Context, string) ([]coreauth.User, error) {
+	return []coreauth.User{}, nil
+}
+
+func (f *fakeAuthService) GetUser(context.Context, string, string) (coreauth.User, error) {
+	return coreauth.User{}, nil
+}
+
+func (f *fakeAuthService) UpdateUser(context.Context, coreauth.UpdateUserInput) (coreauth.User, error) {
+	return coreauth.User{}, nil
+}
+
+func (f *fakeAuthService) DeleteUser(context.Context, string, string) error {
+	return nil
+}
+
+func (f *fakeAuthService) CreateRole(context.Context, coreauth.CreateRoleInput) (coreauth.RoleRecord, error) {
+	return coreauth.RoleRecord{}, nil
+}
+
+func (f *fakeAuthService) ListRoles(context.Context, string) ([]coreauth.RoleRecord, error) {
+	return []coreauth.RoleRecord{}, nil
+}
+
+func (f *fakeAuthService) GetRole(context.Context, string, string) (coreauth.RoleRecord, error) {
+	return coreauth.RoleRecord{}, nil
+}
+
+func (f *fakeAuthService) UpdateRole(context.Context, coreauth.UpdateRoleInput) (coreauth.RoleRecord, error) {
+	return coreauth.RoleRecord{}, nil
+}
+
+func (f *fakeAuthService) DeleteRole(context.Context, string, string) error {
+	return nil
+}
+
+func (f *fakeAuthService) CreateScope(context.Context, coreauth.CreateScopeInput) (coreauth.ScopeRecord, error) {
+	return coreauth.ScopeRecord{}, nil
+}
+
+func (f *fakeAuthService) ListScopes(context.Context, string) ([]coreauth.ScopeRecord, error) {
+	return []coreauth.ScopeRecord{}, nil
+}
+
+func (f *fakeAuthService) GetScope(context.Context, string, string) (coreauth.ScopeRecord, error) {
+	return coreauth.ScopeRecord{}, nil
+}
+
+func (f *fakeAuthService) UpdateScope(context.Context, coreauth.UpdateScopeInput) (coreauth.ScopeRecord, error) {
+	return coreauth.ScopeRecord{}, nil
+}
+
+func (f *fakeAuthService) DeleteScope(context.Context, string, string) error {
+	return nil
+}
+
+func (f *fakeAuthService) AssignRoleToUser(context.Context, string, string, string) error {
+	return nil
+}
+
+func (f *fakeAuthService) RemoveRoleFromUser(context.Context, string, string, string) error {
+	return nil
+}
+
+func (f *fakeAuthService) AssignScopeToRole(context.Context, string, string, string) error {
+	return nil
+}
+
+func (f *fakeAuthService) RemoveScopeFromRole(context.Context, string, string, string) error {
+	return nil
+}
+
+func (f *fakeAuthService) Authorize(context.Context, string, string) error {
+	return nil
 }
 
 type fakePinger struct {

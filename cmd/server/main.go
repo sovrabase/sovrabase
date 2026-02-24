@@ -5,6 +5,9 @@
 //	@description	This is the Sovrabase API server.
 //	@host			localhost:9056
 //	@BasePath		/
+//	@securityDefinitions.apikey	BearerAuth
+//	@in		header
+//	@name		Authorization
 package main
 
 import (

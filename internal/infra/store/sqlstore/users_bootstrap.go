@@ -39,7 +39,9 @@ func (s *Store) CreateFirstAdmin(ctx context.Context, email, passwordHash string
 		Email:        email,
 		PasswordHash: passwordHash,
 		Role:         coreauth.UserRoleAdmin,
+		AccountType:  coreauth.AccountTypeAdmin,
 		IsRoot:       true,
+		IsActive:     true,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -71,6 +73,8 @@ func (s *Store) CreateFirstAdmin(ctx context.Context, email, passwordHash string
 		user.Email,
 		user.PasswordHash,
 		string(user.Role),
+		string(user.AccountType),
+		s.boolTrue(),
 		s.boolTrue(),
 		user.CreatedAt,
 		user.UpdatedAt,
@@ -87,55 +91,16 @@ func (s *Store) CreateFirstAdmin(ctx context.Context, email, passwordHash string
 		return coreauth.User{}, coreauth.ErrBootstrapAlreadyDone
 	}
 
+	if err := s.assignDefaultRoleByNameTx(ctx, tx, user.ID, string(user.Role), now); err != nil {
+		return coreauth.User{}, err
+	}
+
 	if commitErr := tx.Commit(); commitErr != nil {
 		return coreauth.User{}, fmt.Errorf("commit create first admin transaction: %w", commitErr)
 	}
 	committed = true
 
 	return user, nil
-}
-
-func (s *Store) GetByEmail(ctx context.Context, email string) (coreauth.User, error) {
-	if strings.TrimSpace(email) == "" {
-		return coreauth.User{}, fmt.Errorf("%w: email is required", coreauth.ErrInvalidInput)
-	}
-
-	query := fmt.Sprintf(`SELECT %s FROM sb_users WHERE email = %s LIMIT 1`, userColumns(), s.placeholder(1))
-	row := s.db.QueryRowContext(ctx, query, email)
-	user, err := scanUserRow(row.Scan)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return coreauth.User{}, coreauth.ErrUserNotFound
-		}
-		return coreauth.User{}, err
-	}
-	return user, nil
-}
-
-func (s *Store) TouchLastLogin(ctx context.Context, userID string, at time.Time) error {
-	if strings.TrimSpace(userID) == "" {
-		return fmt.Errorf("%w: user id is required", coreauth.ErrInvalidInput)
-	}
-
-	query := fmt.Sprintf(
-		`UPDATE sb_users SET last_login_at = %s, updated_at = %s WHERE id = %s`,
-		s.placeholder(1),
-		s.placeholder(2),
-		s.placeholder(3),
-	)
-
-	res, err := s.db.ExecContext(ctx, query, at, time.Now().UTC(), userID)
-	if err != nil {
-		return fmt.Errorf("update user last login: %w", err)
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("update user last login rows affected: %w", err)
-	}
-	if affected == 0 {
-		return coreauth.ErrUserNotFound
-	}
-	return nil
 }
 
 func (s *Store) bootstrapRequiredTx(ctx context.Context, tx *sql.Tx) (bool, error) {
@@ -154,85 +119,13 @@ func (s *Store) bootstrapRequiredTx(ctx context.Context, tx *sql.Tx) (bool, erro
 func (s *Store) insertFirstAdminQuery() string {
 	if s.dialect == DialectPostgres {
 		return `INSERT INTO sb_users (
-  id, email, password_hash, role, is_root, created_at, updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
+  id, email, password_hash, role, account_type, is_root, is_active, created_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT DO NOTHING`
 	}
 	return `INSERT OR IGNORE INTO sb_users (
-  id, email, password_hash, role, is_root, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?)`
-}
-
-func userColumns() string {
-	return strings.Join([]string{
-		"id",
-		"email",
-		"password_hash",
-		"role",
-		"is_root",
-		"last_login_at",
-		"created_at",
-		"updated_at",
-	}, ", ")
-}
-
-func scanUserRow(scanFn func(dest ...any) error) (coreauth.User, error) {
-	var (
-		id           string
-		email        string
-		passwordHash string
-		roleRaw      string
-		isRootRaw    any
-		lastLoginRaw any
-		createdAtRaw any
-		updatedAtRaw any
-	)
-
-	if err := scanFn(
-		&id,
-		&email,
-		&passwordHash,
-		&roleRaw,
-		&isRootRaw,
-		&lastLoginRaw,
-		&createdAtRaw,
-		&updatedAtRaw,
-	); err != nil {
-		return coreauth.User{}, err
-	}
-
-	isRoot, err := decodeBool(isRootRaw)
-	if err != nil {
-		return coreauth.User{}, err
-	}
-	lastLoginAt, err := decodeOptionalTime(lastLoginRaw)
-	if err != nil {
-		return coreauth.User{}, err
-	}
-	createdAt, err := decodeRequiredTime(createdAtRaw)
-	if err != nil {
-		return coreauth.User{}, err
-	}
-	updatedAt, err := decodeRequiredTime(updatedAtRaw)
-	if err != nil {
-		return coreauth.User{}, err
-	}
-
-	role := coreauth.UserRole(roleRaw)
-	if role != coreauth.UserRoleAdmin {
-		return coreauth.User{}, fmt.Errorf("unsupported user role %q", roleRaw)
-	}
-
-	return coreauth.User{
-		ID:           id,
-		Email:        email,
-		PasswordHash: passwordHash,
-		Role:         role,
-		IsRoot:       isRoot,
-		LastLoginAt:  lastLoginAt,
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
-	}, nil
+  id, email, password_hash, role, account_type, is_root, is_active, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 }
 
 func (s *Store) boolTrue() any {
