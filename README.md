@@ -140,6 +140,49 @@ curl -X POST http://localhost:8080/config \
   -d '{"email":"admin@example.com","password":"very-strong-password"}'
 ```
 
+### CLI local admin (sans token)
+
+Le binaire `sovrabase` expose aussi un mode CLI local qui appelle directement les services internes.
+
+Verifier l'etat bootstrap:
+
+```bash
+sovrabase config status
+```
+
+Bootstrap initial (cree le premier admin et enregistre l'acteur CLI):
+
+```bash
+sovrabase admin bootstrap --name "admin@example.com" --password "very-strong-password"
+```
+
+Exemples de commandes admin:
+
+```bash
+sovrabase admin create-user --name "user@example.com" --password "another-strong-password" --role "admin"
+sovrabase admin list-users
+sovrabase admin create-role --name "manager" --description "Manager role"
+sovrabase admin create-scope --key "users.read" --description "Read users"
+```
+
+Connexion locale (enregistre l'acteur CLI, sans gestion de token manuel):
+
+```bash
+sovrabase auth login --name "admin@example.com" --password "very-strong-password"
+```
+
+Si aucun admin n'est initialise, les commandes admin retournent:
+
+```text
+You should have an admin before performing such commands
+```
+
+Le mode serveur HTTP reste disponible via:
+
+```bash
+sovrabase serve
+```
+
 ### Choix du metadata store (SQLite ou PostgreSQL)
 
 Par defaut, Sovrabase utilise SQLite (`metadata_store.driver=sqlite`).
