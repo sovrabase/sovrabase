@@ -902,3 +902,267 @@ textarea:focus { outline: none; border-color: var(--border-focus); }
 .chip-btn:active {
   transform: none;
 }
+
+/* OAuth advanced toggle arrow rotation */
+#oauth-advanced-toggle.open span {
+  transform: rotate(90deg);
+}
+
+/* ====== OAUTH PROVIDER REDESIGN ====== */
+
+/* Preset picker grid */
+.oauth-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.oauth-preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 8px 10px;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: capitalize;
+  position: relative;
+  overflow: hidden;
+}
+.oauth-preset-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--preset-color, var(--accent));
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.oauth-preset-btn:hover {
+  border-color: var(--preset-color, var(--accent));
+  color: var(--text-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.oauth-preset-btn:hover::before { opacity: 0.07; }
+.oauth-preset-btn.selected {
+  border-color: var(--preset-color, var(--accent));
+  background: var(--bg-card-elevated);
+  color: var(--text-primary);
+}
+.oauth-preset-btn.selected::before { opacity: 0.1; }
+.oauth-preset-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+.oauth-preset-label {
+  position: relative;
+  z-index: 1;
+}
+
+/* OAuth provider card in list */
+.oauth-provider-card-v2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-card-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 8px;
+  transition: all 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+.oauth-provider-card-v2::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--provider-color, var(--accent));
+  border-radius: 0 2px 2px 0;
+}
+.oauth-provider-card-v2:hover {
+  border-color: var(--border-light);
+  background: var(--bg-card-hover);
+  transform: translateX(2px);
+}
+.oauth-provider-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--provider-bg, rgba(91,91,255,0.12));
+  flex-shrink: 0;
+}
+.oauth-provider-info { flex: 1; min-width: 0; }
+.oauth-provider-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: capitalize;
+  margin-bottom: 3px;
+}
+.oauth-provider-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.oauth-provider-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+.oauth-provider-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Empty state for oauth list */
+.oauth-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 20px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+.oauth-empty-icon {
+  font-size: 36px;
+  opacity: 0.5;
+}
+.oauth-empty-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 260px;
+  line-height: 1.5;
+}
+
+/* OAuth modal content styles */
+.modal-content {
+  background: var(--bg-card-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  width: 92%;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  animation: modalSlideUp 0.25s ease;
+}
+.oauth-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+.oauth-section-divider span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.oauth-section-divider::before,
+.oauth-section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+/* Field mapping grid */
+.oauth-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+/* Advanced toggle button */
+.oauth-advanced-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font);
+  transition: color 0.18s ease;
+}
+.oauth-advanced-toggle-btn:hover { color: var(--text-primary); }
+.oauth-adv-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 9px;
+  transition: transform 0.2s ease, background 0.18s ease;
+}
+.oauth-advanced-toggle-btn.open .oauth-adv-arrow {
+  transform: rotate(90deg);
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Redirect URL copy row */
+.oauth-redirect-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.oauth-redirect-row input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px !important;
+}
+.oauth-copy-btn {
+  padding: 0 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+}
+.oauth-copy-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+

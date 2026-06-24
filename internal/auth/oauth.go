@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
@@ -180,6 +181,153 @@ func (p *GitHubProvider) Exchange(ctx context.Context, code string) (*OAuthUserI
 		AvatarURL:  ghUser.AvatarURL,
 		ProviderID: fmt.Sprintf("%d", ghUser.ID),
 	}, nil
+}
+
+// OAuthProviderConfig holds the configuration for any OAuth2-compliant provider.
+type OAuthProviderConfig struct {
+	Name         string   `json:"name"`
+	ClientID     string   `json:"client_id"`
+	ClientSecret string   `json:"client_secret"`
+	RedirectURL  string   `json:"redirect_url"`
+	AuthURL      string   `json:"auth_url"`
+	TokenURL     string   `json:"token_url"`
+	UserInfoURL  string   `json:"userinfo_url"`
+	Scopes       []string `json:"scopes"`
+	EmailField   string   `json:"email_field"`
+	NameField    string   `json:"name_field"`
+	AvatarField  string   `json:"avatar_field"`
+	IDField      string   `json:"id_field"`
+}
+
+// GenericOAuthProvider implements OAuthProvider for any OAuth2-compliant provider.
+type GenericOAuthProvider struct {
+	config      *oauth2.Config
+	userInfoURL string
+	emailField  string
+	nameField   string
+	avatarField string
+	idField     string
+}
+
+// NewGenericOAuthProvider creates a provider from configuration.
+func NewGenericOAuthProvider(cfg OAuthProviderConfig) (*GenericOAuthProvider, error) {
+	if cfg.Name == "" || cfg.ClientID == "" || cfg.ClientSecret == "" {
+		return nil, fmt.Errorf("generic oauth: name, client_id, and client_secret are required")
+	}
+	// Use defaults for well-known providers if fields are empty
+	emailField := cfg.EmailField
+	nameField := cfg.NameField
+	avatarField := cfg.AvatarField
+	idField := cfg.IDField
+	if emailField == "" {
+		emailField = "email"
+	}
+	if nameField == "" {
+		nameField = "name"
+	}
+	if avatarField == "" {
+		avatarField = "avatar_url"
+	}
+	if idField == "" {
+		idField = "id"
+	}
+
+	return &GenericOAuthProvider{
+		config: &oauth2.Config{
+			ClientID:     cfg.ClientID,
+			ClientSecret: cfg.ClientSecret,
+			RedirectURL:  cfg.RedirectURL,
+			Scopes:       cfg.Scopes,
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  cfg.AuthURL,
+				TokenURL: cfg.TokenURL,
+			},
+		},
+		userInfoURL: cfg.UserInfoURL,
+		emailField:  emailField,
+		nameField:   nameField,
+		avatarField: avatarField,
+		idField:     idField,
+	}, nil
+}
+
+// GetAuthURL returns the authorization URL.
+func (p *GenericOAuthProvider) GetAuthURL(state string) string {
+	return p.config.AuthCodeURL(state)
+}
+
+// Exchange swaps the code for a token and fetches the user profile.
+func (p *GenericOAuthProvider) Exchange(ctx context.Context, code string) (*OAuthUserInfo, error) {
+	token, err := p.config.Exchange(ctx, code)
+	if err != nil {
+		return nil, fmt.Errorf("oauth exchange: %w", err)
+	}
+
+	client := p.config.Client(ctx, token)
+	resp, err := client.Get(p.userInfoURL)
+	if err != nil {
+		return nil, fmt.Errorf("userinfo fetch: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("userinfo returned status %d", resp.StatusCode)
+	}
+
+	var raw map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("userinfo decode: %w", err)
+	}
+
+	// Extract fields using configured paths (support nested like "data.email")
+	getField := func(field string) string {
+		val, _ := getNestedField(raw, field)
+		if s, ok := val.(string); ok {
+			return s
+		}
+		// Handle numeric IDs
+		if f, ok := val.(float64); ok {
+			return fmt.Sprintf("%.0f", f)
+		}
+		return ""
+	}
+
+	email := getField(p.emailField)
+	if email == "" {
+		return nil, fmt.Errorf("oauth: email not found in userinfo (field: %s)", p.emailField)
+	}
+
+	providerID := getField(p.idField)
+	if providerID == "" {
+		// Fall back to email hash as ID
+		providerID = email
+	}
+
+	return &OAuthUserInfo{
+		Email:      email,
+		Name:       getField(p.nameField),
+		AvatarURL:  getField(p.avatarField),
+		ProviderID: providerID,
+	}, nil
+}
+
+// getNestedField retrieves a nested field from a map using dot notation
+// e.g. "data.email" → raw["data"]["email"]
+func getNestedField(data map[string]interface{}, path string) (interface{}, bool) {
+	parts := strings.Split(path, ".")
+	var current interface{} = data
+	for _, part := range parts {
+		m, ok := current.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		val, ok := m[part]
+		if !ok {
+			return nil, false
+		}
+		current = val
+	}
+	return current, true
 }
 
 // getPrimaryEmail fetches the primary verified email from GitHub when the

@@ -73,6 +73,7 @@ type AuthService interface {
 	ValidateAccessToken(tokenString string) (*UserClaims, error)
 	GetUser(id string) (*UserInfo, error)
 	CreateOAuthState(provider string) (string, error)
+	CreateOAuthStateURL(provider string) (authURL, state string, err error)
 	HandleOAuthCallback(provider, code, state string) (*UserInfo, *TokenPair, error)
 	VerifyEmail(token string) error
 	ForgotPassword(email string) (string, error)

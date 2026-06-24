@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -38,6 +39,7 @@ type Project struct {
 	ReplGroup    string    `json:"repl_group"` // replication group identifier
 	StorageQuota int64  `json:"storage_quota"`   // in bytes
 	AllowOrigins string `json:"allow_origins"` // comma-separated allowed origins for CORS
+	OAuthProviders []auth.OAuthProviderConfig `json:"oauth_providers"`
 }
 
 // ProjectEnv holds project-specific database, auth service, and storage driver.
@@ -201,6 +203,19 @@ func (pm *ProjectManager) UpdateProject(proj *Project) error {
 }
 
 // DeleteProject marks a project as deleted and removes its data.
+
+// ReloadProjectEnv closes and removes the cached env for a project, forcing
+// recreation on the next GetProjectEnv call (e.g. after OAuth config changes).
+func (pm *ProjectManager) ReloadProjectEnv(id string) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	if env, ok := pm.envs[id]; ok {
+		_ = env.Engine.Close()
+		delete(pm.envs, id)
+	}
+}
+
+// DeleteProject marks a project as deleted and removes its data.
 func (pm *ProjectManager) DeleteProject(id string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -359,6 +374,16 @@ func (pm *ProjectManager) GetProjectEnv(id string) (*ProjectEnv, error) {
 	authSvc.SMTPUser = os.Getenv("SOVRABASE_SMTP_USER")
 	authSvc.SMTPPassword = os.Getenv("SOVRABASE_SMTP_PASSWORD")
 	authSvc.SMTPSender = os.Getenv("SOVRABASE_SMTP_SENDER")
+
+	// Register per-project OAuth providers
+	for _, pCfg := range proj.OAuthProviders {
+		provider, err := auth.NewGenericOAuthProvider(pCfg)
+		if err != nil {
+			slog.Warn("Failed to create OAuth provider for project", "project_id", id, "provider", pCfg.Name, "error", err)
+			continue
+		}
+		authSvc.RegisterOAuthProvider(pCfg.Name, provider)
+	}
 
 	// 5. Initialize storage driver
 	var storageDriver storage.Driver

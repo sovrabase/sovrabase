@@ -12,6 +12,7 @@ let activeProjectEnv = {
   documents: [],
   
   users: [],
+  oauthProviders: [],
   
   buckets: [],
   selectedBucket: null,
@@ -392,7 +393,7 @@ async function switchProjectDetailTab(name) {
   if (panel) panel.classList.add('active');
 
   if (name === 'database') await loadCollections();
-  if (name === 'auth') await loadUsers();
+  if (name === 'auth') { await loadUsers(); await loadOAuthProviders(); }
   if (name === 'storage') await loadBuckets();
   if (name === 'logs') await loadProjectLogs();
 }

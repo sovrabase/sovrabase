@@ -185,6 +185,24 @@ func (s *AuthService) CreateOAuthState(provider string) (string, error) {
 	return state, nil
 }
 
+// CreateOAuthStateURL generates a state token and returns the full authorization
+// URL to redirect the user to for the given provider.
+func (s *AuthService) CreateOAuthStateURL(provider string) (authURL, state string, err error) {
+	p, ok := s.providers[provider]
+	if !ok {
+		return "", "", fmt.Errorf("unknown OAuth provider: %s", provider)
+	}
+
+	state, err = s.CreateOAuthState(provider)
+	if err != nil {
+		return "", "", err
+	}
+
+	authURL = p.GetAuthURL(state)
+	return authURL, state, nil
+}
+
+
 // HandleOAuthCallback completes an OAuth flow: validates the state, exchanges
 // the code, and either finds or creates a user. Returns the user and a token pair.
 func (s *AuthService) HandleOAuthCallback(provider, code, state string) (*User, *TokenPair, error) {

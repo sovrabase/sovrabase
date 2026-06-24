@@ -165,6 +165,10 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/projects/{id}/users", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateUser))))
 	mux.Handle("DELETE /admin/projects/{id}/users/{userId}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteUser))))
 
+	// OAuth provider management endpoints
+	mux.Handle("GET /admin/projects/{id}/auth/providers", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListOAuthProviders))))
+	mux.Handle("PUT /admin/projects/{id}/auth/providers", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleSetOAuthProviders))))
+
 	// Storage management endpoints
 	mux.Handle("GET /admin/projects/{id}/storage/buckets", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListBuckets))))
 	mux.Handle("POST /admin/projects/{id}/storage/buckets", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateBucket))))
@@ -1332,4 +1336,105 @@ func copyDir(src, dst string) error {
 		}
 	}
 	return nil
+}
+
+func (a *AdminServer) handleListOAuthProviders(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	proj, err := a.projects.GetProject(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	// Mask secrets in response
+	type safeProvider struct {
+		Name         string   `json:"name"`
+		ClientID     string   `json:"client_id"`
+		ClientSecret string   `json:"client_secret"` // masked
+		RedirectURL  string   `json:"redirect_url"`
+		AuthURL      string   `json:"auth_url"`
+		TokenURL     string   `json:"token_url"`
+		UserInfoURL  string   `json:"userinfo_url"`
+		Scopes       []string `json:"scopes"`
+		EmailField   string   `json:"email_field"`
+		NameField    string   `json:"name_field"`
+		AvatarField  string   `json:"avatar_field"`
+		IDField      string   `json:"id_field"`
+	}
+
+	result := make([]safeProvider, 0, len(proj.OAuthProviders))
+	for _, p := range proj.OAuthProviders {
+		masked := p.ClientSecret
+		if len(masked) > 4 {
+			masked = masked[:4] + "••••"
+		} else if masked != "" {
+			masked = "••••"
+		}
+		result = append(result, safeProvider{
+			Name:         p.Name,
+			ClientID:     p.ClientID,
+			ClientSecret: masked,
+			RedirectURL:  p.RedirectURL,
+			AuthURL:      p.AuthURL,
+			TokenURL:     p.TokenURL,
+			UserInfoURL:  p.UserInfoURL,
+			Scopes:       p.Scopes,
+			EmailField:   p.EmailField,
+			NameField:    p.NameField,
+			AvatarField:  p.AvatarField,
+			IDField:      p.IDField,
+		})
+	}
+	if result == nil {
+		result = []safeProvider{}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"providers": result,
+	})
+}
+
+func (a *AdminServer) handleSetOAuthProviders(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	proj, err := a.projects.GetProject(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	var req struct {
+		Providers []auth.OAuthProviderConfig `json:"providers"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Validate each provider
+	for i, p := range req.Providers {
+		if p.Name == "" {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("providers[%d]: name is required", i))
+			return
+		}
+		if p.ClientID == "" {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("providers[%d] (%s): client_id is required", i, p.Name))
+			return
+		}
+	}
+
+	proj.OAuthProviders = req.Providers
+	if proj.OAuthProviders == nil {
+		proj.OAuthProviders = []auth.OAuthProviderConfig{}
+	}
+
+	if err := a.projects.UpdateProject(proj); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Reload project env to re-register providers
+	a.projects.ReloadProjectEnv(id)
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"providers": len(proj.OAuthProviders),
+	})
 }

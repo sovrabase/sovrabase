@@ -600,11 +600,12 @@ curl -X POST \
 
         <!-- Auth Tab Panel -->
         <div class="modal-tab-panel" id="pdtab-auth">
+          <!-- Users Section -->
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px;">Auth Users</h4>
             <button class="btn btn-sm btn-primary" onclick="openCreateUserModal()">+ Add User</button>
           </div>
-          <div class="table-wrap" style="max-height:400px; overflow-y:auto;">
+          <div class="table-wrap" style="max-height:300px; overflow-y:auto; margin-bottom:32px;">
             <table>
               <thead>
                 <tr>
@@ -618,6 +619,18 @@ curl -X POST \
               <tbody id="auth-users-tbody">
               </tbody>
             </table>
+          </div>
+
+          <!-- OAuth Providers Section -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px;">OAuth Providers</h4>
+            <button class="btn btn-sm btn-primary" onclick="openAddOAuthProviderModal()">+ Add Provider</button>
+          </div>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">
+            Configure OAuth2 social login providers. Supports any OAuth2-compliant provider: Google, GitHub, Discord, GitLab, Apple, Slack, etc.
+          </p>
+          <div id="oauth-providers-list">
+            <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px;">No OAuth providers configured</div>
           </div>
         </div>
 

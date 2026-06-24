@@ -10,12 +10,19 @@ import (
 	"time"
 )
 
-// projectMiddleware extracts the X-Project-Key header, resolves it to a ProjectEnv, and injects it into the context.
+// projectMiddleware extracts the project key from the X-Project-Key header
+// or the ?project_key= query parameter (needed for browser OAuth redirects
+// which cannot send custom headers), resolves it to a ProjectEnv, and injects
+// it into the context.
 func (s *Server) projectMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Header takes priority; fall back to query param for browser redirects.
 		projectKey := r.Header.Get("X-Project-Key")
 		if projectKey == "" {
-			writeError(w, http.StatusBadRequest, "missing X-Project-Key header")
+			projectKey = r.URL.Query().Get("project_key")
+		}
+		if projectKey == "" {
+			writeError(w, http.StatusBadRequest, "missing X-Project-Key header or project_key query param")
 			return
 		}
 
@@ -37,6 +44,7 @@ func (s *Server) projectMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
 
 // authMiddleware validates the Bearer token and injects user claims into the context.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {

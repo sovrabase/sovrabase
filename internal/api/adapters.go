@@ -74,6 +74,11 @@ func (a *authAdapter) CreateOAuthState(provider string) (string, error) {
 	return a.svc.CreateOAuthState(provider)
 }
 
+func (a *authAdapter) CreateOAuthStateURL(provider string) (string, string, error) {
+	return a.svc.CreateOAuthStateURL(provider)
+}
+
+
 func (a *authAdapter) HandleOAuthCallback(provider, code, state string) (*UserInfo, *TokenPair, error) {
 	user, tokens, err := a.svc.HandleOAuthCallback(provider, code, state)
 	if err != nil {

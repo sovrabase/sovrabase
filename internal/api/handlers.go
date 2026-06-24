@@ -96,41 +96,65 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
-	state, err := s.getAuth(r).CreateOAuthState(provider)
+	authURL, state, err := s.getAuth(r).CreateOAuthStateURL(provider)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{
-		"provider": provider,
-		"state":    state,
-	})
-}
 
-type oauthCallbackRequest struct {
-	Code  string `json:"code"`
-	State string `json:"state"`
-}
-
-func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
-	provider := chi.URLParam(r, "provider")
-	var req oauthCallbackRequest
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	// If the client requests a redirect (browser navigation), do it directly.
+	if r.URL.Query().Get("redirect") == "true" {
+		http.Redirect(w, r, authURL, http.StatusFound)
 		return
 	}
 
-	user, tokens, err := s.getAuth(r).HandleOAuthCallback(provider, req.Code, req.State)
+	// Otherwise return the URL so the frontend can redirect programmatically.
+	// Also expose the project_key so the frontend can embed it in the redirect URL.
+	projectKey := r.URL.Query().Get("project_key")
+	if projectKey == "" {
+		projectKey = r.Header.Get("X-Project-Key")
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"provider":    provider,
+		"state":       state,
+		"url":         authURL,
+		"project_key": projectKey,
+	})
+}
+
+
+// handleOAuthCallback is called by the OAuth provider after the user authenticates.
+// It reads ?code and ?state from query params (standard browser redirect),
+// exchanges the code for tokens, and redirects the user back to the app.
+func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+
+	if code == "" || state == "" {
+		writeError(w, http.StatusBadRequest, "missing code or state")
+		return
+	}
+
+	user, tokens, err := s.getAuth(r).HandleOAuthCallback(provider, code, state)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"user":  user,
-		"token": tokens,
-	})
+	// If there's an app redirect URL configured, send the user back to the app
+	// with the tokens in the URL fragment (never in query string — avoids server logs).
+	appRedirect := r.URL.Query().Get("app_redirect")
+	if appRedirect == "" {
+		appRedirect = "/"
+	}
+
+	_ = user // user is embedded inside tokens
+	fragment := fmt.Sprintf("access_token=%s&refresh_token=%s&provider=%s",
+		tokens.AccessToken, tokens.RefreshToken, provider)
+	http.Redirect(w, r, appRedirect+"#"+fragment, http.StatusFound)
 }
+
 
 type verifyEmailRequest struct {
 	Token string `json:"token"`
