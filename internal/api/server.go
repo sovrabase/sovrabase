@@ -10,6 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+
+	"github.com/ketsuna-org/sovrabase/internal/tenant"
 )
 
 // Server is the HTTP API server for Sovrabase.
@@ -19,6 +21,7 @@ type Server struct {
 	db        DatabaseService
 	auth      AuthService
 	store     StorageService
+	projects  *tenant.ProjectManager
 	adminMux  *http.ServeMux // optional admin routes
 	dashboard http.Handler   // optional dashboard UI
 	logger    *slog.Logger
@@ -93,14 +96,51 @@ type FileInfo struct {
 	URL         string    `json:"url"`
 }
 
+type contextKey string
+
+const (
+	claimsKey     contextKey = "claims"
+	projectEnvKey contextKey = "projectEnv"
+)
+
+func getProjectEnv(r *http.Request) *tenant.ProjectEnv {
+	env, ok := r.Context().Value(projectEnvKey).(*tenant.ProjectEnv)
+	if !ok {
+		return nil
+	}
+	return env
+}
+
+func (s *Server) getDB(r *http.Request) DatabaseService {
+	if env := getProjectEnv(r); env != nil {
+		return env.Engine
+	}
+	return s.db
+}
+
+func (s *Server) getAuth(r *http.Request) AuthService {
+	if env := getProjectEnv(r); env != nil {
+		return WrapAuthService(env.Auth)
+	}
+	return s.auth
+}
+
+func (s *Server) getStorage(r *http.Request) StorageService {
+	if env := getProjectEnv(r); env != nil {
+		return WrapStorageDriver(env.Storage)
+	}
+	return s.store
+}
+
 // NewServer creates a new API server.
-func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store StorageService) *Server {
+func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store StorageService, pm *tenant.ProjectManager) *Server {
 	s := &Server{
-		config: cfg,
-		db:     db,
-		auth:   authSvc,
-		store:  store,
-		logger: slog.Default(),
+		config:   cfg,
+		db:       db,
+		auth:     authSvc,
+		store:    store,
+		projects: pm,
+		logger:   slog.Default(),
 	}
 
 	r := chi.NewRouter()
@@ -114,7 +154,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{cfg.AllowOrigins},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Project-Key"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -125,6 +165,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 
 	// Auth routes (public)
 	r.Route("/auth/v1", func(r chi.Router) {
+		r.Use(s.projectMiddleware)
 		r.Post("/signup", s.handleSignUp)
 		r.Post("/signin", s.handleSignIn)
 		r.Post("/refresh", s.handleRefresh)
@@ -134,6 +175,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 
 	// API routes (protected)
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(s.projectMiddleware)
 		r.Use(s.authMiddleware)
 		r.Get("/me", s.handleGetMe)
 

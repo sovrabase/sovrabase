@@ -63,6 +63,14 @@ func main() {
 		}
 	}
 
+	// Initialize multi-tenant project manager
+	projectMgr, err := tenant.NewProjectManager(cfg.DataDir)
+	if err != nil {
+		logger.Error("Failed to initialize project manager", "error", err)
+		os.Exit(1)
+	}
+	defer projectMgr.Close()
+
 	// Create API server
 	server := api.NewServer(
 		&api.Config{
@@ -73,15 +81,8 @@ func main() {
 		engine,
 		api.WrapAuthService(authService),
 		api.WrapStorageDriver(storageDriver),
+		projectMgr,
 	)
-
-	// Initialize multi-tenant project manager
-	projectMgr, err := tenant.NewProjectManager(cfg.DataDir)
-	if err != nil {
-		logger.Error("Failed to initialize project manager", "error", err)
-		os.Exit(1)
-	}
-	defer projectMgr.Close()
 
 	// Register admin API (with config reference for GET/POST /admin/config)
 	adminMux := http.NewServeMux()

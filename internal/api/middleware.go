@@ -6,6 +6,33 @@ import (
 	"strings"
 )
 
+// projectMiddleware extracts the X-Project-Key header, resolves it to a ProjectEnv, and injects it into the context.
+func (s *Server) projectMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		projectKey := r.Header.Get("X-Project-Key")
+		if projectKey == "" {
+			writeError(w, http.StatusBadRequest, "missing X-Project-Key header")
+			return
+		}
+
+		proj, err := s.projects.GetProjectBySecret(projectKey)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "invalid project key")
+			return
+		}
+
+		env, err := s.projects.GetProjectEnv(proj.ID)
+		if err != nil {
+			s.logger.Error("failed to load project environment", "project_id", proj.ID, "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to load project environment")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), projectEnvKey, env)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // authMiddleware validates the Bearer token and injects user claims into the context.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -21,7 +48,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		claims, err := s.auth.ValidateAccessToken(parts[1])
+		claims, err := s.getAuth(r).ValidateAccessToken(parts[1])
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "invalid or expired token")
 			return
@@ -32,10 +59,6 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
-
-type contextKey string
-
-const claimsKey contextKey = "claims"
 
 // getClaims extracts user claims from the request context.
 func getClaims(r *http.Request) *UserClaims {

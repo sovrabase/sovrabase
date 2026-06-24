@@ -271,11 +271,6 @@ async function openProjectDetailView(id) {
   const apiFirstPanel = document.getElementById('api-sdk-curl');
   if (apiFirstPanel) apiFirstPanel.classList.add('active');
 
-  // Reset API key display
-  document.getElementById('pdtab-apikey-mask').style.display = 'inline';
-  document.getElementById('pdtab-apikey-full').style.display = 'none';
-  document.getElementById('pdtab-apikey-mask').textContent = '•••••••••••• (click to reveal)';
-
   document.getElementById('detail-title').textContent = 'Project Details';
 
   try {
@@ -289,14 +284,22 @@ async function openProjectDetailView(id) {
       <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value mono">${escapeHtml(p.id)}</span></div>
       <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value"><span class="badge badge-${p.status || 'active'}"><span class="badge-dot"></span>${escapeHtml(p.status || 'active')}</span></span></div>
       <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${formatDate(p.created_at)}</span></div>
-      <div class="detail-row"><span class="detail-label">API URL</span><span class="detail-value mono">${escapeHtml(data.api_url || p.api_url || '')}</span></div>`;
+      <div class="detail-row"><span class="detail-label">API URL</span><span class="detail-value mono">${escapeHtml(data.api_url || p.api_url || '')}</span></div>
+      <div class="detail-row">
+        <span class="detail-label">API Key</span>
+        <span class="detail-value">
+          <span class="mask-toggle" id="pdtab-apikey-mask" onclick="toggleApiKeyReveal()">•••••••••••• (click to reveal)</span>
+          <span id="pdtab-apikey-full" style="display:none;font-family:var(--font-mono);font-size:12px;word-break:break-all;"></span>
+        </span>
+      </div>`;
 
     // Update API code snippets
     const ak = detailApiKey || 'API_KEY';
     const pid = p.id || 'PROJECT_ID';
     const hostPort = window.location.origin;
     document.getElementById('api-curl-snippet').textContent = `# Initialize with your project credentials
-curl -H "Authorization: Bearer ${ak}" \\
+curl -H "X-Project-Key: ${ak}" \\
+  -H "Authorization: Bearer USER_TOKEN" \\
   ${hostPort}/api/v1`;
     document.getElementById('api-dart-snippet').textContent = `final client = SovrabaseClient(
   apiKey: '${ak}',
