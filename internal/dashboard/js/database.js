@@ -41,15 +41,33 @@ function selectCollection(name) {
   const dropBtn = document.getElementById('btn-drop-col-col1');
   const addDocBtn = document.getElementById('btn-add-doc-col2');
   const importDocBtn = document.getElementById('btn-import-doc-col2');
+  const filterBar = document.getElementById('db-filter-bar');
+  const filterInput = document.getElementById('db-filter-input');
   
+  if (filterInput) filterInput.value = '';
+
   if (!name) {
     if (dropBtn) dropBtn.style.display = 'none';
     if (addDocBtn) addDocBtn.style.display = 'none';
     if (importDocBtn) importDocBtn.style.display = 'none';
+    if (filterBar) filterBar.style.display = 'none';
+
     document.getElementById('fs-documents-list').innerHTML = `
       <div style="text-align:center; padding-top:40px; color:var(--text-secondary);" id="fs-no-collection-selected">
         <p style="font-size:11px;">Select a collection</p>
       </div>`;
+    
+    // Clear rules inputs
+    const checkbox = document.getElementById('rls-enable-checkbox');
+    if (checkbox) checkbox.checked = false;
+    ['get', 'list', 'create', 'update', 'delete'].forEach(action => {
+      const el = document.getElementById('rls-rule-' + action);
+      if (el) el.value = '';
+      const hl = document.getElementById('hl-' + action);
+      if (hl) hl.innerHTML = '';
+    });
+    toggleRlsEnable(false);
+
     selectDocument(null);
     return;
   }
@@ -57,9 +75,16 @@ function selectCollection(name) {
   if (dropBtn) dropBtn.style.display = 'block';
   if (addDocBtn) addDocBtn.style.display = 'block';
   if (importDocBtn) importDocBtn.style.display = 'block';
+  if (filterBar) filterBar.style.display = 'flex';
   
   const noColEl = document.getElementById('fs-no-collection-selected');
   if (noColEl) noColEl.style.display = 'none';
+
+  // If rules tab is currently active, load rules
+  const rulesTab = document.getElementById('db-right-tab-rules');
+  if (rulesTab && rulesTab.classList.contains('active')) {
+    loadCollectionRules();
+  }
   
   loadDocuments();
 }
@@ -67,12 +92,190 @@ function selectCollection(name) {
 async function loadDocuments() {
   const col = activeProjectEnv.selectedCollection;
   if (!col) return;
+
+  const filterInput = document.getElementById('db-filter-input');
+  let url = `/admin/projects/${detailProjectId}/collections/${col}/documents`;
+
+  if (filterInput && filterInput.value.trim() !== '') {
+    const query = filterInput.value.trim();
+    const separator = query.includes('=') ? '=' : (query.includes(':') ? ':' : null);
+    if (separator) {
+      const parts = query.split(separator);
+      const key = parts[0].trim();
+      const val = parts.slice(1).join(separator).trim();
+      url += `?filter_key=${encodeURIComponent(key)}&filter_val=${encodeURIComponent(val)}`;
+    }
+  }
+
   try {
-    const docs = await api(`/admin/projects/${detailProjectId}/collections/${col}/documents`);
+    const docs = await api(url);
     activeProjectEnv.documents = docs || [];
-    renderDocumentsList();
+    applyDocumentFilter();
   } catch (err) {
     showToast('Failed to load documents: ' + err.message, 'error');
+  }
+}
+
+function applyDocumentFilter() {
+  const filterInput = document.getElementById('db-filter-input');
+  if (!filterInput) return;
+  const query = filterInput.value.trim().toLowerCase();
+
+  let filtered = activeProjectEnv.documents;
+  if (query !== '') {
+    const separator = query.includes('=') ? '=' : (query.includes(':') ? ':' : null);
+    if (separator) {
+      const parts = query.split(separator);
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const val = parts.slice(1).join(separator).trim();
+        filtered = activeProjectEnv.documents.filter(doc => {
+          return doc[key] !== undefined && String(doc[key]).toLowerCase().includes(val);
+        });
+      }
+    } else {
+      // General search
+      filtered = activeProjectEnv.documents.filter(doc => {
+        return JSON.stringify(doc).toLowerCase().includes(query);
+      });
+    }
+  }
+
+  renderFilteredDocuments(filtered);
+}
+
+function renderFilteredDocuments(filtered) {
+  const container = document.getElementById('fs-documents-list');
+  if (!container) return;
+  
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:12px;">No matching documents</div>';
+    selectDocument(null);
+    return;
+  }
+  container.innerHTML = filtered.map(d => {
+    const id = d._id || '';
+    const activeClass = activeProjectEnv.selectedDocumentId === id ? 'active' : '';
+    return `<div class="fs-item ${activeClass}" onclick="selectDocument('${escapeHtml(id)}')">
+      <span style="font-family:var(--font-mono);font-size:12px;">${escapeHtml(id)}</span>
+    </div>`;
+  }).join('');
+  
+  if (activeProjectEnv.selectedDocumentId) {
+    const stillExists = filtered.some(d => d._id === activeProjectEnv.selectedDocumentId);
+    if (stillExists) {
+      selectDocument(activeProjectEnv.selectedDocumentId);
+    } else {
+      selectDocument(null);
+    }
+  }
+}
+
+function switchDbRightTab(tab) {
+  const fieldsBtn = document.getElementById('db-right-tab-fields');
+  const rulesBtn = document.getElementById('db-right-tab-rules');
+  const fieldsContent = document.getElementById('fs-document-fields');
+  const rulesContent = document.getElementById('fs-collection-rules');
+
+  if (tab === 'fields') {
+    fieldsBtn.classList.add('active');
+    fieldsBtn.style.borderBottomColor = 'var(--accent)';
+    fieldsBtn.style.color = 'var(--text-primary)';
+    rulesBtn.classList.remove('active');
+    rulesBtn.style.borderBottomColor = 'transparent';
+    rulesBtn.style.color = 'var(--text-secondary)';
+
+    fieldsContent.style.display = 'block';
+    rulesContent.style.display = 'none';
+  } else if (tab === 'rules') {
+    rulesBtn.classList.add('active');
+    rulesBtn.style.borderBottomColor = 'var(--accent)';
+    rulesBtn.style.color = 'var(--text-primary)';
+    fieldsBtn.classList.remove('active');
+    fieldsBtn.style.borderBottomColor = 'transparent';
+    fieldsBtn.style.color = 'var(--text-secondary)';
+
+    fieldsContent.style.display = 'none';
+    rulesContent.style.display = 'flex';
+
+    loadCollectionRules();
+  }
+}
+
+async function loadCollectionRules() {
+  const col = activeProjectEnv.selectedCollection;
+  if (!col) return;
+
+  try {
+    const data = await api(`/admin/projects/${detailProjectId}/collections/${col}/rules`);
+    const enabled = data.enabled || false;
+    const rules = data.rules || {};
+
+    document.getElementById('rls-enable-checkbox').checked = enabled;
+    
+    // Backwards compatibility: if rules.read exists but not get/list, use it!
+    const getVal = rules.get !== undefined ? rules.get : (rules.read || '');
+    const listVal = rules.list !== undefined ? rules.list : (rules.read || '');
+
+    document.getElementById('rls-rule-get').value = getVal;
+    document.getElementById('rls-rule-list').value = listVal;
+    document.getElementById('rls-rule-create').value = rules.create || '';
+    document.getElementById('rls-rule-update').value = rules.update || '';
+    document.getElementById('rls-rule-delete').value = rules.delete || '';
+
+    // Trigger syntax highlights
+    ['get', 'list', 'create', 'update', 'delete'].forEach(action => {
+      updateRuleHighlight(action);
+    });
+
+    toggleRlsEnable(enabled);
+  } catch (err) {
+    showToast('Failed to load rules: ' + err.message, 'error');
+  }
+}
+
+function toggleRlsEnable(enabled) {
+  const inputsDiv = document.getElementById('rls-rules-inputs');
+  if (!inputsDiv) return;
+  if (enabled) {
+    inputsDiv.style.opacity = '1';
+    inputsDiv.style.pointerEvents = 'auto';
+  } else {
+    inputsDiv.style.opacity = '0.5';
+    inputsDiv.style.pointerEvents = 'none';
+  }
+}
+
+async function saveCollectionRules() {
+  const col = activeProjectEnv.selectedCollection;
+  if (!col) return;
+
+  const enabled = document.getElementById('rls-enable-checkbox').checked;
+  const getVal = document.getElementById('rls-rule-get').value.trim();
+  const listVal = document.getElementById('rls-rule-list').value.trim();
+  const create = document.getElementById('rls-rule-create').value.trim();
+  const update = document.getElementById('rls-rule-update').value.trim();
+  const deleteRule = document.getElementById('rls-rule-delete').value.trim();
+
+  const body = {
+    enabled: enabled,
+    rules: {
+      get: getVal,
+      list: listVal,
+      create: create,
+      update: update,
+      delete: deleteRule
+    }
+  };
+
+  try {
+    await api(`/admin/projects/${detailProjectId}/collections/${col}/rules`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    showToast('Rules saved successfully');
+  } catch (err) {
+    showToast('Failed to save rules: ' + err.message, 'error');
   }
 }
 
@@ -683,3 +886,172 @@ async function submitImportCollection() {
     showToast(err.message, 'error');
   }
 }
+
+// ====== RLS RULES REAL-TIME SYNTAX HIGHLIGHTING & AUTOCOMPLETE ======
+
+function highlightRuleSyntax(text) {
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Strings
+  html = html.replace(/(["'])(.*?)\1/g, '<span class="hl-str">$1$2$1</span>');
+
+  // Keywords
+  html = html.replace(/\b(auth|data|id)\b/g, '<span class="hl-key">$1</span>');
+
+  // Properties
+  html = html.replace(/\.(\w+)\b/g, '.<span class="hl-prop">$1</span>');
+
+  // Constants
+  html = html.replace(/\b(true|false|null)\b/g, '<span class="hl-const">$1</span>');
+
+  // Operators
+  html = html.replace(/(&amp;&amp;|\|\||==|!=|!)/g, '<span class="hl-op">$1</span>');
+
+  return html;
+}
+
+function updateRuleHighlight(action) {
+  const input = document.getElementById('rls-rule-' + action);
+  const overlay = document.getElementById('hl-' + action);
+  if (!input || !overlay) return;
+  overlay.innerHTML = highlightRuleSyntax(input.value);
+  overlay.scrollLeft = input.scrollLeft;
+}
+
+function syncRuleScroll(action) {
+  const input = document.getElementById('rls-rule-' + action);
+  const overlay = document.getElementById('hl-' + action);
+  if (input && overlay) {
+    overlay.scrollLeft = input.scrollLeft;
+  }
+}
+
+let activeRulesInputId = null;
+
+function handleRuleInputFocus(id) {
+  activeRulesInputId = id;
+}
+
+function insertRuleKeyword(keyword) {
+  if (!activeRulesInputId) return;
+  const input = document.getElementById(activeRulesInputId);
+  if (!input) return;
+
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  const text = input.value;
+  input.value = text.substring(0, start) + keyword + text.substring(end);
+  
+  input.focus();
+  input.selectionStart = input.selectionEnd = start + keyword.length;
+  
+  const action = activeRulesInputId.replace('rls-rule-', '');
+  updateRuleHighlight(action);
+}
+
+// Autocomplete logic
+const suggestionsList = ["auth", "auth.uid", "auth.role", "auth.email", "data", "true", "false", "null"];
+let selectedAutocompleteIndex = 0;
+let currentMatches = [];
+
+function handleRuleInput(event, action) {
+  updateRuleHighlight(action);
+  
+  const input = event.target;
+  const val = input.value;
+  const caretPos = input.selectionStart;
+  
+  const lastSpace = val.substring(0, caretPos).lastIndexOf(' ');
+  const currentWord = val.substring(lastSpace + 1, caretPos).trim();
+  
+  const popover = document.getElementById('rules-autocomplete');
+  if (!currentWord || currentWord.length < 1) {
+    if (popover) popover.style.display = 'none';
+    return;
+  }
+  
+  currentMatches = suggestionsList.filter(item => item.startsWith(currentWord) && item !== currentWord);
+  
+  if (currentMatches.length === 0) {
+    if (popover) popover.style.display = 'none';
+    return;
+  }
+  
+  selectedAutocompleteIndex = 0;
+  renderAutocomplete(input);
+}
+
+function renderAutocomplete(input) {
+  const popover = document.getElementById('rules-autocomplete');
+  if (!popover) return;
+  
+  popover.innerHTML = currentMatches.map((m, idx) => {
+    const activeClass = idx === selectedAutocompleteIndex ? 'active' : '';
+    return `<div class="autocomplete-item ${activeClass}" onclick="insertSuggestion('${m}')" style="padding: 6px 10px; font-family: var(--font-mono); font-size: 11.5px; border-radius: 4px; cursor: pointer; transition: all var(--transition);">
+      ${m}
+    </div>`;
+  }).join('');
+  
+  const wrapper = input.parentElement;
+  popover.style.top = (wrapper.offsetTop + wrapper.offsetHeight + 4) + 'px';
+  popover.style.left = wrapper.offsetLeft + 'px';
+  popover.style.width = wrapper.offsetWidth + 'px';
+  popover.style.display = 'flex';
+}
+
+function handleRuleKeydown(event, action) {
+  const popover = document.getElementById('rules-autocomplete');
+  if (!popover || popover.style.display === 'none') return;
+  
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    selectedAutocompleteIndex = (selectedAutocompleteIndex + 1) % currentMatches.length;
+    renderAutocomplete(event.target);
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    selectedAutocompleteIndex = (selectedAutocompleteIndex - 1 + currentMatches.length) % currentMatches.length;
+    renderAutocomplete(event.target);
+  } else if (event.key === 'Enter' || event.key === 'Tab') {
+    event.preventDefault();
+    if (currentMatches[selectedAutocompleteIndex]) {
+      insertSuggestion(currentMatches[selectedAutocompleteIndex]);
+    }
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    popover.style.display = 'none';
+  }
+}
+
+function insertSuggestion(val) {
+  if (!activeRulesInputId) return;
+  const input = document.getElementById(activeRulesInputId);
+  if (!input) return;
+  
+  const caretPos = input.selectionStart;
+  const fullText = input.value;
+  
+  const lastSpace = fullText.substring(0, caretPos).lastIndexOf(' ');
+  const start = lastSpace + 1;
+  
+  input.value = fullText.substring(0, start) + val + fullText.substring(caretPos);
+  
+  input.focus();
+  input.selectionStart = input.selectionEnd = start + val.length;
+  
+  const action = activeRulesInputId.replace('rls-rule-', '');
+  updateRuleHighlight(action);
+  
+  const popover = document.getElementById('rules-autocomplete');
+  if (popover) popover.style.display = 'none';
+}
+
+// Close autocomplete popup when clicking outside rules fields
+document.addEventListener('click', (e) => {
+  const popover = document.getElementById('rules-autocomplete');
+  if (popover && !e.target.classList.contains('rules-input') && !e.target.classList.contains('autocomplete-item')) {
+    popover.style.display = 'none';
+  }
+});

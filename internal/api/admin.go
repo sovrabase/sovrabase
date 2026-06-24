@@ -15,6 +15,7 @@ import (
 
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/config"
+	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
 )
@@ -147,6 +148,8 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/projects/{id}/collections/{name}/import", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleImportCollection))))
 	mux.Handle("PUT /admin/projects/{id}/collections/{name}/documents/{docId}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUpdateDocument))))
 	mux.Handle("DELETE /admin/projects/{id}/collections/{name}/documents/{docId}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteDocument))))
+	mux.Handle("GET /admin/projects/{id}/collections/{name}/rules", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleGetRules))))
+	mux.Handle("POST /admin/projects/{id}/collections/{name}/rules", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleSetRules))))
 
 	// Auth management endpoints
 	mux.Handle("GET /admin/projects/{id}/users", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListUsers))))
@@ -367,7 +370,22 @@ func (a *AdminServer) handleListDocuments(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	docs, err := env.Engine.List(name)
+
+	var docs []map[string]interface{}
+	q := r.URL.Query()
+	filterKey := q.Get("filter_key")
+	filterVal := q.Get("filter_val")
+
+	if filterKey != "" {
+		docs, err = env.Engine.Query(name, map[string]interface{}{
+			filterKey: map[string]interface{}{
+				"$contains": filterVal,
+			},
+		}, nil)
+	} else {
+		docs, err = env.Engine.List(name)
+	}
+
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -376,6 +394,55 @@ func (a *AdminServer) handleListDocuments(w http.ResponseWriter, r *http.Request
 		docs = []map[string]interface{}{}
 	}
 	writeJSON(w, http.StatusOK, docs)
+}
+
+func (a *AdminServer) handleGetRules(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	name := r.PathValue("name")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	cfg, err := env.Engine.GetRules(name)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, cfg)
+}
+
+func (a *AdminServer) handleSetRules(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	name := r.PathValue("name")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	var cfg db.RulesConfig
+	if err := decodeJSON(r, &cfg); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid rules JSON")
+		return
+	}
+
+	// Validate rule expressions
+	for action, expr := range cfg.Rules {
+		if expr != "" {
+			tokens := db.Tokenize(expr)
+			if _, err := db.ParseRulesExpr(tokens); err != nil {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid rule expression for %s: %v", action, err))
+				return
+			}
+		}
+	}
+
+	if err := env.Engine.SetRules(name, &cfg); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 }
 
 func (a *AdminServer) handleInsertDocument(w http.ResponseWriter, r *http.Request) {

@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
 )
 
@@ -41,7 +42,9 @@ type DatabaseService interface {
 	Update(collection, id string, doc map[string]interface{}) error
 	Delete(collection, id string) error
 	List(collection string) ([]map[string]interface{}, error)
-	Query(collection string, filter map[string]interface{}) ([]map[string]interface{}, error)
+	Query(collection string, filter map[string]interface{}, projection []string) ([]map[string]interface{}, error)
+	GetRules(collection string) (*db.RulesConfig, error)
+	SetRules(collection string, cfg *db.RulesConfig) error
 }
 
 // AuthService is the interface expected from the auth package.

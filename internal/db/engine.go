@@ -1,8 +1,10 @@
 package db
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -260,26 +262,6 @@ func (e *Engine) List(collection string) ([]map[string]interface{}, error) {
 	return e.scanCollection(collection)
 }
 
-// Query returns documents in a collection matching the given filter.
-// Only top-level equality filters are supported (e.g., {"status": "active"}).
-func (e *Engine) Query(collection string, filter map[string]interface{}) ([]map[string]interface{}, error) {
-	docs, err := e.scanCollection(collection)
-	if err != nil {
-		return nil, err
-	}
-	if len(filter) == 0 {
-		return docs, nil
-	}
-
-	var result []map[string]interface{}
-	for _, doc := range docs {
-		if matchFilter(doc, filter) {
-			result = append(result, doc)
-		}
-	}
-	return result, nil
-}
-
 // scanCollection iterates over all documents in a collection.
 func (e *Engine) scanCollection(collection string) ([]map[string]interface{}, error) {
 	prefix := []byte(collection + ":")
@@ -306,20 +288,161 @@ func (e *Engine) scanCollection(collection string) ([]map[string]interface{}, er
 	return docs, nil
 }
 
+// RulesConfig holds the RLS configuration for a collection.
+type RulesConfig struct {
+	Enabled bool              `json:"enabled"`
+	Rules   map[string]string `json:"rules"` // action -> expression
+}
+
+// GetRules retrieves the RLS configuration for a collection.
+func (e *Engine) GetRules(collection string) (*RulesConfig, error) {
+	key := []byte("__rules__:" + collection)
+	val, closer, err := e.db.Get(key)
+	if err == pebble.ErrNotFound {
+		return &RulesConfig{Enabled: false, Rules: map[string]string{}}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("db: get rules: %w", err)
+	}
+	defer closer.Close()
+
+	var cfg RulesConfig
+	if err := json.Unmarshal(val, &cfg); err != nil {
+		return nil, fmt.Errorf("db: unmarshal rules: %w", err)
+	}
+	return &cfg, nil
+}
+
+// SetRules stores the RLS configuration for a collection.
+func (e *Engine) SetRules(collection string, cfg *RulesConfig) error {
+	key := []byte("__rules__:" + collection)
+	val, err := json.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("db: marshal rules: %w", err)
+	}
+	return e.db.Set(key, val, pebble.Sync)
+}
+
+// Query returns documents in a collection matching the given filter.
+// Supports both simple equality filters and advanced comparisons, as well as projection.
+func (e *Engine) Query(collection string, filter map[string]interface{}, projection []string) ([]map[string]interface{}, error) {
+	docs, err := e.scanCollection(collection)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []map[string]interface{}
+	for _, doc := range docs {
+		if len(filter) == 0 || matchFilter(doc, filter) {
+			if len(projection) > 0 {
+				projected := make(map[string]interface{})
+				if idVal, ok := doc["_id"]; ok {
+					projected["_id"] = idVal
+				}
+				for _, field := range projection {
+					if val, ok := doc[field]; ok {
+						projected[field] = val
+					}
+				}
+				result = append(result, projected)
+			} else {
+				result = append(result, doc)
+			}
+		}
+	}
+	return result, nil
+}
+
 // matchFilter returns true if doc matches all filter conditions.
-// Only top-level equality checks are performed.
 func matchFilter(doc map[string]interface{}, filter map[string]interface{}) bool {
 	for k, want := range filter {
 		got, ok := doc[k]
+
+		if opMap, isMap := want.(map[string]interface{}); isMap && len(opMap) > 0 {
+			if !ok {
+				got = nil
+			}
+			for op, val := range opMap {
+				if !compareOp(got, op, val) {
+					return false
+				}
+			}
+			continue
+		}
+
 		if !ok {
 			return false
 		}
-		// Simple equality check (not deep).
 		if fmt.Sprint(got) != fmt.Sprint(want) {
 			return false
 		}
 	}
 	return true
+}
+
+func compareOp(got interface{}, op string, want interface{}) bool {
+	gotStr := fmt.Sprint(got)
+	wantStr := fmt.Sprint(want)
+
+	gotNum, gotIsNum := toFloat64(got)
+	wantNum, wantIsNum := toFloat64(want)
+	numeric := gotIsNum && wantIsNum
+
+	switch op {
+	case "$eq":
+		if numeric {
+			return gotNum == wantNum
+		}
+		return gotStr == wantStr
+	case "$ne":
+		if numeric {
+			return gotNum != wantNum
+		}
+		return gotStr != wantStr
+	case "$gt":
+		if numeric {
+			return gotNum > wantNum
+		}
+		return gotStr > wantStr
+	case "$gte":
+		if numeric {
+			return gotNum >= wantNum
+		}
+		return gotStr >= wantStr
+	case "$lt":
+		if numeric {
+			return gotNum < wantNum
+		}
+		return gotStr < wantStr
+	case "$lte":
+		if numeric {
+			return gotNum <= wantNum
+		}
+		return gotStr <= wantStr
+	case "$contains":
+		return strings.Contains(strings.ToLower(gotStr), strings.ToLower(wantStr))
+	}
+	return false
+}
+
+func toFloat64(v interface{}) (float64, bool) {
+	if v == nil {
+		return 0, false
+	}
+	switch val := v.(type) {
+	case int:
+		return float64(val), true
+	case int64:
+		return float64(val), true
+	case float64:
+		return val, true
+	case float32:
+		return float64(val), true
+	case string:
+		f, err := strconv.ParseFloat(val, 64)
+		return f, err == nil
+	}
+	return 0, false
 }
 
 // prefixUpperBound returns the key that sits just beyond all keys sharing a

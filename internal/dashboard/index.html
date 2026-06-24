@@ -417,6 +417,10 @@ curl -X POST \
                   <button class="btn btn-xs btn-secondary" onclick="triggerImportDoc()" id="btn-import-doc-col2" style="font-size: 10px; display: none;">Import</button>
                 </div>
               </div>
+              <!-- Filter Bar -->
+              <div id="db-filter-bar" style="display: none; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-card-elevated); gap: 6px;">
+                <input type="text" id="db-filter-input" placeholder="Filter e.g. status=active..." oninput="applyDocumentFilter()" style="width: 100%; padding: 5px 8px; font-size: 11px; background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); outline: none;">
+              </div>
               <div class="fs-col-content" id="fs-documents-list">
                 <!-- Dynamic documents list using .fs-item -->
                 <div style="text-align:center; padding-top:40px; color:var(--text-secondary);" id="fs-no-collection-selected">
@@ -425,15 +429,90 @@ curl -X POST \
               </div>
             </div>
 
-            <!-- Column 3: Fields Tree -->
+            <!-- Column 3: Fields & Rules -->
             <div class="fs-col" style="flex: 1;">
-              <div class="fs-col-header">
-                <span>Fields</span>
-                <button class="btn btn-xs btn-danger" onclick="deleteSelectedDocument()" id="btn-delete-doc-col3" style="font-size: 10px; display: none;">Delete Document</button>
+              <div class="fs-col-header" style="justify-content: flex-start; gap: 16px;">
+                <div style="display: flex; gap: 12px; height: 100%; align-items: center;">
+                  <button class="db-right-tab active" id="db-right-tab-fields" onclick="switchDbRightTab('fields')" style="background:none; border:none; color:var(--text-primary); font-size:11px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; cursor:pointer; padding: 4px 0; border-bottom:2px solid var(--accent); height:100%; transition:all var(--transition); font-family:var(--font); outline:none;">Fields</button>
+                  <button class="db-right-tab" id="db-right-tab-rules" onclick="switchDbRightTab('rules')" style="background:none; border:none; color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; cursor:pointer; padding: 4px 0; border-bottom:2px solid transparent; height:100%; transition:all var(--transition); font-family:var(--font); outline:none;">Rules (RLS)</button>
+                </div>
+                <button class="btn btn-xs btn-danger" onclick="deleteSelectedDocument()" id="btn-delete-doc-col3" style="font-size: 10px; display: none; margin-left: auto;">Delete Document</button>
               </div>
+              <!-- Tab 1: Fields content -->
               <div class="fs-col-content" id="fs-document-fields">
                 <div style="text-align:center; padding-top:40px; color:var(--text-secondary);" id="fs-no-document-selected">
                   <p style="font-size:11px;">Select a document</p>
+                </div>
+              </div>
+              <!-- Tab 2: Security Rules content -->
+              <div class="fs-col-content" id="fs-collection-rules" style="display: none; padding: 20px; flex-direction: column; gap: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <div style="font-size: 13.5px; font-weight: 600; color: var(--text-primary);">Row-Level Security (RLS)</div>
+                    <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">Restrict read/write access to this collection</div>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="rls-enable-checkbox" onchange="toggleRlsEnable(this.checked)">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div id="rls-rules-inputs" style="display: flex; flex-direction: column; gap: 14px; opacity: 0.5; pointer-events: none; transition: opacity var(--transition); position: relative;">
+                  
+                  <!-- Suggestion chips (Helper quick-inserts) -->
+                  <div class="quick-chips" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; background: rgba(0,0,0,0.15); border-radius: var(--radius); border: 1px solid var(--border);">
+                    <span style="font-size: 10px; font-weight: 700; color: var(--text-muted); align-self: center; text-transform: uppercase; margin-right: 4px; padding-left: 4px;">Insert:</span>
+                    <button class="chip-btn" onclick="insertRuleKeyword('auth')" style="background: var(--bg-card-elevated); border: 1px solid var(--border); color: #38bdf8; font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all var(--transition);">auth</button>
+                    <button class="chip-btn" onclick="insertRuleKeyword('auth.uid')" style="background: var(--bg-card-elevated); border: 1px solid var(--border); color: #38bdf8; font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all var(--transition);">auth.uid</button>
+                    <button class="chip-btn" onclick="insertRuleKeyword('auth.role')" style="background: var(--bg-card-elevated); border: 1px solid var(--border); color: #38bdf8; font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all var(--transition);">auth.role</button>
+                    <button class="chip-btn" onclick="insertRuleKeyword('data')" style="background: var(--bg-card-elevated); border: 1px solid var(--border); color: #f472b6; font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all var(--transition);">data</button>
+                    <button class="chip-btn" onclick="insertRuleKeyword('true')" style="background: var(--bg-card-elevated); border: 1px solid var(--border); color: #fb923c; font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all var(--transition);">true</button>
+                    <button class="chip-btn" onclick="insertRuleKeyword('false')" style="background: var(--bg-card-elevated); border: 1px solid var(--border); color: #fb923c; font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all var(--transition);">false</button>
+                    <button class="chip-btn" onclick="insertRuleKeyword('null')" style="background: var(--bg-card-elevated); border: 1px solid var(--border); color: #fb923c; font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all var(--transition);">null</button>
+                  </div>
+
+                  <!-- Autocomplete Floating Popover -->
+                  <div id="rules-autocomplete" style="position: absolute; display: none; background: var(--bg-card-elevated); border: 1px solid var(--border-light); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 1000; padding: 4px; flex-direction: column; max-height: 150px; overflow-y: auto;"></div>
+
+                  <div class="form-group" style="margin: 0; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: var(--text-muted); text-transform: uppercase;">Get Policy (Single doc read)</label>
+                    <div class="rules-field-wrapper">
+                      <div class="rules-highlight-overlay" id="hl-get"></div>
+                      <input type="text" id="rls-rule-get" class="rules-input" placeholder="e.g. true (public) or auth != null" oninput="handleRuleInput(event, 'get')" onkeydown="handleRuleKeydown(event, 'get')" onscroll="syncRuleScroll('get')" onfocus="handleRuleInputFocus(this.id)">
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin: 0; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: var(--text-muted); text-transform: uppercase;">List Policy (List & query reads)</label>
+                    <div class="rules-field-wrapper">
+                      <div class="rules-highlight-overlay" id="hl-list"></div>
+                      <input type="text" id="rls-rule-list" class="rules-input" placeholder="e.g. auth != null && auth.role == 'admin'" oninput="handleRuleInput(event, 'list')" onkeydown="handleRuleKeydown(event, 'list')" onscroll="syncRuleScroll('list')" onfocus="handleRuleInputFocus(this.id)">
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin: 0; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: var(--text-muted); text-transform: uppercase;">Create Policy</label>
+                    <div class="rules-field-wrapper">
+                      <div class="rules-highlight-overlay" id="hl-create"></div>
+                      <input type="text" id="rls-rule-create" class="rules-input" placeholder="e.g. auth != null && auth.uid == data.user_id" oninput="handleRuleInput(event, 'create')" onkeydown="handleRuleKeydown(event, 'create')" onscroll="syncRuleScroll('create')" onfocus="handleRuleInputFocus(this.id)">
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin: 0; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: var(--text-muted); text-transform: uppercase;">Update Policy</label>
+                    <div class="rules-field-wrapper">
+                      <div class="rules-highlight-overlay" id="hl-update"></div>
+                      <input type="text" id="rls-rule-update" class="rules-input" placeholder="e.g. auth != null && auth.uid == data.user_id" oninput="handleRuleInput(event, 'update')" onkeydown="handleRuleKeydown(event, 'update')" onscroll="syncRuleScroll('update')" onfocus="handleRuleInputFocus(this.id)">
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin: 0; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: var(--text-muted); text-transform: uppercase;">Delete Policy</label>
+                    <div class="rules-field-wrapper">
+                      <div class="rules-highlight-overlay" id="hl-delete"></div>
+                      <input type="text" id="rls-rule-delete" class="rules-input" placeholder="e.g. auth.role == 'admin'" oninput="handleRuleInput(event, 'delete')" onkeydown="handleRuleKeydown(event, 'delete')" onscroll="syncRuleScroll('delete')" onfocus="handleRuleInputFocus(this.id)">
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;">
+                  <button class="btn btn-sm btn-primary" onclick="saveCollectionRules()">Save Rules</button>
                 </div>
               </div>
             </div>

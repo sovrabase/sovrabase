@@ -445,7 +445,7 @@ func TestQueryEquality(t *testing.T) {
 	// Query books.
 	docs, err := eng.Query("products", map[string]interface{}{
 		"category": "book",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -461,7 +461,7 @@ func TestQueryEquality(t *testing.T) {
 	// Query electronics.
 	docs, err = eng.Query("products", map[string]interface{}{
 		"category": "electronics",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +490,7 @@ func TestQueryMultiField(t *testing.T) {
 	docs, err := eng.Query("users", map[string]interface{}{
 		"role":   "admin",
 		"active": "true", // Query values are matched via fmt.Sprint
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,7 +510,7 @@ func TestQueryNoMatch(t *testing.T) {
 
 	docs, err := eng.Query("items", map[string]interface{}{
 		"color": "blue",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -526,7 +526,7 @@ func TestQueryEmptyFilter(t *testing.T) {
 	eng.Insert("items", "a", map[string]interface{}{"x": 1})
 	eng.Insert("items", "b", map[string]interface{}{"x": 2})
 
-	docs, err := eng.Query("items", nil)
+	docs, err := eng.Query("items", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -543,12 +543,65 @@ func TestQueryMissingField(t *testing.T) {
 
 	docs, err := eng.Query("items", map[string]interface{}{
 		"baz": "qux",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(docs) != 0 {
 		t.Fatalf("expected 0 docs, got %d", len(docs))
+	}
+}
+
+func TestQueryAdvancedAndProjections(t *testing.T) {
+	eng := newTestEngine(t)
+	eng.CreateCollection("users")
+
+	eng.Insert("users", "1", map[string]interface{}{"name": "Alice", "age": 25, "active": true})
+	eng.Insert("users", "2", map[string]interface{}{"name": "Bob", "age": 17, "active": false})
+	eng.Insert("users", "3", map[string]interface{}{"name": "Charlie", "age": 30, "active": true})
+
+	// Test inequality $gt operator
+	docs, err := eng.Query("users", map[string]interface{}{
+		"age": map[string]interface{}{"$gt": 18},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 2 {
+		t.Fatalf("expected 2 users aged > 18, got %d", len(docs))
+	}
+
+	// Test projection (only select name)
+	docs, err = eng.Query("users", map[string]interface{}{
+		"active": true,
+	}, []string{"name"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 2 {
+		t.Fatalf("expected 2 active users, got %d", len(docs))
+	}
+	for _, d := range docs {
+		if _, ok := d["age"]; ok {
+			t.Fatalf("age should be excluded by projection")
+		}
+		if _, ok := d["name"]; !ok {
+			t.Fatalf("name should be included by projection")
+		}
+		if _, ok := d["_id"]; !ok {
+			t.Fatalf("_id should always be included in projection")
+		}
+	}
+
+	// Test $contains operator
+	docs, err = eng.Query("users", map[string]interface{}{
+		"name": map[string]interface{}{"$contains": "li"},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 2 { // Alice and Charlie
+		t.Fatalf("expected 2 users containing 'li', got %d", len(docs))
 	}
 }
 

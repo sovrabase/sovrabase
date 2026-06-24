@@ -38,7 +38,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			writeError(w, http.StatusUnauthorized, "missing authorization header")
+			next.ServeHTTP(w, r)
 			return
 		}
 

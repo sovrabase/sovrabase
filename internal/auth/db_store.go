@@ -48,7 +48,7 @@ func (s *DBUserStore) GetByID(id string) (*User, error) {
 
 // GetByEmail retrieves a user by email.
 func (s *DBUserStore) GetByEmail(email string) (*User, error) {
-	docs, err := s.engine.Query("_users", map[string]interface{}{"email": email})
+	docs, err := s.engine.Query("_users", map[string]interface{}{"email": email}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("auth: query user by email: %w", err)
 	}

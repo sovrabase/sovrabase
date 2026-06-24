@@ -3,9 +3,11 @@ package api
 import (
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/ketsuna-org/sovrabase/internal/db"
 )
 
 // ─── Auth Handlers ───────────────────────────────────────────────────────────
@@ -139,6 +141,94 @@ func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 
 // ─── Database Handlers ───────────────────────────────────────────────────────
 
+func (s *Server) checkRLS(r *http.Request, collection string, action string, docID string, newDoc map[string]interface{}) (bool, error) {
+	engine := s.getDB(r)
+
+	rulesCfg, err := engine.GetRules(collection)
+	if err != nil {
+		return true, nil // Allow access if rules cannot be read
+	}
+
+	if !rulesCfg.Enabled {
+		return true, nil
+	}
+
+	ruleExpr, ok := rulesCfg.Rules[action]
+	if !ok || ruleExpr == "" {
+		return false, nil // Default deny if rule is not specified but RLS is enabled
+	}
+
+	var authEnv map[string]interface{}
+	claims := getClaims(r)
+	if claims != nil {
+		authEnv = map[string]interface{}{
+			"uid":   claims.UserID,
+			"email": claims.Email,
+			"role":  claims.Role,
+		}
+	}
+
+	env := map[string]interface{}{
+		"auth": authEnv,
+		"id":   docID,
+	}
+
+	if action == "create" || action == "update" {
+		env["data"] = newDoc
+	} else if action == "get" && docID != "" {
+		existing, err := engine.Get(collection, docID)
+		if err == nil && existing != nil {
+			env["data"] = existing
+		}
+	} else if action == "delete" {
+		existing, err := engine.Get(collection, docID)
+		if err == nil && existing != nil {
+			env["data"] = existing
+		}
+	}
+
+	return db.EvaluateRule(ruleExpr, env)
+}
+
+func (s *Server) filterDocs(r *http.Request, collection string, docs []map[string]interface{}) ([]map[string]interface{}, error) {
+	engine := s.getDB(r)
+
+	rulesCfg, err := engine.GetRules(collection)
+	if err != nil || !rulesCfg.Enabled {
+		return docs, nil
+	}
+
+	ruleExpr, ok := rulesCfg.Rules["list"]
+	if !ok || ruleExpr == "" {
+		return []map[string]interface{}{}, nil
+	}
+
+	var authEnv map[string]interface{}
+	claims := getClaims(r)
+	if claims != nil {
+		authEnv = map[string]interface{}{
+			"uid":   claims.UserID,
+			"email": claims.Email,
+			"role":  claims.Role,
+		}
+	}
+
+	var filtered []map[string]interface{}
+	for _, doc := range docs {
+		docID, _ := doc["_id"].(string)
+		env := map[string]interface{}{
+			"auth": authEnv,
+			"id":   docID,
+			"data": doc,
+		}
+		allowed, err := db.EvaluateRule(ruleExpr, env)
+		if err == nil && allowed {
+			filtered = append(filtered, doc)
+		}
+	}
+	return filtered, nil
+}
+
 func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
@@ -149,12 +239,23 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := uuid.New().String()
+	doc["_id"] = id // Set the ID beforehand for rule evaluation
+
+	allowed, err := s.checkRLS(r, collection, "create", id, doc)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusForbidden, "RLS policy restricts insertion")
+		return
+	}
+
 	if err := s.getDB(r).Insert(collection, id, doc); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Return the created document
 	created, _ := s.getDB(r).Get(collection, id)
 	writeJSON(w, http.StatusCreated, created)
 }
@@ -163,8 +264,18 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 	id := chi.URLParam(r, "id")
 
-	doc, err := s.getDB(r).Get(collection, id)
+	allowed, err := s.checkRLS(r, collection, "get", id, nil)
 	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusForbidden, "RLS policy restricts access")
+		return
+	}
+
+	doc, err := s.getDB(r).Get(collection, id)
+	if err != nil || doc == nil {
 		writeError(w, http.StatusNotFound, "document not found")
 		return
 	}
@@ -182,6 +293,16 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	allowed, err := s.checkRLS(r, collection, "update", id, doc)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusForbidden, "RLS policy restricts update")
+		return
+	}
+
 	if err := s.getDB(r).Update(collection, id, doc); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -195,6 +316,16 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 	id := chi.URLParam(r, "id")
 
+	allowed, err := s.checkRLS(r, collection, "delete", id, nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusForbidden, "RLS policy restricts deletion")
+		return
+	}
+
 	if err := s.getDB(r).Delete(collection, id); err != nil {
 		writeError(w, http.StatusNotFound, "document not found")
 		return
@@ -206,11 +337,46 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
-	docs, err := s.getDB(r).List(collection)
+	q := r.URL.Query()
+	var projection []string
+	if selectStr := q.Get("select"); selectStr != "" {
+		for _, part := range strings.Split(selectStr, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				projection = append(projection, part)
+			}
+		}
+	}
+
+	filter := make(map[string]interface{})
+	for key, values := range q {
+		if key == "select" {
+			continue
+		}
+		if len(values) > 0 {
+			filter[key] = values[0]
+		}
+	}
+
+	var docs []map[string]interface{}
+	var err error
+	if len(filter) > 0 || len(projection) > 0 {
+		docs, err = s.getDB(r).Query(collection, filter, projection)
+	} else {
+		docs, err = s.getDB(r).List(collection)
+	}
+
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	docs, err = s.filterDocs(r, collection, docs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	if docs == nil {
 		docs = []map[string]interface{}{}
 	}
@@ -219,7 +385,9 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 }
 
 type queryRequest struct {
-	Filter map[string]interface{} `json:"filter"`
+	Filter     map[string]interface{} `json:"filter"`
+	Select     []string               `json:"select"`
+	Projection []string               `json:"projection"`
 }
 
 func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -231,11 +399,23 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	docs, err := s.getDB(r).Query(collection, req.Filter)
+	proj := req.Select
+	if len(proj) == 0 {
+		proj = req.Projection
+	}
+
+	docs, err := s.getDB(r).Query(collection, req.Filter, proj)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	docs, err = s.filterDocs(r, collection, docs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	if docs == nil {
 		docs = []map[string]interface{}{}
 	}
