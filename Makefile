@@ -1,16 +1,33 @@
-.PHONY: build run test clean docs
+.PHONY: build run test clean deps fmt lint dev
 
-build:
-	go build -o bin/server ./cmd/server
+BINARY_NAME=sovrabase
+BUILD_DIR=build
+CGO_ENABLED=0
 
-run:
-	go run ./cmd/server
+deps:
+	go mod tidy
+	go mod download
+
+build: deps
+	CGO_ENABLED=$(CGO_ENABLED) go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/sovrabase
+
+run: build
+	./$(BUILD_DIR)/$(BINARY_NAME)
 
 test:
-	go test ./... -v
+	CGO_ENABLED=$(CGO_ENABLED) go test -v -race ./...
+
+test-short:
+	CGO_ENABLED=$(CGO_ENABLED) go test -short ./...
 
 clean:
-	rm -rf bin/*
+	rm -rf $(BUILD_DIR) data/
 
-docs:
-	swag init --parseDependency --parseInternal -g cmd/server/main.go -d ./ 2>&1
+fmt:
+	go fmt ./...
+
+lint:
+	go vet ./...
+
+dev: build
+	SOVRABASE_DATA_DIR=./data SOVRABASE_LISTEN_ADDR=:6070 ./$(BUILD_DIR)/$(BINARY_NAME)

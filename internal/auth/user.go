@@ -1,0 +1,60 @@
+package auth
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+)
+
+// Role represents a user's authorization level.
+type Role string
+
+const (
+	RoleUser  Role = "user"
+	RoleAdmin Role = "admin"
+)
+
+// User represents a Sovrabase user account.
+type User struct {
+	ID           string    `json:"id"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"`
+	Role         Role      `json:"role"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// TokenPair contains the access and refresh tokens returned on login/signup.
+type TokenPair struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"` // seconds until access token expires
+}
+
+// NewUser creates a User with a generated UUID and timestamps.
+func NewUser(email, passwordHash string) *User {
+	now := time.Now().UTC()
+	return &User{
+		ID:           uuid.New().String(),
+		Email:        email,
+		PasswordHash: passwordHash,
+		Role:         RoleUser,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+}
+
+// HashPassword returns a bcrypt hash of the given password.
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
+// CheckPassword compares a bcrypt hash against a plaintext password.
+func CheckPassword(hash, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+}

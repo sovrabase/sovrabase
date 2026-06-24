@@ -1,43 +1,24 @@
 # Stage 1: Build
-FROM golang:1.25.2-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
-# Build arguments for multi-architecture support
-ARG TARGETARCH
+RUN apk add --no-cache git ca-certificates
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
-
-WORKDIR /build
-
-# Copy go mod files
+WORKDIR /src
 COPY go.mod go.sum ./
-
-# Download dependencies
 RUN go mod download
 
-# Copy source code
 COPY . .
-
-# Build the application
-# CGO_ENABLED=0 for static binary
-# -ldflags="-w -s" to strip debug info and reduce binary size
-# TARGETARCH will be automatically set by Docker buildx (amd64 or arm64)
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
-    -ldflags="-w -s" \
-    -o sovrabase \
-    ./cmd/server/main.go
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /sovrabase ./cmd/sovrabase
 
 # Stage 2: Runtime
 FROM scratch
 
-# Copy CA certificates for HTTPS
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /sovrabase /sovrabase
 
-# Copy timezone data
-COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+EXPOSE 6070
+VOLUME ["/data"]
+ENV SOVRABASE_DATA_DIR=/data
+ENV SOVRABASE_STORAGE_DIR=/data/storage
 
-# Copy binary
-COPY --from=builder /build/sovrabase /sovrabase
-# Run the application
-# The config file must be provided via volume mount at /config/config.yaml
 ENTRYPOINT ["/sovrabase"]

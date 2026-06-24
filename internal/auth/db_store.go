@@ -1,0 +1,140 @@
+package auth
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/ketsuna-org/sovrabase/internal/db"
+)
+
+// DBUserStore implements UserStore using a db.Engine.
+type DBUserStore struct {
+	engine *db.Engine
+}
+
+// NewDBUserStore creates a new DBUserStore and ensures the _users collection exists.
+func NewDBUserStore(engine *db.Engine) *DBUserStore {
+	// Ensure collection exists; ignore already exists errors.
+	_ = engine.CreateCollection("_users")
+	return &DBUserStore{engine: engine}
+}
+
+// Create inserts a new user.
+func (s *DBUserStore) Create(user *User) error {
+	// Check for duplicate emails
+	existing, err := s.GetByEmail(user.Email)
+	if err == nil && existing != nil {
+		return fmt.Errorf("user with email %q already exists", user.Email)
+	}
+
+	doc := userToMap(user)
+	if err := s.engine.Insert("_users", user.ID, doc); err != nil {
+		return fmt.Errorf("auth: create user: %w", err)
+	}
+	return nil
+}
+
+// GetByID retrieves a user by ID.
+func (s *DBUserStore) GetByID(id string) (*User, error) {
+	doc, err := s.engine.Get("_users", id)
+	if err != nil {
+		return nil, fmt.Errorf("auth: get user by ID: %w", err)
+	}
+	if doc == nil {
+		return nil, fmt.Errorf("user %q not found", id)
+	}
+	return mapToUser(doc)
+}
+
+// GetByEmail retrieves a user by email.
+func (s *DBUserStore) GetByEmail(email string) (*User, error) {
+	docs, err := s.engine.Query("_users", map[string]interface{}{"email": email})
+	if err != nil {
+		return nil, fmt.Errorf("auth: query user by email: %w", err)
+	}
+	if len(docs) == 0 {
+		return nil, fmt.Errorf("user with email %q not found", email)
+	}
+	return mapToUser(docs[0])
+}
+
+// Update persists changes to an existing user.
+func (s *DBUserStore) Update(user *User) error {
+	// Check that the user exists first
+	if _, err := s.GetByID(user.ID); err != nil {
+		return err
+	}
+
+	doc := userToMap(user)
+	if err := s.engine.Update("_users", user.ID, doc); err != nil {
+		return fmt.Errorf("auth: update user: %w", err)
+	}
+	return nil
+}
+
+// Delete removes a user by ID.
+func (s *DBUserStore) Delete(id string) error {
+	// Check that the user exists first
+	if _, err := s.GetByID(id); err != nil {
+		return err
+	}
+
+	if err := s.engine.Delete("_users", id); err != nil {
+		return fmt.Errorf("auth: delete user: %w", err)
+	}
+	return nil
+}
+
+// List returns all users.
+func (s *DBUserStore) List() ([]*User, error) {
+	docs, err := s.engine.List("_users")
+	if err != nil {
+		return nil, fmt.Errorf("auth: list users: %w", err)
+	}
+
+	var users []*User
+	for _, doc := range docs {
+		user, err := mapToUser(doc)
+		if err != nil {
+			continue
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+// Helper functions to map User to/from map[string]interface{}
+func userToMap(u *User) map[string]interface{} {
+	return map[string]interface{}{
+		"_id":           u.ID,
+		"email":          u.Email,
+		"password_hash":  u.PasswordHash,
+		"role":           string(u.Role),
+		"created_at":     u.CreatedAt.Format(time.RFC3339Nano),
+		"updated_at":     u.UpdatedAt.Format(time.RFC3339Nano),
+	}
+}
+
+func mapToUser(m map[string]interface{}) (*User, error) {
+	id, _ := m["_id"].(string)
+	email, _ := m["email"].(string)
+	pwHash, _ := m["password_hash"].(string)
+	roleStr, _ := m["role"].(string)
+
+	var createdAt, updatedAt time.Time
+	if caStr, ok := m["created_at"].(string); ok {
+		createdAt, _ = time.Parse(time.RFC3339Nano, caStr)
+	}
+	if uaStr, ok := m["updated_at"].(string); ok {
+		updatedAt, _ = time.Parse(time.RFC3339Nano, uaStr)
+	}
+
+	return &User{
+		ID:           id,
+		Email:        email,
+		PasswordHash: pwHash,
+		Role:         Role(roleStr),
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+	}, nil
+}

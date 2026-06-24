@@ -1,0 +1,341 @@
+// Package tenant implements multi-tenant project isolation for Sovrabase.
+//
+// Each project gets its own Pebble database instance, JWT secret, storage
+// namespace, and replication group. The ProjectManager stores project metadata
+// in a master Pebble database and creates/destroys isolated environments.
+package tenant
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/cockroachdb/pebble"
+	"github.com/google/uuid"
+
+	"github.com/ketsuna-org/sovrabase/internal/auth"
+	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/storage"
+)
+
+// Project represents an isolated Sovrabase project (tenant).
+type Project struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	OwnerID     string    `json:"owner_id"`
+	JWTSecret   string    `json:"jwt_secret"`
+	DataDir     string    `json:"data_dir"`
+	StorageDir  string    `json:"storage_dir"`
+	CreatedAt   time.Time `json:"created_at"`
+	Status      string    `json:"status"` // "active", "suspended", "deleted"
+	ReplGroup   string    `json:"repl_group"` // replication group identifier
+}
+
+// ProjectEnv holds project-specific database, auth service, and storage driver.
+type ProjectEnv struct {
+	Engine  *db.Engine
+	Auth    *auth.AuthService
+	Storage storage.Driver
+}
+
+// ProjectManager manages all projects in the system.
+type ProjectManager struct {
+	mu       sync.RWMutex
+	db       *pebble.DB
+	baseDir  string
+	projects map[string]*Project // in-memory cache
+	envs     map[string]*ProjectEnv // project ID -> active environment cache
+}
+
+// NewProjectManager creates a new project manager backed by the master database
+// stored at {baseDir}/_master.
+func NewProjectManager(baseDir string) (*ProjectManager, error) {
+	masterDir := filepath.Join(baseDir, "_master")
+	if err := os.MkdirAll(masterDir, 0755); err != nil {
+		return nil, fmt.Errorf("tenant: create master dir: %w", err)
+	}
+
+	db, err := pebble.Open(masterDir, &pebble.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("tenant: open master db: %w", err)
+	}
+
+	pm := &ProjectManager{
+		db:       db,
+		baseDir:  baseDir,
+		projects: make(map[string]*Project),
+		envs:     make(map[string]*ProjectEnv),
+	}
+
+	// Load existing projects into cache
+	if err := pm.loadAll(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("tenant: load projects: %w", err)
+	}
+
+	return pm, nil
+}
+
+// Close shuts down the project manager's database and closes all project databases.
+func (pm *ProjectManager) Close() error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	for _, env := range pm.envs {
+		_ = env.Engine.Close()
+	}
+	return pm.db.Close()
+}
+
+// CreateProject creates a new isolated project.
+func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	// Check for duplicate names
+	for _, p := range pm.projects {
+		if p.Name == name && p.Status != "deleted" {
+			return nil, fmt.Errorf("tenant: project %q already exists", name)
+		}
+	}
+
+	id := uuid.New().String()
+	jwtSecret, err := generateSecureToken(32)
+	if err != nil {
+		return nil, fmt.Errorf("tenant: generate secret: %w", err)
+	}
+
+	projectDir := filepath.Join(pm.baseDir, "projects", id)
+	proj := &Project{
+		ID:         id,
+		Name:       name,
+		OwnerID:    ownerID,
+		JWTSecret:  jwtSecret,
+		DataDir:    filepath.Join(projectDir, "db"),
+		StorageDir: filepath.Join(projectDir, "storage"),
+		CreatedAt:  time.Now().UTC(),
+		Status:     "active",
+		ReplGroup:  "default",
+	}
+
+	// Create project directories
+	os.MkdirAll(proj.DataDir, 0755)
+	os.MkdirAll(proj.StorageDir, 0755)
+
+	// Persist to master DB
+	if err := pm.saveProject(proj); err != nil {
+		return nil, err
+	}
+
+	pm.projects[id] = proj
+	return proj, nil
+}
+
+// GetProject retrieves a project by ID.
+func (pm *ProjectManager) GetProject(id string) (*Project, error) {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	proj, ok := pm.projects[id]
+	if !ok {
+		return nil, fmt.Errorf("tenant: project %q not found", id)
+	}
+	return proj, nil
+}
+
+// GetProjectBySecret retrieves a project by its JWT secret (API key).
+func (pm *ProjectManager) GetProjectBySecret(secret string) (*Project, error) {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	for _, p := range pm.projects {
+		if p.JWTSecret == secret {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("tenant: invalid project secret")
+}
+
+// ListProjects returns all active projects.
+func (pm *ProjectManager) ListProjects() []*Project {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	var result []*Project
+	for _, p := range pm.projects {
+		if p.Status == "active" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// DeleteProject marks a project as deleted and removes its data.
+func (pm *ProjectManager) DeleteProject(id string) error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	proj, ok := pm.projects[id]
+	if !ok {
+		return fmt.Errorf("tenant: project %q not found", id)
+	}
+
+	proj.Status = "deleted"
+	if err := pm.saveProject(proj); err != nil {
+		return err
+	}
+
+	// Close database engine and remove from cache if open
+	if env, ok := pm.envs[id]; ok {
+		_ = env.Engine.Close()
+		delete(pm.envs, id)
+	}
+
+	// Remove project data directory
+	projectDir := filepath.Join(pm.baseDir, "projects", id)
+	os.RemoveAll(projectDir)
+
+	delete(pm.projects, id)
+
+	// Remove from master DB
+	key := projectDBKey(id)
+	return pm.db.Delete(key, pebble.Sync)
+}
+
+// ProjectCount returns the number of active projects.
+func (pm *ProjectManager) ProjectCount() int {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	count := 0
+	for _, p := range pm.projects {
+		if p.Status == "active" {
+			count++
+		}
+	}
+	return count
+}
+
+// saveProject persists a project to the master database.
+func (pm *ProjectManager) saveProject(proj *Project) error {
+	data, err := json.Marshal(proj)
+	if err != nil {
+		return fmt.Errorf("tenant: marshal project: %w", err)
+	}
+	return pm.db.Set(projectDBKey(proj.ID), data, pebble.Sync)
+}
+
+// loadAll loads all projects from the master database into memory.
+func (pm *ProjectManager) loadAll() error {
+	prefix := []byte("project:")
+	iter, err := pm.db.NewIter(&pebble.IterOptions{
+		LowerBound: prefix,
+		UpperBound: keyUpperBound(prefix),
+	})
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		var proj Project
+		if err := json.Unmarshal(iter.Value(), &proj); err != nil {
+			continue
+		}
+		if proj.JWTSecret == "" {
+			secret, err := generateSecureToken(32)
+			if err == nil {
+				proj.JWTSecret = secret
+				// Save it back to master DB
+				data, err := json.Marshal(&proj)
+				if err == nil {
+					_ = pm.db.Set(projectDBKey(proj.ID), data, pebble.Sync)
+				}
+			}
+		}
+		pm.projects[proj.ID] = &proj
+	}
+	return iter.Error()
+}
+
+// GetProjectEnv returns (and opens if not cached) the project's isolated environment.
+func (pm *ProjectManager) GetProjectEnv(id string) (*ProjectEnv, error) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	// 1. Check cache
+	if env, ok := pm.envs[id]; ok {
+		return env, nil
+	}
+
+	// 2. Fetch project
+	proj, ok := pm.projects[id]
+	if !ok || proj.Status == "deleted" {
+		return nil, fmt.Errorf("tenant: project %q not found", id)
+	}
+
+	// 3. Initialize db engine
+	engine, err := db.NewEngine(proj.DataDir)
+	if err != nil {
+		return nil, fmt.Errorf("tenant: failed to initialize project db: %w", err)
+	}
+
+	// 4. Initialize auth service
+	userStore := auth.NewDBUserStore(engine)
+	authSvc := auth.NewService(proj.JWTSecret, userStore)
+
+	// 5. Initialize storage driver
+	var storageDriver storage.Driver
+	if os.Getenv("S3_ACCESS_KEY") != "" {
+		s3Svc, err := storage.NewS3DriverFromEnv()
+		if err != nil {
+			engine.Close()
+			return nil, fmt.Errorf("tenant: failed to initialize project S3 driver: %w", err)
+		}
+		storageDriver = s3Svc
+	} else {
+		localSvc, err := storage.NewLocalDriver(proj.StorageDir, "")
+		if err != nil {
+			engine.Close()
+			return nil, fmt.Errorf("tenant: failed to initialize project local storage driver: %w", err)
+		}
+		storageDriver = localSvc
+	}
+
+	env := &ProjectEnv{
+		Engine:  engine,
+		Auth:    authSvc,
+		Storage: storageDriver,
+	}
+
+	pm.envs[id] = env
+	return env, nil
+}
+
+func projectDBKey(id string) []byte {
+	return []byte("project:" + id)
+}
+
+func keyUpperBound(prefix []byte) []byte {
+	upper := make([]byte, len(prefix))
+	copy(upper, prefix)
+	for i := len(prefix) - 1; i >= 0; i-- {
+		if prefix[i] < 0xff {
+			upper[i]++
+			return upper[:i+1]
+		}
+	}
+	return append(prefix, 0x00)
+}
+
+func generateSecureToken(length int) (string, error) {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}

@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sovrabase Control Plane</title>
+<script>
+window.onerror = function(message, source, lineno, colno, error) {
+  const errStr = `${message} at ${source}:${lineno}:${colno}`;
+  alert("Global JS Error: " + errStr);
+  return false;
+};
+</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<!-- ========== LOGIN VIEW ========== -->
+<div id="login-container" style="display:none; justify-content:center; align-items:center; min-height:100vh; width:100%; background:radial-gradient(circle at 50% 50%, #111119 0%, #030008 100%); font-family:var(--font); position:relative; overflow:hidden; box-sizing:border-box;">
+  <!-- Ambient glowing decorative background elements -->
+  <div style="position: absolute; width: 450px; height: 450px; background: radial-gradient(circle, rgba(91, 91, 255, 0.1) 0%, rgba(91, 91, 255, 0) 70%); top: 10%; left: 15%; filter: blur(60px); pointer-events: none; z-index: 1;"></div>
+  <div style="position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, rgba(139, 92, 246, 0) 70%); bottom: 10%; right: 10%; filter: blur(70px); pointer-events: none; z-index: 1;"></div>
+  
+  <!-- Glassmorphism Card -->
+  <div class="glass" style="border:1px solid rgba(255,255,255,0.06); border-radius:var(--radius-xl); padding:48px 40px; width:90%; max-width:420px; box-shadow:0 24px 80px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05); display:flex; flex-direction:column; gap:24px; z-index:2; position:relative;">
+    
+    <!-- Logo and Heading -->
+    <div style="text-align:center;">
+      <div style="width:68px; height:68px; background:rgba(91,91,255,0.08); border:1px solid rgba(91,91,255,0.18); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 18px; font-size:32px; box-shadow:0 8px 32px rgba(91, 91, 255, 0.15); animation: floating 3s ease-in-out infinite;">🇪🇺</div>
+      <h2 style="font-size:26px; font-weight:800; letter-spacing:-0.5px; background:linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:6px;">Sovrabase</h2>
+      <p style="font-size:13.5px; color:var(--text-secondary); margin-top:2px;">Sign in to sovereign control plane</p>
+    </div>
+
+    <!-- Login Form -->
+    <form id="login-form" onsubmit="handleLoginSubmit(event)" style="display:flex; flex-direction:column; gap:20px;">
+      <div class="form-group" style="margin:0; gap:8px;">
+        <label for="login-email" style="font-size:11px; font-weight:700; letter-spacing:0.8px; color:var(--text-muted);">Admin Email</label>
+        <input type="email" id="login-email" required placeholder="admin@sovrabase.eu" autocomplete="username" style="padding:12px 16px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius); color:var(--text-primary); font-size:14px; outline:none; transition:all 0.2s ease;">
+      </div>
+      <div class="form-group" style="margin:0; gap:8px;">
+        <label for="login-password" style="font-size:11px; font-weight:700; letter-spacing:0.8px; color:var(--text-muted);">Password</label>
+        <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password" style="padding:12px 16px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius); color:var(--text-primary); font-size:14px; outline:none; transition:all 0.2s ease;">
+      </div>
+      <button type="submit" class="btn btn-primary" id="btn-login-submit" style="justify-content:center; padding:14px; font-size:14px; font-weight:600; background:linear-gradient(135deg, #5b5bff, #8b5cf6); border:none; color:white; border-radius:var(--radius); cursor:pointer; box-shadow:0 4px 20px rgba(91, 91, 255, 0.35); transition:all 0.2s ease; margin-top:8px;">
+        Sign In
+      </button>
+    </form>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="flag">🇪🇺</span>
+      <span class="brand">Sovrabase</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <div class="nav-item active" data-view="dashboard" onclick="navigateTo('dashboard')">
+        <span class="nav-icon">⊞</span> Dashboard
+      </div>
+      <div class="nav-item" data-view="projects" onclick="navigateTo('projects')">
+        <span class="nav-icon">⊡</span> Projects
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-section-label">System</div>
+      <div class="nav-item" data-view="settings" onclick="navigateTo('settings')">
+        <span class="nav-icon">⚙</span> Settings
+      </div>
+      <div class="nav-item" onclick="logout()" style="color:var(--danger);">
+        <span class="nav-icon" style="color:var(--danger);">⎋</span> Logout
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="status-row">
+        <span class="status-dot"></span>
+        <span id="sidebar-version">v0.3.0</span>
+      </div>
+      <div id="sidebar-region">eu-west</div>
+    </div>
+  </aside>
+
+  <!-- ========== MAIN CONTENT ========== -->
+  <main class="main">
+
+    <!-- ===== DASHBOARD VIEW ===== -->
+    <div id="view-dashboard" class="view active">
+      <div class="page-hero">
+        <h1>Sovrabase Control Plane</h1>
+        <p class="hero-sub">Sovereign European BaaS — GDPR compliant, no US Cloud Act</p>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-card-icon">📦</div>
+          <div class="stat-card-label">Active Projects</div>
+          <div class="stat-card-value" id="stat-projects">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">🖥</div>
+          <div class="stat-card-label">Database Nodes</div>
+          <div class="stat-card-value" id="stat-nodes">1</div>
+          <div class="stat-card-sub">Standalone mode</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">💾</div>
+          <div class="stat-card-label">Storage Used</div>
+          <div class="stat-card-value" id="stat-storage">0 MB</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">🌍</div>
+          <div class="stat-card-label">European Region</div>
+          <div class="stat-card-value" id="stat-region">—</div>
+          <div class="stat-card-sub" id="stat-region-flag"></div>
+        </div>
+      </div>
+
+      <!-- Replication status -->
+      <div class="card" id="replication-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">🔄 Replication Status</div>
+          </div>
+        </div>
+        <div id="replication-info">
+          <p style="font-size:13px;color:var(--text-secondary)">Standalone — replication not configured</p>
+        </div>
+      </div>
+
+      <!-- Quick Start -->
+      <div class="card">
+        <div class="card-title mb-3">🚀 Quick Start</div>
+        <div class="quick-start-tabs">
+          <button class="qs-tab active" onclick="switchQuickStartTab('create')">Create Project</button>
+          <button class="qs-tab" onclick="switchQuickStartTab('flutter')">Flutter SDK</button>
+          <button class="qs-tab" onclick="switchQuickStartTab('rest')">REST API</button>
+        </div>
+        <div class="qs-panel active" id="qs-create">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Create your first Sovrabase project and get an API key instantly.</p>
+          <button class="btn btn-primary" onclick="navigateTo('projects'); setTimeout(openCreateModal,200);">
+            ✨ Create your first project
+          </button>
+        </div>
+        <div class="qs-panel" id="qs-flutter">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">Add Sovrabase to your Flutter app:</p>
+          <div class="code-block">final sovrabase = SovrabaseClient(
+  apiKey: 'YOUR_API_KEY',
+  projectId: 'YOUR_PROJECT_ID',
+);</div>
+        </div>
+        <div class="qs-panel" id="qs-rest">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">Use the REST API with your API key:</p>
+          <div class="code-block"># List collections
+curl -H "Authorization: Bearer TOKEN" \
+  http://localhost:6070/api/v1/collections/users
+
+# Create a document
+curl -X POST \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Alice"}' \
+  http://localhost:6070/api/v1/collections/users/documents</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PROJECTS VIEW ===== -->
+    <div id="view-projects" class="view">
+      <div class="page-header">
+        <h2>Projects</h2>
+        <button class="btn btn-primary" onclick="openCreateModal()">
+          + New Project
+        </button>
+      </div>
+
+      <div class="search-wrap" style="margin-bottom:16px">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="project-search"
+          placeholder="Filter projects..." oninput="filterProjects()">
+      </div>
+
+      <div class="table-wrap" id="projects-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>ID</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th style="width:100px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="projects-tbody">
+          </tbody>
+        </table>
+      </div>
+      <div id="projects-empty" style="display:none"></div>
+    </div>
+
+    <!-- ===== SETTINGS VIEW ===== -->
+    <div id="view-settings" class="view">
+      <div class="page-hero">
+        <h1>Settings</h1>
+        <p class="hero-sub">Server configuration — saved to <span id="sys-config-file" class="mono" style="color:var(--accent);font-size:12px;">data/config.yaml</span></p>
+      </div>
+
+      <!-- System information -->
+      <div class="card">
+        <div class="card-title mb-3">💻 System Information</div>
+        <div class="info-grid">
+          <div class="detail-row">
+            <span class="detail-label">Version</span>
+            <span class="detail-value" id="sys-version">—</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Go Version</span>
+            <span class="detail-value" id="sys-go-version">—</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Listen Address</span>
+            <span class="detail-value mono" id="sys-listen-addr">—</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Data Directory</span>
+            <span class="detail-value mono" id="sys-data-dir">—</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Storage Driver</span>
+            <span class="detail-value" id="sys-storage-driver">Local Filesystem</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Replication Role</span>
+            <span class="detail-value" id="sys-repl-role">Standalone</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Region</span>
+            <span class="detail-value" id="sys-region">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Account -->
+      <div class="card">
+        <div class="card-title mb-3">🔐 Admin Account</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          Credentials used to log in to this dashboard. Changes apply after restart.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label for="cfg-admin-email">Admin Email</label>
+            <input type="email" id="cfg-admin-email" placeholder="admin@sovrabase.eu" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-admin-password">New Password</label>
+            <input type="password" id="cfg-admin-password" placeholder="Leave blank to keep current" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="cfg-admin-password-confirm">Confirm Password</label>
+            <input type="password" id="cfg-admin-password-confirm" placeholder="Repeat new password" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="cfg-session-duration">Session Duration <span style="font-size:11px;color:var(--text-muted)">(e.g. 24h, 168h, 30m)</span></label>
+            <input type="text" id="cfg-session-duration" placeholder="24h" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 Storage Configuration -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div class="card-title" style="margin-bottom:0">🪣 External S3 Storage</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary);">
+            <div class="toggle-switch">
+              <input type="checkbox" id="cfg-s3-enabled" onchange="toggleS3Form()">
+              <span class="toggle-slider"></span>
+            </div>
+            Enable S3
+          </label>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          Use any S3-compatible provider (AWS, Scaleway, MinIO, OVH, etc.) for project file storage.
+        </p>
+        <div id="s3-form-fields" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label for="cfg-s3-endpoint">Endpoint</label>
+              <input type="text" id="cfg-s3-endpoint" placeholder="s3.fr-par.scw.cloud" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="cfg-s3-prefix">Bucket Prefix</label>
+              <input type="text" id="cfg-s3-prefix" placeholder="sovrabase" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="cfg-s3-access-key">Access Key</label>
+              <input type="text" id="cfg-s3-access-key" placeholder="Access key ID" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="cfg-s3-secret-key">Secret Key</label>
+              <input type="password" id="cfg-s3-secret-key" placeholder="Leave blank to keep current" autocomplete="new-password">
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer;font-size:13px;color:var(--text-secondary);">
+            <input type="checkbox" id="cfg-s3-ssl" checked>
+            Use SSL/TLS
+          </label>
+        </div>
+      </div>
+
+      <!-- Replication Configuration -->
+      <div class="card">
+        <div class="card-title mb-3">🔄 Database Replication</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          Configure this node's role in the cluster. Changes apply after restart.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label for="cfg-role">Node Role</label>
+            <select id="cfg-role">
+              <option value="">Standalone (no replication)</option>
+              <option value="master">Master (primary write node)</option>
+              <option value="heir">Heir (hot standby / auto-failover)</option>
+              <option value="reader">Reader (read-only replica)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="cfg-node-id">Node ID</label>
+            <input type="text" id="cfg-node-id" placeholder="node-1" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-repl-addr">Replication Listen Address</label>
+            <input type="text" id="cfg-repl-addr" placeholder=":9090" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-peers">Peers <span style="font-size:11px;color:var(--text-muted)">(one per line, e.g. host:9090)</span></label>
+            <textarea id="cfg-peers" rows="3" style="resize:vertical;" placeholder="node2.host:9090&#10;node3.host:9090"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save & Restart -->
+      <div class="card" style="background: linear-gradient(135deg, rgba(91,91,255,0.06) 0%, rgba(91,91,255,0.02) 100%); border-color: rgba(91,91,255,0.2);">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Apply Changes</div>
+            <p style="font-size:13px;color:var(--text-muted);margin:0;">Config is saved to <code>config.yaml</code>. A restart applies S3 &amp; replication changes.</p>
+          </div>
+          <div style="display:flex;gap:10px;flex-shrink:0;">
+            <button class="btn btn-secondary" onclick="loadSettings()">↺ Reset</button>
+            <button class="btn btn-primary" id="btn-save-config" onclick="saveConfig()">💾 Save Config</button>
+            <button class="btn" id="btn-restart-server" onclick="restartServer()" style="background:var(--warning);color:#000;font-weight:700;" title="Save config and restart the server process">
+              ⚡ Save &amp; Restart
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="danger-zone">
+        <h4>⚠ Danger Zone</h4>
+        <p>Irreversible actions. Please proceed with caution.</p>
+        <div class="coming-soon" style="display:inline-block">
+          <button class="btn btn-danger" disabled>Reset All Data</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PROJECT DETAIL VIEW ===== -->
+    <div id="view-project-detail" class="view">
+      <div class="page-header" style="align-items: center; display: flex; gap: 16px;">
+        <button class="btn btn-secondary btn-icon" onclick="navigateTo('projects');" style="margin-right: 8px;">
+          ← Back to Projects
+        </button>
+        <h2 id="detail-title">Project Details</h2>
+      </div>
+
+      <div class="quick-start-tabs" style="margin-bottom: 20px;">
+        <button class="qs-tab active" data-pdtab="overview" onclick="switchProjectDetailTab('overview')">Overview</button>
+        <button class="qs-tab" data-pdtab="database" onclick="switchProjectDetailTab('database')">Database</button>
+        <button class="qs-tab" data-pdtab="auth" onclick="switchProjectDetailTab('auth')">Auth</button>
+        <button class="qs-tab" data-pdtab="storage" onclick="switchProjectDetailTab('storage')">Storage</button>
+        <button class="qs-tab" data-pdtab="api" onclick="switchProjectDetailTab('api')">API</button>
+        <button class="qs-tab" data-pdtab="logs" onclick="switchProjectDetailTab('logs')">Logs & Metrics</button>
+      </div>
+
+      <div class="card" style="padding: 24px; min-height: 400px;">
+        <!-- Overview Tab Panel -->
+        <div class="modal-tab-panel active" id="pdtab-overview">
+          <div class="info-grid" id="pdtab-overview-content"></div>
+          <div style="margin-top:12px">
+            <span class="detail-label">API Key: </span>
+            <span class="mask-toggle" id="pdtab-apikey-mask" onclick="toggleApiKeyReveal()">•••••••••••• (click to reveal)</span>
+            <span id="pdtab-apikey-full" style="display:none;font-family:var(--font-mono);font-size:12px;word-break:break-all;"></span>
+          </div>
+        </div>
+
+        <!-- Database Tab Panel (Firestore-Style 3-Column Layout) -->
+        <div class="modal-tab-panel" id="pdtab-database">
+          <div class="firestore-layout">
+            <!-- Column 1: Collections -->
+            <div class="fs-col" style="width: 240px; border-right: 1px solid var(--border);">
+              <div class="fs-col-header">
+                <span>Collections</span>
+                <div style="display: flex; gap: 4px;">
+                  <button class="btn btn-xs btn-danger" onclick="dropSelectedCollection()" id="btn-drop-col-col1" style="font-size: 10px; display: none;">Drop</button>
+                  <button class="btn btn-xs btn-secondary" onclick="openCreateCollectionModal()" style="font-size: 10px;">+ New</button>
+                </div>
+              </div>
+              <div class="fs-col-content" id="fs-collections-list">
+                <!-- Dynamic collections list using .fs-item -->
+              </div>
+            </div>
+
+            <!-- Column 2: Documents -->
+            <div class="fs-col" style="width: 280px; border-right: 1px solid var(--border);">
+              <div class="fs-col-header">
+                <span>Documents</span>
+                <div style="display: flex; gap: 4px;">
+                  <button class="btn btn-xs btn-primary" onclick="openCreateDocModal()" id="btn-add-doc-col2" style="font-size: 10px; display: none;">+ Add</button>
+                  <button class="btn btn-xs btn-secondary" onclick="triggerImportDoc()" id="btn-import-doc-col2" style="font-size: 10px; display: none;">Import</button>
+                </div>
+              </div>
+              <div class="fs-col-content" id="fs-documents-list">
+                <!-- Dynamic documents list using .fs-item -->
+                <div style="text-align:center; padding-top:40px; color:var(--text-secondary);" id="fs-no-collection-selected">
+                  <p style="font-size:11px;">Select a collection</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Column 3: Fields Tree -->
+            <div class="fs-col" style="flex: 1;">
+              <div class="fs-col-header">
+                <span>Fields</span>
+                <button class="btn btn-xs btn-danger" onclick="deleteSelectedDocument()" id="btn-delete-doc-col3" style="font-size: 10px; display: none;">Delete Document</button>
+              </div>
+              <div class="fs-col-content" id="fs-document-fields">
+                <div style="text-align:center; padding-top:40px; color:var(--text-secondary);" id="fs-no-document-selected">
+                  <p style="font-size:11px;">Select a document</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Auth Tab Panel -->
+        <div class="modal-tab-panel" id="pdtab-auth">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px;">Auth Users</h4>
+            <button class="btn btn-sm btn-primary" onclick="openCreateUserModal()">+ Add User</button>
+          </div>
+          <div class="table-wrap" style="max-height:400px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:120px;">ID</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Created</th>
+                  <th style="width:70px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="auth-users-tbody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Storage Tab Panel -->
+        <div class="modal-tab-panel" id="pdtab-storage">
+          <div style="display:flex; gap:20px; min-height:400px;">
+            <!-- Left: Buckets List -->
+            <div style="width:200px; border-right:1px solid var(--border); padding-right:16px; display:flex; flex-direction:column; gap:10px;">
+              <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px;">Buckets</h4>
+              <div id="storage-buckets-list" style="display:flex; flex-direction:column; gap:4px; overflow-y:auto; flex:1;">
+                <!-- Dynamic buckets -->
+              </div>
+              <button class="btn btn-sm btn-secondary" onclick="openCreateBucketModal()" style="width:100%;">+ Create Bucket</button>
+            </div>
+            <!-- Right: Files Browser -->
+            <div id="storage-files-browser" style="flex:1; display:flex; flex-direction:column; gap:12px;">
+              <div style="text-align:center; padding-top:80px; color:var(--text-secondary);" id="storage-no-bucket-selected">
+                <span style="font-size:36px;">📁</span>
+                <p style="margin-top:8px; font-size:13px;">Select a bucket to view and upload files</p>
+              </div>
+              <div id="storage-bucket-content" style="display:none; flex-direction:column; gap:12px; flex:1;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <h3 id="selected-bucket-title" style="font-size:16px; font-weight:700;"></h3>
+                  <div style="display:flex; gap:6px;">
+                    <button class="btn btn-sm btn-primary" onclick="triggerFileUpload()">+ Upload File</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteSelectedBucket()">Delete Bucket</button>
+                  </div>
+                </div>
+                <div class="table-wrap" style="max-height:300px; overflow-y:auto;">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Type</th>
+                        <th style="width:145px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="storage-files-tbody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- API Tab Panel -->
+        <div class="modal-tab-panel" id="pdtab-api">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Choose your SDK:</p>
+          <div class="quick-start-tabs" id="api-sdk-tabs">
+            <button class="qs-tab active" onclick="switchApiSdkTab('curl')">cURL</button>
+            <button class="qs-tab" onclick="switchApiSdkTab('dart')">Dart / Flutter</button>
+            <button class="qs-tab" onclick="switchApiSdkTab('js')">JavaScript</button>
+          </div>
+          <div class="qs-panel active" id="api-sdk-curl">
+            <div class="code-block" id="api-curl-snippet"># Initialize with your project credentials
+curl -H "Authorization: Bearer API_KEY" \
+  http://localhost:6070/api/v1</div>
+          </div>
+          <div class="qs-panel" id="api-sdk-dart">
+            <div class="code-block" id="api-dart-snippet">final client = SovrabaseClient(
+  apiKey: 'API_KEY',
+  projectId: 'PROJECT_ID',
+);</div>
+          </div>
+          <div class="qs-panel" id="api-sdk-js">
+            <div class="code-block" id="api-js-snippet">const sovrabase = new SovrabaseClient({
+  apiKey: 'API_KEY',
+  projectId: 'PROJECT_ID',
+});</div>
+          </div>
+        </div>
+
+        <!-- Logs & Metrics Tab Panel -->
+        <div class="modal-tab-panel" id="pdtab-logs">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px;">Request Logs & Metrics</h4>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-sm btn-secondary" onclick="loadProjectLogs()">🔄 Refresh</button>
+              <button class="btn btn-sm btn-danger" onclick="flushProjectLogs()">Clear Logs</button>
+            </div>
+          </div>
+          
+          <!-- Metrics Cards Row -->
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-bottom: 20px;">
+            <div class="stat-card" style="padding:14px; background:var(--bg-card-elevated);">
+              <div class="stat-card-label" style="font-size:10px;">Total Requests</div>
+              <div class="stat-card-value" id="metrics-total-requests" style="font-size:22px; margin-top:2px;">0</div>
+            </div>
+            <div class="stat-card" style="padding:14px; background:var(--bg-card-elevated);">
+              <div class="stat-card-label" style="font-size:10px;">Success Rate</div>
+              <div class="stat-card-value" id="metrics-success-rate" style="font-size:22px; margin-top:2px; color:var(--success);">100%</div>
+            </div>
+            <div class="stat-card" style="padding:14px; background:var(--bg-card-elevated);">
+              <div class="stat-card-label" style="font-size:10px;">Error Rate</div>
+              <div class="stat-card-value" id="metrics-error-rate" style="font-size:22px; margin-top:2px;">0%</div>
+            </div>
+          </div>
+
+          <!-- Logs Table -->
+          <div class="table-wrap" style="max-height:360px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:180px;">Timestamp</th>
+                  <th style="width:75px;">Method</th>
+                  <th>Path</th>
+                  <th style="width:75px;">Status</th>
+                  <th style="width:90px;">Duration</th>
+                </tr>
+              </thead>
+              <tbody id="logs-tbody">
+                <tr><td colspan="5" class="text-muted" style="text-align:center;">No logs recorded yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ========== TOAST CONTAINER ========== -->
+<div id="toast-container"></div>
+
+<!-- ========== CREATE PROJECT MODAL ========== -->
+<div class="modal-overlay" id="modal-create" style="display:none">
+  <div class="modal" id="modal-create-inner">
+    <div class="modal-header">
+      <h3>Create New Project</h3>
+      <button class="modal-close" onclick="closeCreateModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="create-form-section">
+        <div class="form-group">
+          <label for="new-project-name">Project Name *</label>
+          <input type="text" id="new-project-name" placeholder="my-sovrabase-project" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="new-project-owner">Owner ID</label>
+          <input type="text" id="new-project-owner" placeholder="default" autocomplete="off">
+          <span class="form-hint">Optional — defaults to "default" if left empty</span>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+          <button class="btn btn-primary" id="btn-create-submit" onclick="createProject()">
+            Create Project
+          </button>
+        </div>
+      </div>
+      <div id="create-success-section" style="display:none">
+        <div class="key-display">
+          <div class="key-display-header">
+            <span class="key-display-label">✓ Project Created — API Key</span>
+            <button class="btn btn-sm btn-secondary" onclick="copyText('create-api-key-value')">📋 Copy</button>
+          </div>
+          <div class="code-block" id="create-api-key-value" style="margin:0"></div>
+        </div>
+        <div class="key-warning">
+          ⚠ Save this API key securely — it won't be displayed again!
+        </div>
+        <div style="margin-top:8px">
+          <span class="detail-label">Project ID:</span>
+          <span class="detail-value mono" id="create-project-id"></span>
+        </div>
+        <div style="margin-top:4px">
+          <span class="detail-label">API URL:</span>
+          <span class="detail-value mono" id="create-api-url"></span>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" onclick="closeCreateModal(); navigateTo('projects'); loadProjects();">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ========== DELETE CONFIRM MODAL ========== -->
+<div class="modal-overlay" id="modal-delete" style="display:none">
+  <div class="modal" id="modal-delete-inner">
+    <div class="modal-header">
+      <h3>Delete Project</h3>
+      <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+        Are you sure you want to delete <strong id="delete-project-name"></strong>?
+        This action cannot be undone and all data will be permanently lost.
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger" id="btn-confirm-delete" onclick="confirmDeleteProject()">
+          Delete Project
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== CREATE COLLECTION MODAL ========== -->
+<div class="modal-overlay" id="modal-create-col" style="display:none">
+  <div class="modal" id="modal-create-col-inner">
+    <div class="modal-header">
+      <h3>Create Collection</h3>
+      <button class="modal-close" onclick="closeSubModal('modal-create-col')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="new-col-name">Collection Name *</label>
+        <input type="text" id="new-col-name" placeholder="users" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeSubModal('modal-create-col')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateCollection()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== CREATE DOCUMENT MODAL ========== -->
+<div class="modal-overlay" id="modal-create-doc" style="display:none">
+  <div class="modal modal-lg" id="modal-create-doc-inner">
+    <div class="modal-header">
+      <h3 id="doc-modal-title">Create Document</h3>
+      <button class="modal-close" onclick="closeSubModal('modal-create-doc')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="doc-editor-id">Document ID</label>
+        <input type="text" id="doc-editor-id" placeholder="Auto-generated (UUID) if left blank" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="margin:0;">Fields</label>
+          <button class="btn btn-xs btn-secondary" onclick="addEditorFieldRoot()">+ Add Field</button>
+        </div>
+        <div id="doc-editor-fields-container" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto; padding-right:6px;">
+          <!-- Dynamic fields rendered here -->
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top:24px;">
+        <button class="btn btn-secondary" onclick="closeSubModal('modal-create-doc')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitSaveDocument()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== IMPORT COLLECTION MODAL ========== -->
+<div class="modal-overlay" id="modal-import-col" style="display:none">
+  <div class="modal modal-lg" id="modal-import-col-inner">
+    <div class="modal-header">
+      <h3>Import Collection (JSON Array)</h3>
+      <button class="modal-close" onclick="closeSubModal('modal-import-col')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="import-json-textarea">JSON Array *</label>
+        <textarea id="import-json-textarea" style="width:100%; height:200px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-family:var(--font-mono); font-size:12.5px; padding:12px; outline:none;" placeholder='[&#10;  {"name": "Alice", "age": 25},&#10;  {"name": "Bob", "age": 28}&#10;]'></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeSubModal('modal-import-col')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitImportCollection()">Import</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== CREATE USER MODAL ========== -->
+<div class="modal-overlay" id="modal-create-user" style="display:none">
+  <div class="modal" id="modal-create-user-inner">
+    <div class="modal-header">
+      <h3>Create User</h3>
+      <button class="modal-close" onclick="closeSubModal('modal-create-user')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="new-user-email">Email *</label>
+        <input type="email" id="new-user-email" placeholder="user@example.com" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="new-user-password">Password *</label>
+        <input type="password" id="new-user-password" placeholder="Min 8 characters" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="new-user-role">Role</label>
+        <select id="new-user-role">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeSubModal('modal-create-user')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateUser()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== CREATE BUCKET MODAL ========== -->
+<div class="modal-overlay" id="modal-create-bucket" style="display:none">
+  <div class="modal" id="modal-create-bucket-inner">
+    <div class="modal-header">
+      <h3>Create Storage Bucket</h3>
+      <button class="modal-close" onclick="closeSubModal('modal-create-bucket')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="new-bucket-name">Bucket Name *</label>
+        <input type="text" id="new-bucket-name" placeholder="avatars" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeSubModal('modal-create-bucket')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateBucket()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden File Input -->
+<input type="file" id="storage-hidden-file-input" style="display:none" onchange="handleFileSelected(event)">
+
+<!-- ========== CUSTOM CONFIRMATION MODAL ========== -->
+<div class="modal-overlay" id="modal-confirm-custom" style="display:none" onclick="if(event.target === this) handleConfirmResult(false)">
+  <div class="modal" style="max-width: 440px;">
+    <div class="modal-header">
+      <h3 id="confirm-title">Confirm Action</h3>
+      <button class="modal-close" onclick="handleConfirmResult(false)">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-message" style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.5;"></p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="handleConfirmResult(false)">Cancel</button>
+        <button class="btn" id="confirm-btn-ok" onclick="handleConfirmResult(true)">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SCRIPTS ========== -->
+<script src="/js/api.js" defer></script>
+<script src="/js/auth.js" defer></script>
+<script src="/js/database.js" defer></script>
+<script src="/js/storage.js" defer></script>
+<script src="/js/app.js" defer></script>
+</body>
+</html>
