@@ -258,7 +258,7 @@ func TestValidateAccessToken(t *testing.T) {
 func TestCreateOAuthState(t *testing.T) {
 	svc := newTestService()
 
-	state, err := svc.CreateOAuthState("google")
+	state, err := svc.CreateOAuthState("google", "test-project-id", "/dashboard")
 	if err != nil {
 		t.Fatalf("CreateOAuthState failed: %v", err)
 	}
@@ -266,8 +266,23 @@ func TestCreateOAuthState(t *testing.T) {
 	if state == "" {
 		t.Fatal("expected non-empty state token")
 	}
-	if len(state) != 64 { // 32 bytes → 64 hex characters
-		t.Fatalf("expected 64-char hex state, got %d", len(state))
+	// State format: base64url(json_payload).hex(random32)
+	// JSON payload ~ {"project_id":"...","app_redirect":"..."}
+	// Must be longer than the random suffix alone
+	if len(state) < 1 + 64 + len("test-project-id") {
+		t.Fatalf("expected state longer than random suffix alone, got %d chars", len(state))
+	}
+
+	// Verify the payload can be decoded
+	payload, err := svc.DecodeStatePayload(state)
+	if err != nil {
+		t.Fatalf("DecodeStatePayload failed: %v", err)
+	}
+	if payload.ProjectID != "test-project-id" {
+		t.Fatalf("expected project ID 'test-project-id', got '%s'", payload.ProjectID)
+	}
+	if payload.AppRedirect != "/dashboard" {
+		t.Fatalf("expected app redirect '/dashboard', got '%s'", payload.AppRedirect)
 	}
 }
 

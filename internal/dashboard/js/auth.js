@@ -214,7 +214,8 @@ function testOAuthProvider(providerName) {
     showToast('Project key not available — try reopening the project', 'error');
     return;
   }
-  const url = `/auth/v1/oauth/${encodeURIComponent(providerName)}?project_key=${encodeURIComponent(detailApiKey)}&redirect=true`;
+  const finalRedirect = encodeURIComponent(window.location.pathname + window.location.search);
+  const url = `/auth/v1/oauth/${encodeURIComponent(providerName)}?project_key=${encodeURIComponent(detailApiKey)}&redirect=true&final_redirect=${finalRedirect}`;
   window.open(url, '_blank', 'noopener');
 }
 
@@ -288,8 +289,7 @@ function autoFillRedirect() {
   const name = document.getElementById('oauth-name').value.trim();
   const redirectInput = document.getElementById('oauth-redirect-url');
   if (name) {
-    const key = detailApiKey ? `?project_key=${encodeURIComponent(detailApiKey)}` : '';
-    redirectInput.value = window.location.origin + '/auth/v1/oauth/' + name + '/callback' + key;
+    redirectInput.value = window.location.origin + '/auth/v1/oauth/' + name + '/callback';
   } else {
     redirectInput.value = '';
   }

@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -29,6 +31,13 @@ type AuthService struct {
 type stateEntry struct {
 	provider  string
 	expiresAt time.Time
+}
+
+// OAuthStatePayload is JSON-encoded into the OAuth state token so the callback
+// can recover project context and redirect preferences without query params.
+type OAuthStatePayload struct {
+	ProjectID   string `json:"project_id"`
+	AppRedirect string `json:"app_redirect,omitempty"`
 }
 
 // NewService creates a new AuthService backed by the given UserStore.
@@ -163,14 +172,26 @@ func (s *AuthService) DeleteUser(id string) error {
 }
 
 // CreateOAuthState generates a cryptographically random state token for an
-// OAuth flow and stores it linked to the provider name.
-func (s *AuthService) CreateOAuthState(provider string) (string, error) {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
+// OAuth flow. Metadata (project ID, app redirect) is JSON-encoded into the
+// state so the callback can recover it without query parameters.
+// State format: base64url(json_payload) + "." + hex(random32)
+func (s *AuthService) CreateOAuthState(provider, projectID, appRedirect string) (string, error) {
+	randomBytes := make([]byte, 32)
+	if _, err := rand.Read(randomBytes); err != nil {
 		return "", fmt.Errorf("generating state: %w", err)
 	}
 
-	state := hex.EncodeToString(bytes)
+	payload := OAuthStatePayload{
+		ProjectID:   projectID,
+		AppRedirect: appRedirect,
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("encoding state payload: %w", err)
+	}
+
+	encodedPayload := base64.RawURLEncoding.EncodeToString(jsonPayload)
+	state := encodedPayload + "." + hex.EncodeToString(randomBytes)
 
 	s.oauthStatesMu.Lock()
 	s.oauthStates[state] = stateEntry{
@@ -187,19 +208,42 @@ func (s *AuthService) CreateOAuthState(provider string) (string, error) {
 
 // CreateOAuthStateURL generates a state token and returns the full authorization
 // URL to redirect the user to for the given provider.
-func (s *AuthService) CreateOAuthStateURL(provider string) (authURL, state string, err error) {
+func (s *AuthService) CreateOAuthStateURL(provider, projectID, appRedirect string) (authURL, state string, err error) {
 	p, ok := s.providers[provider]
 	if !ok {
 		return "", "", fmt.Errorf("unknown OAuth provider: %s", provider)
 	}
 
-	state, err = s.CreateOAuthState(provider)
+	state, err = s.CreateOAuthState(provider, projectID, appRedirect)
 	if err != nil {
 		return "", "", err
 	}
 
 	authURL = p.GetAuthURL(state)
 	return authURL, state, nil
+}
+
+// DecodeStatePayload extracts the full OAuth state payload (project ID,
+// app redirect, etc.) from a state token.
+func (s *AuthService) DecodeStatePayload(state string) (*OAuthStatePayload, error) {
+	idx := strings.IndexByte(state, '.')
+	if idx == -1 {
+		return nil, fmt.Errorf("invalid state format: no separator")
+	}
+
+	jsonBytes, err := base64.RawURLEncoding.DecodeString(state[:idx])
+	if err != nil {
+		return nil, fmt.Errorf("invalid state format: %w", err)
+	}
+
+	var payload OAuthStatePayload
+	if err := json.Unmarshal(jsonBytes, &payload); err != nil {
+		return nil, fmt.Errorf("invalid state payload: %w", err)
+	}
+	if payload.ProjectID == "" {
+		return nil, fmt.Errorf("state payload missing project_id")
+	}
+	return &payload, nil
 }
 
 

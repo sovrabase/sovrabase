@@ -70,12 +70,16 @@ func (a *authAdapter) GetUser(id string) (*UserInfo, error) {
 	return authUserToAPI(user), nil
 }
 
-func (a *authAdapter) CreateOAuthState(provider string) (string, error) {
-	return a.svc.CreateOAuthState(provider)
+func (a *authAdapter) CreateOAuthState(provider, projectID, appRedirect string) (string, error) {
+	return a.svc.CreateOAuthState(provider, projectID, appRedirect)
 }
 
-func (a *authAdapter) CreateOAuthStateURL(provider string) (string, string, error) {
-	return a.svc.CreateOAuthStateURL(provider)
+func (a *authAdapter) CreateOAuthStateURL(provider, projectID, appRedirect string) (string, string, error) {
+	return a.svc.CreateOAuthStateURL(provider, projectID, appRedirect)
+}
+
+func (a *authAdapter) DecodeStatePayload(state string) (*auth.OAuthStatePayload, error) {
+	return a.svc.DecodeStatePayload(state)
 }
 
 

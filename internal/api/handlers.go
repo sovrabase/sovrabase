@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -96,7 +97,9 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
-	authURL, state, err := s.getAuth(r).CreateOAuthStateURL(provider)
+	projectID := getProjectID(r)
+	appRedirect := r.URL.Query().Get("final_redirect")
+	authURL, state, err := s.getAuth(r).CreateOAuthStateURL(provider, projectID, appRedirect)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -124,8 +127,8 @@ func (s *Server) handleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 
 
 // handleOAuthCallback is called by the OAuth provider after the user authenticates.
-// It reads ?code and ?state from query params (standard browser redirect),
-// exchanges the code for tokens, and redirects the user back to the app.
+// It reads ?code and ?state from query params (standard browser redirect).
+// The project ID and redirect preferences are decoded from the state token itself.
 func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 	code := r.URL.Query().Get("code")
@@ -136,15 +139,36 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Decode the full payload from the state token (project ID, app redirect, etc.).
+	payload, err := s.auth.DecodeStatePayload(state)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid state: "+err.Error())
+		return
+	}
+
+	// Load the project environment and inject it into the request context.
+	proj, err := s.projects.GetProject(payload.ProjectID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "project not found")
+		return
+	}
+	env, err := s.projects.GetProjectEnv(proj.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load project environment")
+		return
+	}
+	ctx := context.WithValue(r.Context(), projectEnvKey, env)
+	ctx = context.WithValue(ctx, projectIDKey, proj.ID)
+	r = r.WithContext(ctx)
+
 	user, tokens, err := s.getAuth(r).HandleOAuthCallback(provider, code, state)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	// If there's an app redirect URL configured, send the user back to the app
-	// with the tokens in the URL fragment (never in query string — avoids server logs).
-	appRedirect := r.URL.Query().Get("app_redirect")
+	// Redirect to the app's post-login URL encoded in the state (defaults to /).
+	appRedirect := payload.AppRedirect
 	if appRedirect == "" {
 		appRedirect = "/"
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
@@ -72,8 +73,9 @@ type AuthService interface {
 	RefreshToken(refreshToken string) (*TokenPair, error)
 	ValidateAccessToken(tokenString string) (*UserClaims, error)
 	GetUser(id string) (*UserInfo, error)
-	CreateOAuthState(provider string) (string, error)
-	CreateOAuthStateURL(provider string) (authURL, state string, err error)
+	CreateOAuthState(provider, projectID, appRedirect string) (string, error)
+	CreateOAuthStateURL(provider, projectID, appRedirect string) (authURL, state string, err error)
+	DecodeStatePayload(state string) (*auth.OAuthStatePayload, error)
 	HandleOAuthCallback(provider, code, state string) (*UserInfo, *TokenPair, error)
 	VerifyEmail(token string) error
 	ForgotPassword(email string) (string, error)
@@ -252,11 +254,14 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		r.Post("/signin", s.handleSignIn)
 		r.Post("/refresh", s.handleRefresh)
 		r.Get("/oauth/{provider}", s.handleOAuthRedirect)
-		r.Get("/oauth/{provider}/callback", s.handleOAuthCallback)
 		r.Post("/verify-email", s.handleVerifyEmail)
 		r.Post("/forgot-password", s.handleForgotPassword)
 		r.Post("/reset-password", s.handleResetPassword)
 	})
+	// OAuth callback is outside projectMiddleware because it receives
+	// ?code and ?state from the OAuth provider (no X-Project-Key header).
+	// The project ID is decoded from the state token itself.
+	r.Get("/auth/v1/oauth/{provider}/callback", s.handleOAuthCallback)
 
 	// API routes (rate limited + auth)
 	r.Route("/api/v1", func(r chi.Router) {
