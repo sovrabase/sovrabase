@@ -15,26 +15,32 @@ const (
 	RoleAdmin Role = "admin"
 )
 
+// OAuthProviderMetadata stores per-provider OAuth data for a user.
+// A user can link multiple providers (Discord + GitHub, etc.) without overwriting.
+type OAuthProviderMetadata struct {
+	Provider     string    `json:"provider"`
+	ProviderID   string    `json:"provider_id"`
+	AccessToken  string    `json:"-"`
+	RefreshToken string    `json:"-"`
+	TokenExpiry  time.Time `json:"-"`
+}
+
 // User represents a Sovrabase user account.
 type User struct {
-	ID                  string    `json:"id"`
-	Email               string    `json:"email"`
-	PasswordHash        string    `json:"-"`
-	Role                Role      `json:"role"`
-	Name                string    `json:"name,omitempty"`
-	AvatarURL           string    `json:"avatar_url,omitempty"`
-	Provider            string    `json:"provider,omitempty"`
-	ProviderID          string    `json:"provider_id,omitempty"`
-	ProviderAccessToken string    `json:"-"`
-	ProviderRefreshToken string   `json:"-"`
-	ProviderTokenExpiry time.Time `json:"-"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
-	IsVerified          bool      `json:"is_verified"`
-	VerificationToken   string    `json:"verification_token,omitempty"`
-	VerificationExpires time.Time `json:"verification_expires,omitempty"`
-	ResetToken          string    `json:"reset_token,omitempty"`
-	ResetExpires        time.Time `json:"reset_expires,omitempty"`
+	ID                  string                   `json:"id"`
+	Email               string                   `json:"email"`
+	PasswordHash        string                   `json:"-"`
+	Role                Role                     `json:"role"`
+	Name                string                   `json:"name,omitempty"`
+	AvatarURL           string                   `json:"avatar_url,omitempty"`
+	OAuthProviders      []OAuthProviderMetadata  `json:"_metadata,omitempty"`
+	CreatedAt           time.Time                `json:"created_at"`
+	UpdatedAt           time.Time                `json:"updated_at"`
+	IsVerified          bool                     `json:"is_verified"`
+	VerificationToken   string                   `json:"verification_token,omitempty"`
+	VerificationExpires time.Time                `json:"verification_expires,omitempty"`
+	ResetToken          string                   `json:"reset_token,omitempty"`
+	ResetExpires        time.Time                `json:"reset_expires,omitempty"`
 }
 
 // TokenPair contains the access and refresh tokens returned on login/signup.

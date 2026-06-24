@@ -23,22 +23,23 @@ function renderUsersTable() {
     const email = u.email || '';
     const role = u.role || 'user';
     const name = u.name || '';
-    const provider = u.provider || '';
     const avatar = u.avatar_url || '';
+    const providers = u._metadata || [];
     const created = formatDate(u.created_at);
     const shortId = id.substring(0, 8) + '...';
     
     const avatarHtml = avatar 
       ? `<img src="${escapeHtml(avatar)}" class="user-avatar" width="24" height="24" style="border-radius:50%;margin-right:8px;vertical-align:middle;" onerror="this.style.display='none'" alt="">`
       : '';
-    const providerTag = provider 
-      ? `<span class="badge badge-info" style="margin-left:4px;">${escapeHtml(provider)}</span>`
-      : '';
+    const providerTags = providers.map(p => {
+      const meta = getProviderMeta(p.provider);
+      return `<span class="badge" style="margin-left:4px;background:${meta.bg};color:${meta.color};border:1px solid ${meta.color}30;">${escapeHtml(p.provider)}</span>`;
+    }).join('');
     const displayName = name || email;
     
     return `<tr>
       <td class="td-id" title="${escapeHtml(id)}">${escapeHtml(shortId)}</td>
-      <td class="td-name">${avatarHtml}${escapeHtml(displayName)}${providerTag}</td>
+      <td class="td-name">${avatarHtml}${escapeHtml(displayName)}${providerTags}</td>
       <td><span class="badge ${role === 'admin' ? 'badge-suspended' : 'badge-active'}"><span class="badge-dot"></span>${escapeHtml(role)}</span></td>
       <td class="td-date">${created}</td>
       <td class="td-actions">

@@ -144,20 +144,25 @@ func userToMap(u *User) map[string]interface{} {
 	if u.AvatarURL != "" {
 		m["avatar_url"] = u.AvatarURL
 	}
-	if u.Provider != "" {
-		m["provider"] = u.Provider
-	}
-	if u.ProviderID != "" {
-		m["provider_id"] = u.ProviderID
-	}
-	if u.ProviderAccessToken != "" {
-		m["provider_access_token"] = u.ProviderAccessToken
-	}
-	if u.ProviderRefreshToken != "" {
-		m["provider_refresh_token"] = u.ProviderRefreshToken
-	}
-	if !u.ProviderTokenExpiry.IsZero() {
-		m["provider_token_expiry"] = u.ProviderTokenExpiry.Format(time.RFC3339Nano)
+	if len(u.OAuthProviders) > 0 {
+		providers := make([]map[string]interface{}, len(u.OAuthProviders))
+		for i, p := range u.OAuthProviders {
+			pm := map[string]interface{}{
+				"provider":    p.Provider,
+				"provider_id": p.ProviderID,
+			}
+			if p.AccessToken != "" {
+				pm["access_token"] = p.AccessToken
+			}
+			if p.RefreshToken != "" {
+				pm["refresh_token"] = p.RefreshToken
+			}
+			if !p.TokenExpiry.IsZero() {
+				pm["token_expiry"] = p.TokenExpiry.Format(time.RFC3339Nano)
+			}
+			providers[i] = pm
+		}
+		m["_metadata"] = providers
 	}
 	if u.VerificationToken != "" {
 		m["verification_token"] = u.VerificationToken
@@ -180,10 +185,33 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 	resetToken, _ := m["reset_token"].(string)
 	name, _ := m["name"].(string)
 	avatarURL, _ := m["avatar_url"].(string)
-	provider, _ := m["provider"].(string)
-	providerID, _ := m["provider_id"].(string)
-	providerAccessToken, _ := m["provider_access_token"].(string)
-	providerRefreshToken, _ := m["provider_refresh_token"].(string)
+
+	// Parse _metadata array of provider entries
+	var oauthProviders []OAuthProviderMetadata
+	if rawProviders, ok := m["_metadata"].([]interface{}); ok {
+		oauthProviders = make([]OAuthProviderMetadata, 0, len(rawProviders))
+		for _, raw := range rawProviders {
+			pm, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			provider, _ := pm["provider"].(string)
+			providerID, _ := pm["provider_id"].(string)
+			accessToken, _ := pm["access_token"].(string)
+			refreshToken, _ := pm["refresh_token"].(string)
+			var tokenExpiry time.Time
+			if teStr, ok := pm["token_expiry"].(string); ok && teStr != "" {
+				tokenExpiry, _ = time.Parse(time.RFC3339Nano, teStr)
+			}
+			oauthProviders = append(oauthProviders, OAuthProviderMetadata{
+				Provider:     provider,
+				ProviderID:   providerID,
+				AccessToken:  accessToken,
+				RefreshToken: refreshToken,
+				TokenExpiry:  tokenExpiry,
+			})
+		}
+	}
 
 	var createdAt, updatedAt time.Time
 	if caStr, ok := m["created_at"].(string); ok {
@@ -203,11 +231,6 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 		resetExpires, _ = time.Parse(time.RFC3339Nano, reStr)
 	}
 
-	var providerTokenExpiry time.Time
-	if pteStr, ok := m["provider_token_expiry"].(string); ok && pteStr != "" {
-		providerTokenExpiry, _ = time.Parse(time.RFC3339Nano, pteStr)
-	}
-
 	return &User{
 		ID:                   id,
 		Email:                email,
@@ -215,11 +238,7 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 		Role:                 Role(roleStr),
 		Name:                 name,
 		AvatarURL:            avatarURL,
-		Provider:             provider,
-		ProviderID:           providerID,
-		ProviderAccessToken:  providerAccessToken,
-		ProviderRefreshToken: providerRefreshToken,
-		ProviderTokenExpiry:  providerTokenExpiry,
+		OAuthProviders:       oauthProviders,
 		CreatedAt:            createdAt,
 		UpdatedAt:            updatedAt,
 		IsVerified:           isVerified,

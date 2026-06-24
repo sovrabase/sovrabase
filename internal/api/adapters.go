@@ -107,14 +107,20 @@ func authUserToAPI(u *auth.User) *UserInfo {
 	if u == nil {
 		return nil
 	}
+	providers := make([]ProviderMetaInfo, len(u.OAuthProviders))
+	for i, p := range u.OAuthProviders {
+		providers[i] = ProviderMetaInfo{
+			Provider:   p.Provider,
+			ProviderID: p.ProviderID,
+		}
+	}
 	return &UserInfo{
 		ID:                u.ID,
 		Email:             u.Email,
 		Role:              string(u.Role),
 		Name:              u.Name,
 		AvatarURL:         u.AvatarURL,
-		Provider:          u.Provider,
-		ProviderID:        u.ProviderID,
+		OAuthProviders:    providers,
 		CreatedAt:         u.CreatedAt,
 		IsVerified:        u.IsVerified,
 		VerificationToken: u.VerificationToken,

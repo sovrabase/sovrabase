@@ -297,11 +297,13 @@ func (s *AuthService) HandleOAuthCallback(provider, code, state string) (*User, 
 		user.IsVerified = true // OAuth users are verified!
 		user.Name = oauthInfo.Name
 		user.AvatarURL = oauthInfo.AvatarURL
-		user.Provider = provider
-		user.ProviderID = oauthInfo.ProviderID
-		user.ProviderAccessToken = providerToken.AccessToken
-		user.ProviderRefreshToken = providerToken.RefreshToken
-		user.ProviderTokenExpiry = providerToken.Expiry
+		user.OAuthProviders = []OAuthProviderMetadata{{
+			Provider:     provider,
+			ProviderID:   oauthInfo.ProviderID,
+			AccessToken:  providerToken.AccessToken,
+			RefreshToken: providerToken.RefreshToken,
+			TokenExpiry:  providerToken.Expiry,
+		}}
 		if createErr := s.store.Create(user); createErr != nil {
 			return nil, nil, fmt.Errorf("creating oauth user: %w", createErr)
 		}
@@ -320,19 +322,28 @@ func (s *AuthService) HandleOAuthCallback(provider, code, state string) (*User, 
 			user.AvatarURL = oauthInfo.AvatarURL
 			updated = true
 		}
-		if user.Provider == "" {
-			user.Provider = provider
-			updated = true
+
+		// Upsert into OAuthProviders array — same provider = update, new provider = append.
+		found := false
+		for i := range user.OAuthProviders {
+			if user.OAuthProviders[i].Provider == provider {
+				user.OAuthProviders[i].ProviderID = oauthInfo.ProviderID
+				user.OAuthProviders[i].AccessToken = providerToken.AccessToken
+				user.OAuthProviders[i].RefreshToken = providerToken.RefreshToken
+				user.OAuthProviders[i].TokenExpiry = providerToken.Expiry
+				found = true
+				updated = true
+				break
+			}
 		}
-		if oauthInfo.ProviderID != "" && user.ProviderID != oauthInfo.ProviderID {
-			user.ProviderID = oauthInfo.ProviderID
-			updated = true
-		}
-		// Always refresh provider tokens on re-login
-		if providerToken.AccessToken != "" {
-			user.ProviderAccessToken = providerToken.AccessToken
-			user.ProviderRefreshToken = providerToken.RefreshToken
-			user.ProviderTokenExpiry = providerToken.Expiry
+		if !found {
+			user.OAuthProviders = append(user.OAuthProviders, OAuthProviderMetadata{
+				Provider:     provider,
+				ProviderID:   oauthInfo.ProviderID,
+				AccessToken:  providerToken.AccessToken,
+				RefreshToken: providerToken.RefreshToken,
+				TokenExpiry:  providerToken.Expiry,
+			})
 			updated = true
 		}
 		if updated {
