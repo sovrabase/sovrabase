@@ -23,6 +23,12 @@ func main() {
 
     // Auth — tokens are stored automatically
     user, err := db.SignUp("user@example.com", "password")
+    if user.AccessToken == "" {
+        // Email verification required — check your inbox
+        fmt.Println("Please verify your email:", user.User.Email)
+        // After clicking the verification link, sign in:
+        // db.SignIn("user@example.com", "password")
+    }
     // Or: pair, err := db.SignIn("user@example.com", "password")
 
     // CRUD

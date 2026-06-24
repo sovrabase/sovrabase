@@ -23,7 +23,9 @@ func (c *Client) SignUp(email, password string) (*AuthResponse, error) {
 	}
 
 	if raw.Token == nil {
-		return nil, fmt.Errorf("signup: missing token in response")
+		// Email verification required — return user without tokens.
+		// The caller should prompt the user to check their email.
+		return &AuthResponse{User: raw.User}, nil
 	}
 	resp := raw.Token
 	resp.User = raw.User
