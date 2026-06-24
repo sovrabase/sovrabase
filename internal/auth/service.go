@@ -37,6 +37,7 @@ type stateEntry struct {
 // can recover project context and redirect preferences without query params.
 type OAuthStatePayload struct {
 	ProjectID   string `json:"project_id"`
+	Provider    string `json:"provider,omitempty"`
 	AppRedirect string `json:"app_redirect,omitempty"`
 }
 
@@ -183,6 +184,7 @@ func (s *AuthService) CreateOAuthState(provider, projectID, appRedirect string) 
 
 	payload := OAuthStatePayload{
 		ProjectID:   projectID,
+		Provider:    provider,
 		AppRedirect: appRedirect,
 	}
 	jsonPayload, err := json.Marshal(payload)
@@ -275,7 +277,7 @@ func (s *AuthService) HandleOAuthCallback(provider, code, state string) (*User, 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	oauthInfo, err := p.Exchange(ctx, code)
+	oauthInfo, providerToken, err := p.Exchange(ctx, code)
 	if err != nil {
 		return nil, nil, fmt.Errorf("oauth exchange: %w", err)
 	}
@@ -293,12 +295,49 @@ func (s *AuthService) HandleOAuthCallback(provider, code, state string) (*User, 
 
 		user = NewUser(oauthInfo.Email, hash)
 		user.IsVerified = true // OAuth users are verified!
+		user.Name = oauthInfo.Name
+		user.AvatarURL = oauthInfo.AvatarURL
+		user.Provider = provider
+		user.ProviderID = oauthInfo.ProviderID
+		user.ProviderAccessToken = providerToken.AccessToken
+		user.ProviderRefreshToken = providerToken.RefreshToken
+		user.ProviderTokenExpiry = providerToken.Expiry
 		if createErr := s.store.Create(user); createErr != nil {
 			return nil, nil, fmt.Errorf("creating oauth user: %w", createErr)
 		}
-	} else if !user.IsVerified {
-		user.IsVerified = true
-		_ = s.store.Update(user)
+	} else {
+		// Existing user — update OAuth metadata on every login so name/avatar stay fresh.
+		updated := false
+		if !user.IsVerified {
+			user.IsVerified = true
+			updated = true
+		}
+		if oauthInfo.Name != "" && user.Name != oauthInfo.Name {
+			user.Name = oauthInfo.Name
+			updated = true
+		}
+		if oauthInfo.AvatarURL != "" && user.AvatarURL != oauthInfo.AvatarURL {
+			user.AvatarURL = oauthInfo.AvatarURL
+			updated = true
+		}
+		if user.Provider == "" {
+			user.Provider = provider
+			updated = true
+		}
+		if oauthInfo.ProviderID != "" && user.ProviderID != oauthInfo.ProviderID {
+			user.ProviderID = oauthInfo.ProviderID
+			updated = true
+		}
+		// Always refresh provider tokens on re-login
+		if providerToken.AccessToken != "" {
+			user.ProviderAccessToken = providerToken.AccessToken
+			user.ProviderRefreshToken = providerToken.RefreshToken
+			user.ProviderTokenExpiry = providerToken.Expiry
+			updated = true
+		}
+		if updated {
+			_ = s.store.Update(user)
+		}
 	}
 
 	tokens, err := s.generateTokenPair(user)

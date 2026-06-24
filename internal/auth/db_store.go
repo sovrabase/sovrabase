@@ -130,13 +130,34 @@ func (s *DBUserStore) List() ([]*User, error) {
 // Helper functions to map User to/from map[string]interface{}
 func userToMap(u *User) map[string]interface{} {
 	m := map[string]interface{}{
-		"_id":           u.ID,
-		"email":          u.Email,
-		"password_hash":  u.PasswordHash,
-		"role":           string(u.Role),
-		"created_at":     u.CreatedAt.Format(time.RFC3339Nano),
-		"updated_at":     u.UpdatedAt.Format(time.RFC3339Nano),
-		"is_verified":    u.IsVerified,
+		"_id":          u.ID,
+		"email":        u.Email,
+		"password_hash": u.PasswordHash,
+		"role":         string(u.Role),
+		"created_at":   u.CreatedAt.Format(time.RFC3339Nano),
+		"updated_at":   u.UpdatedAt.Format(time.RFC3339Nano),
+		"is_verified":  u.IsVerified,
+	}
+	if u.Name != "" {
+		m["name"] = u.Name
+	}
+	if u.AvatarURL != "" {
+		m["avatar_url"] = u.AvatarURL
+	}
+	if u.Provider != "" {
+		m["provider"] = u.Provider
+	}
+	if u.ProviderID != "" {
+		m["provider_id"] = u.ProviderID
+	}
+	if u.ProviderAccessToken != "" {
+		m["provider_access_token"] = u.ProviderAccessToken
+	}
+	if u.ProviderRefreshToken != "" {
+		m["provider_refresh_token"] = u.ProviderRefreshToken
+	}
+	if !u.ProviderTokenExpiry.IsZero() {
+		m["provider_token_expiry"] = u.ProviderTokenExpiry.Format(time.RFC3339Nano)
 	}
 	if u.VerificationToken != "" {
 		m["verification_token"] = u.VerificationToken
@@ -155,8 +176,14 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 	pwHash, _ := m["password_hash"].(string)
 	roleStr, _ := m["role"].(string)
 	isVerified, _ := m["is_verified"].(bool)
-	verificationToken, _ := m["verification_token"].(string)
+	verifiedToken, _ := m["verification_token"].(string)
 	resetToken, _ := m["reset_token"].(string)
+	name, _ := m["name"].(string)
+	avatarURL, _ := m["avatar_url"].(string)
+	provider, _ := m["provider"].(string)
+	providerID, _ := m["provider_id"].(string)
+	providerAccessToken, _ := m["provider_access_token"].(string)
+	providerRefreshToken, _ := m["provider_refresh_token"].(string)
 
 	var createdAt, updatedAt time.Time
 	if caStr, ok := m["created_at"].(string); ok {
@@ -176,17 +203,29 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 		resetExpires, _ = time.Parse(time.RFC3339Nano, reStr)
 	}
 
+	var providerTokenExpiry time.Time
+	if pteStr, ok := m["provider_token_expiry"].(string); ok && pteStr != "" {
+		providerTokenExpiry, _ = time.Parse(time.RFC3339Nano, pteStr)
+	}
+
 	return &User{
-		ID:                  id,
-		Email:               email,
-		PasswordHash:        pwHash,
-		Role:                Role(roleStr),
-		CreatedAt:           createdAt,
-		UpdatedAt:           updatedAt,
-		IsVerified:          isVerified,
-		VerificationToken:   verificationToken,
-		VerificationExpires: verificationExpires,
-		ResetToken:          resetToken,
-		ResetExpires:        resetExpires,
+		ID:                   id,
+		Email:                email,
+		PasswordHash:         pwHash,
+		Role:                 Role(roleStr),
+		Name:                 name,
+		AvatarURL:            avatarURL,
+		Provider:             provider,
+		ProviderID:           providerID,
+		ProviderAccessToken:  providerAccessToken,
+		ProviderRefreshToken: providerRefreshToken,
+		ProviderTokenExpiry:  providerTokenExpiry,
+		CreatedAt:            createdAt,
+		UpdatedAt:            updatedAt,
+		IsVerified:           isVerified,
+		VerificationToken:    verifiedToken,
+		VerificationExpires:  verificationExpires,
+		ResetToken:           resetToken,
+		ResetExpires:         resetExpires,
 	}, nil
 }

@@ -24,7 +24,7 @@ type OAuthUserInfo struct {
 // OAuthProvider defines the interface for OAuth login connectors.
 type OAuthProvider interface {
 	GetAuthURL(state string) string
-	Exchange(ctx context.Context, code string) (*OAuthUserInfo, error)
+	Exchange(ctx context.Context, code string) (*OAuthUserInfo, *oauth2.Token, error)
 }
 
 // GoogleProvider implements OAuthProvider for Google Sign-In.
@@ -63,21 +63,21 @@ func (p *GoogleProvider) GetAuthURL(state string) string {
 
 // Exchange swaps the OAuth authorization code for a token and fetches the
 // user's profile from Google.
-func (p *GoogleProvider) Exchange(ctx context.Context, code string) (*OAuthUserInfo, error) {
+func (p *GoogleProvider) Exchange(ctx context.Context, code string) (*OAuthUserInfo, *oauth2.Token, error) {
 	token, err := p.config.Exchange(ctx, code)
 	if err != nil {
-		return nil, fmt.Errorf("google exchange: %w", err)
+		return nil, nil, fmt.Errorf("google exchange: %w", err)
 	}
 
 	client := p.config.Client(ctx, token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
-		return nil, fmt.Errorf("google userinfo: %w", err)
+		return nil, nil, fmt.Errorf("google userinfo: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("google userinfo returned status %d", resp.StatusCode)
+		return nil, nil, fmt.Errorf("google userinfo returned status %d", resp.StatusCode)
 	}
 
 	var info struct {
@@ -87,7 +87,7 @@ func (p *GoogleProvider) Exchange(ctx context.Context, code string) (*OAuthUserI
 		Picture string `json:"picture"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-		return nil, fmt.Errorf("google userinfo decode: %w", err)
+		return nil, nil, fmt.Errorf("google userinfo decode: %w", err)
 	}
 
 	return &OAuthUserInfo{
@@ -95,7 +95,7 @@ func (p *GoogleProvider) Exchange(ctx context.Context, code string) (*OAuthUserI
 		Name:       info.Name,
 		AvatarURL:  info.Picture,
 		ProviderID: info.Sub,
-	}, nil
+	}, token, nil
 }
 
 // GitHubProvider implements OAuthProvider for GitHub OAuth.
@@ -131,10 +131,10 @@ func (p *GitHubProvider) GetAuthURL(state string) string {
 
 // Exchange swaps the OAuth authorization code for a token and fetches the
 // user's profile from GitHub.
-func (p *GitHubProvider) Exchange(ctx context.Context, code string) (*OAuthUserInfo, error) {
+func (p *GitHubProvider) Exchange(ctx context.Context, code string) (*OAuthUserInfo, *oauth2.Token, error) {
 	token, err := p.config.Exchange(ctx, code)
 	if err != nil {
-		return nil, fmt.Errorf("github exchange: %w", err)
+		return nil, nil, fmt.Errorf("github exchange: %w", err)
 	}
 
 	client := p.config.Client(ctx, token)
@@ -142,12 +142,12 @@ func (p *GitHubProvider) Exchange(ctx context.Context, code string) (*OAuthUserI
 	// Fetch user profile
 	userResp, err := client.Get("https://api.github.com/user")
 	if err != nil {
-		return nil, fmt.Errorf("github user: %w", err)
+		return nil, nil, fmt.Errorf("github user: %w", err)
 	}
 	defer userResp.Body.Close()
 
 	if userResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github user returned status %d", userResp.StatusCode)
+		return nil, nil, fmt.Errorf("github user returned status %d", userResp.StatusCode)
 	}
 
 	var ghUser struct {
@@ -158,7 +158,7 @@ func (p *GitHubProvider) Exchange(ctx context.Context, code string) (*OAuthUserI
 		Email     string `json:"email"`
 	}
 	if err := json.NewDecoder(userResp.Body).Decode(&ghUser); err != nil {
-		return nil, fmt.Errorf("github user decode: %w", err)
+		return nil, nil, fmt.Errorf("github user decode: %w", err)
 	}
 
 	email := ghUser.Email
@@ -166,7 +166,7 @@ func (p *GitHubProvider) Exchange(ctx context.Context, code string) (*OAuthUserI
 		// Fetch primary email if not set on profile
 		email, err = p.getPrimaryEmail(client)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -180,7 +180,7 @@ func (p *GitHubProvider) Exchange(ctx context.Context, code string) (*OAuthUserI
 		Name:       name,
 		AvatarURL:  ghUser.AvatarURL,
 		ProviderID: fmt.Sprintf("%d", ghUser.ID),
-	}, nil
+	}, token, nil
 }
 
 // OAuthProviderConfig holds the configuration for any OAuth2-compliant provider.
@@ -257,26 +257,26 @@ func (p *GenericOAuthProvider) GetAuthURL(state string) string {
 }
 
 // Exchange swaps the code for a token and fetches the user profile.
-func (p *GenericOAuthProvider) Exchange(ctx context.Context, code string) (*OAuthUserInfo, error) {
+func (p *GenericOAuthProvider) Exchange(ctx context.Context, code string) (*OAuthUserInfo, *oauth2.Token, error) {
 	token, err := p.config.Exchange(ctx, code)
 	if err != nil {
-		return nil, fmt.Errorf("oauth exchange: %w", err)
+		return nil, nil, fmt.Errorf("oauth exchange: %w", err)
 	}
 
 	client := p.config.Client(ctx, token)
 	resp, err := client.Get(p.userInfoURL)
 	if err != nil {
-		return nil, fmt.Errorf("userinfo fetch: %w", err)
+		return nil, nil, fmt.Errorf("userinfo fetch: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("userinfo returned status %d", resp.StatusCode)
+		return nil, nil, fmt.Errorf("userinfo returned status %d", resp.StatusCode)
 	}
 
 	var raw map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("userinfo decode: %w", err)
+		return nil, nil, fmt.Errorf("userinfo decode: %w", err)
 	}
 
 	// Extract fields using configured paths (support nested like "data.email")
@@ -294,7 +294,7 @@ func (p *GenericOAuthProvider) Exchange(ctx context.Context, code string) (*OAut
 
 	email := getField(p.emailField)
 	if email == "" {
-		return nil, fmt.Errorf("oauth: email not found in userinfo (field: %s)", p.emailField)
+		return nil, nil, fmt.Errorf("oauth: email not found in userinfo (field: %s)", p.emailField)
 	}
 
 	providerID := getField(p.idField)
@@ -308,7 +308,7 @@ func (p *GenericOAuthProvider) Exchange(ctx context.Context, code string) (*OAut
 		Name:       getField(p.nameField),
 		AvatarURL:  getField(p.avatarField),
 		ProviderID: providerID,
-	}, nil
+	}, token, nil
 }
 
 // getNestedField retrieves a nested field from a map using dot notation

@@ -281,6 +281,9 @@ func TestCreateOAuthState(t *testing.T) {
 	if payload.ProjectID != "test-project-id" {
 		t.Fatalf("expected project ID 'test-project-id', got '%s'", payload.ProjectID)
 	}
+	if payload.Provider != "google" {
+		t.Fatalf("expected provider 'google', got '%s'", payload.Provider)
+	}
 	if payload.AppRedirect != "/dashboard" {
 		t.Fatalf("expected app redirect '/dashboard', got '%s'", payload.AppRedirect)
 	}

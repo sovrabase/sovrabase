@@ -21,6 +21,13 @@ type User struct {
 	Email               string    `json:"email"`
 	PasswordHash        string    `json:"-"`
 	Role                Role      `json:"role"`
+	Name                string    `json:"name,omitempty"`
+	AvatarURL           string    `json:"avatar_url,omitempty"`
+	Provider            string    `json:"provider,omitempty"`
+	ProviderID          string    `json:"provider_id,omitempty"`
+	ProviderAccessToken string    `json:"-"`
+	ProviderRefreshToken string   `json:"-"`
+	ProviderTokenExpiry time.Time `json:"-"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 	IsVerified          bool      `json:"is_verified"`

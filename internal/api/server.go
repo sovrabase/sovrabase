@@ -95,6 +95,10 @@ type UserInfo struct {
 	ID                string    `json:"id"`
 	Email             string    `json:"email"`
 	Role              string    `json:"role"`
+	Name              string    `json:"name,omitempty"`
+	AvatarURL         string    `json:"avatar_url,omitempty"`
+	Provider          string    `json:"provider,omitempty"`
+	ProviderID        string    `json:"provider_id,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	IsVerified        bool      `json:"is_verified"`
 	VerificationToken string    `json:"verification_token,omitempty"`
