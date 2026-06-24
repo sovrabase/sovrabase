@@ -3,12 +3,9 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 	"runtime"
 	"runtime/debug"
 	"time"
-
-	"golang.org/x/sys/windows"
 
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/db"
@@ -93,57 +90,6 @@ type diskUsage struct {
 	TotalBytes  uint64  `json:"total_bytes"`
 	FreeBytes   uint64  `json:"free_bytes"`
 	UsedPercent float64 `json:"used_percent"`
-}
-
-// getDiskUsage returns disk usage information for the given path.
-// Uses windows.GetDiskFreeSpaceEx on Windows.
-func getDiskUsage(path string) *diskUsage {
-	// Ensure the path exists
-	info, err := os.Stat(path)
-	if err != nil {
-		return &diskUsage{
-			Path:        path,
-			TotalBytes:  0,
-			FreeBytes:   0,
-			UsedPercent: 0,
-		}
-	}
-
-	dir := path
-	if !info.IsDir() {
-		dir = info.Name()
-	}
-
-	// Use the parent directory if available
-	absPath, err := os.Getwd()
-	if err != nil {
-		absPath = dir
-	}
-
-	// Use Windows API for disk space
-	abs, err := windows.UTF16PtrFromString(absPath)
-	if err != nil {
-		return &diskUsage{Path: path}
-	}
-
-	var freeBytesAvailable, totalBytes, totalFreeBytes uint64
-	err = windows.GetDiskFreeSpaceEx(abs, &freeBytesAvailable, &totalBytes, &totalFreeBytes)
-	if err != nil {
-		return &diskUsage{Path: path}
-	}
-
-	used := totalBytes - totalFreeBytes
-	var usedPercent float64
-	if totalBytes > 0 {
-		usedPercent = float64(used) / float64(totalBytes) * 100.0
-	}
-
-	return &diskUsage{
-		Path:        path,
-		TotalBytes:  totalBytes,
-		FreeBytes:   totalFreeBytes,
-		UsedPercent: usedPercent,
-	}
 }
 
 // buildVersion returns the build version from module info if available.
