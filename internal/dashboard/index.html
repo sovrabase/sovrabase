@@ -787,6 +787,19 @@ curl -H "Authorization: Bearer API_KEY" \
 <!-- Hidden File Input -->
 <input type="file" id="storage-hidden-file-input" style="display:none" onchange="handleFileSelected(event)">
 
+<!-- ========== FILE PREVIEW MODAL ========== -->
+<div class="modal-overlay" id="modal-preview-file" style="display:none">
+  <div class="modal modal-lg" id="modal-preview-file-inner">
+    <div class="modal-header">
+      <h3 id="preview-file-title" style="word-break: break-all;">File Preview</h3>
+      <button class="modal-close" onclick="closeSubModal('modal-preview-file')">&times;</button>
+    </div>
+    <div class="modal-body" id="preview-file-body" style="max-height:75vh; overflow:auto; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:200px; background:var(--bg-input); border-radius:var(--radius); padding:16px;">
+      <!-- Dynamic preview content goes here -->
+    </div>
+  </div>
+</div>
+
 <!-- ========== CUSTOM CONFIRMATION MODAL ========== -->
 <div class="modal-overlay" id="modal-confirm-custom" style="display:none" onclick="if(event.target === this) handleConfirmResult(false)">
   <div class="modal" style="max-width: 440px;">

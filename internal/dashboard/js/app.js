@@ -619,6 +619,7 @@ document.addEventListener('click', function(e) {
     if (e.target.id === 'modal-import-col') closeSubModal('modal-import-col');
     if (e.target.id === 'modal-create-user') closeSubModal('modal-create-user');
     if (e.target.id === 'modal-create-bucket') closeSubModal('modal-create-bucket');
+    if (e.target.id === 'modal-preview-file') closeSubModal('modal-preview-file');
   }
 });
 
@@ -632,6 +633,7 @@ document.addEventListener('keydown', function(e) {
     if (document.getElementById('modal-import-col').style.display === 'flex') closeSubModal('modal-import-col');
     if (document.getElementById('modal-create-user').style.display === 'flex') closeSubModal('modal-create-user');
     if (document.getElementById('modal-create-bucket').style.display === 'flex') closeSubModal('modal-create-bucket');
+    if (document.getElementById('modal-preview-file').style.display === 'flex') closeSubModal('modal-preview-file');
   }
   // Enter in create modal
   if (e.key === 'Enter' && document.getElementById('modal-create').style.display === 'flex') {

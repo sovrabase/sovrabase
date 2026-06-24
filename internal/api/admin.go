@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -58,19 +60,23 @@ func (a *AdminServer) SetReplicationStatus(status *ReplicationStatus) {
 // authMiddleware protects routes with admin JWT checks.
 func (a *AdminServer) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenString := ""
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			writeError(w, http.StatusUnauthorized, "missing authorization header")
+		if authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+				tokenString = parts[1]
+			}
+		} else {
+			tokenString = r.URL.Query().Get("token")
+		}
+
+		if tokenString == "" {
+			writeError(w, http.StatusUnauthorized, "missing authorization header or token query parameter")
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-			writeError(w, http.StatusUnauthorized, "invalid authorization format")
-			return
-		}
-
-		claims, err := auth.ValidateToken(parts[1], a.jwtSecret)
+		claims, err := auth.ValidateToken(tokenString, a.jwtSecret)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "invalid or expired token")
 			return
@@ -153,6 +159,7 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /admin/projects/{id}/storage/buckets/{bucket}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteBucket))))
 	mux.Handle("GET /admin/projects/{id}/storage/buckets/{bucket}/files", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListFiles))))
 	mux.Handle("POST /admin/projects/{id}/storage/buckets/{bucket}/files", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUploadFile))))
+	mux.Handle("GET /admin/projects/{id}/storage/buckets/{bucket}/files/{path...}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDownloadFile))))
 	mux.Handle("DELETE /admin/projects/{id}/storage/buckets/{bucket}/files/{path...}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteFile))))
 
 	// Request logs endpoint
@@ -654,6 +661,28 @@ func (a *AdminServer) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
+
+func (a *AdminServer) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	bucket := r.PathValue("bucket")
+	pathVal := r.PathValue("path")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	reader, info, err := env.Storage.Download(bucket, pathVal)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "file not found")
+		return
+	}
+	defer reader.Close()
+
+	w.Header().Set("Content-Type", info.ContentType)
+	w.Header().Set("Content-Disposition", "inline; filename=\""+path.Base(info.Path)+"\"")
+	io.Copy(w, reader)
+}
+
 
 func (a *AdminServer) handleListLogs(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
