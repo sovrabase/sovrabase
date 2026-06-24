@@ -57,6 +57,7 @@ db.SignUp(email, password string) (*AuthResponse, error)
 db.SignIn(email, password string) (*TokenPair, error)
 db.Refresh() error                           // auto-called on 401
 db.SetAuth(accessToken, refreshToken string)  // manual override
+db.GetMe() (*User, error)                    // current authenticated user
 db.ForgotPassword(email string) (map[string]interface{}, error)
 db.ResetPassword(token, newPassword string) error
 db.VerifyEmail(token string) error
