@@ -82,16 +82,36 @@ func (a *authAdapter) HandleOAuthCallback(provider, code, state string) (*UserIn
 	return authUserToAPI(user), authTokensToAPI(tokens), nil
 }
 
+func (a *authAdapter) VerifyEmail(token string) error {
+	return a.svc.VerifyEmail(token)
+}
+
+func (a *authAdapter) ForgotPassword(email string) (string, error) {
+	return a.svc.ForgotPassword(email)
+}
+
+func (a *authAdapter) ResetPassword(token, newPassword string) error {
+	return a.svc.ResetPassword(token, newPassword)
+}
+
 func authUserToAPI(u *auth.User) *UserInfo {
+	if u == nil {
+		return nil
+	}
 	return &UserInfo{
-		ID:        u.ID,
-		Email:     u.Email,
-		Role:      string(u.Role),
-		CreatedAt: u.CreatedAt,
+		ID:                u.ID,
+		Email:             u.Email,
+		Role:              string(u.Role),
+		CreatedAt:         u.CreatedAt,
+		IsVerified:        u.IsVerified,
+		VerificationToken: u.VerificationToken,
 	}
 }
 
 func authTokensToAPI(t *auth.TokenPair) *TokenPair {
+	if t == nil {
+		return nil
+	}
 	return &TokenPair{
 		AccessToken:  t.AccessToken,
 		RefreshToken: t.RefreshToken,

@@ -369,3 +369,95 @@ func TestTokenAccessTokenExpiry(t *testing.T) {
 		t.Fatal("expected tampered token to fail validation")
 	}
 }
+
+func TestVerifyEmailFlow(t *testing.T) {
+	svc := newTestService()
+	svc.EmailVerificationEnabled = true
+	svc.SMTPHost = "localhost"
+
+	user, _, _ := svc.SignUp("verify@example.com", "password123")
+
+	// Invalid token
+	err := svc.VerifyEmail("wrong-token")
+	if err == nil {
+		t.Fatal("expected VerifyEmail to fail with wrong token")
+	}
+
+	// Valid token
+	err = svc.VerifyEmail(user.VerificationToken)
+	if err != nil {
+		t.Fatalf("VerifyEmail failed: %v", err)
+	}
+
+	// Getting user and checking verified
+	retrieved, _ := svc.GetUser(user.ID)
+	if !retrieved.IsVerified {
+		t.Fatal("expected user to be verified")
+	}
+	if retrieved.VerificationToken != "" {
+		t.Fatal("expected verification token to be cleared")
+	}
+
+	// Verifying again should fail (token is cleared)
+	err = svc.VerifyEmail(user.VerificationToken)
+	if err == nil {
+		t.Fatal("expected second VerifyEmail to fail")
+	}
+}
+
+func TestForgotPasswordAndResetFlow(t *testing.T) {
+	svc := newTestService()
+	svc.EmailVerificationEnabled = true
+	svc.SMTPHost = "localhost"
+
+	user, _, _ := svc.SignUp("reset@example.com", "password123")
+	_ = svc.VerifyEmail(user.VerificationToken)
+
+	// Forgot password for unknown email
+	_, err := svc.ForgotPassword("unknown@example.com")
+	if err == nil {
+		t.Fatal("expected ForgotPassword to fail for unknown email")
+	}
+
+	// Forgot password for valid email
+	token, err := svc.ForgotPassword("reset@example.com")
+	if err != nil {
+		t.Fatalf("ForgotPassword failed: %v", err)
+	}
+	if token == "" {
+		t.Fatal("expected non-empty reset token")
+	}
+
+	// Reset password with short password
+	err = svc.ResetPassword(token, "short")
+	if err == nil {
+		t.Fatal("expected ResetPassword to fail for short password")
+	}
+
+	// Reset password with wrong token
+	err = svc.ResetPassword("wrong-token", "newpassword123")
+	if err == nil {
+		t.Fatal("expected ResetPassword to fail for wrong token")
+	}
+
+	// Reset password with valid token
+	err = svc.ResetPassword(token, "newpassword123")
+	if err != nil {
+		t.Fatalf("ResetPassword failed: %v", err)
+	}
+
+	// Check login with new password
+	tokens, err := svc.SignIn("reset@example.com", "newpassword123")
+	if err != nil {
+		t.Fatalf("SignIn failed with new password: %v", err)
+	}
+	if tokens.AccessToken == "" {
+		t.Fatal("expected non-empty access token after reset")
+	}
+
+	// Check login with old password fails
+	_, err = svc.SignIn("reset@example.com", "password123")
+	if err == nil {
+		t.Fatal("expected login with old password to fail")
+	}
+}

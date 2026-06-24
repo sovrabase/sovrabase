@@ -697,3 +697,60 @@ func TestMemEngine(t *testing.T) {
 		t.Fatalf("expected v=1, got %v", doc["v"])
 	}
 }
+
+func TestQueryNewOperators(t *testing.T) {
+	eng := newTestEngineMem(t)
+	_ = eng.CreateCollection("items")
+
+	_ = eng.Insert("items", "1", map[string]interface{}{"name": "Apple", "type": "fruit", "qty": 10})
+	_ = eng.Insert("items", "2", map[string]interface{}{"name": "Banana", "type": "fruit", "qty": 20, "color": "yellow"})
+	_ = eng.Insert("items", "3", map[string]interface{}{"name": "Carrot", "type": "vegetable", "qty": 30})
+
+	// 1. Test $startsWith
+	docs, err := eng.Query("items", map[string]interface{}{
+		"name": map[string]interface{}{"$startsWith": "Ap"},
+	}, nil)
+	if err != nil || len(docs) != 1 || docs[0]["name"] != "Apple" {
+		t.Fatalf("expected Apple, got: %v (err: %v)", docs, err)
+	}
+
+	// 2. Test $exists true
+	docs, err = eng.Query("items", map[string]interface{}{
+		"color": map[string]interface{}{"$exists": true},
+	}, nil)
+	if err != nil || len(docs) != 1 || docs[0]["name"] != "Banana" {
+		t.Fatalf("expected Banana (color exists), got: %v (err: %v)", docs, err)
+	}
+
+	// 3. Test $exists false
+	docs, err = eng.Query("items", map[string]interface{}{
+		"color": map[string]interface{}{"$exists": false},
+	}, nil)
+	if err != nil || len(docs) != 2 {
+		t.Fatalf("expected 2 items without color, got: %v (err: %v)", docs, err)
+	}
+
+	// 4. Test $regex
+	docs, err = eng.Query("items", map[string]interface{}{
+		"name": map[string]interface{}{"$regex": "^B.n.n.$"},
+	}, nil)
+	if err != nil || len(docs) != 1 || docs[0]["name"] != "Banana" {
+		t.Fatalf("expected Banana, got: %v (err: %v)", docs, err)
+	}
+
+	// 5. Test $in
+	docs, err = eng.Query("items", map[string]interface{}{
+		"qty": map[string]interface{}{"$in": []interface{}{10, 30, 99}},
+	}, nil)
+	if err != nil || len(docs) != 2 {
+		t.Fatalf("expected Apple and Carrot (qty 10, 30), got: %v (err: %v)", docs, err)
+	}
+
+	// 6. Test $nin
+	docs, err = eng.Query("items", map[string]interface{}{
+		"qty": map[string]interface{}{"$nin": []interface{}{10, 30}},
+	}, nil)
+	if err != nil || len(docs) != 1 || docs[0]["name"] != "Banana" {
+		t.Fatalf("expected Banana, got: %v (err: %v)", docs, err)
+	}
+}

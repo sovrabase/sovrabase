@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,27 +14,36 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/realtime"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
 )
 
 // Server is the HTTP API server for Sovrabase.
 type Server struct {
-	router    chi.Router
-	config    *Config
-	db        DatabaseService
-	auth      AuthService
-	store     StorageService
-	projects  *tenant.ProjectManager
-	adminMux  *http.ServeMux // optional admin routes
-	dashboard http.Handler   // optional dashboard UI
-	logger    *slog.Logger
+	router       chi.Router
+	config       *Config
+	db           DatabaseService
+	auth         AuthService
+	store        StorageService
+	projects     *tenant.ProjectManager
+	adminMux     *http.ServeMux // optional admin routes
+	dashboard    http.Handler   // optional dashboard UI
+	realtimeHub  *realtime.Hub  // optional realtime hub
+	rateLimiters *tenantRateLimiter
+	logger       *slog.Logger
+	httpServer   *http.Server // reference for graceful shutdown
 }
 
 // Config holds API-specific configuration.
 type Config struct {
-	ListenAddr   string
-	AllowOrigins string
-	JWTSecret    string
+	ListenAddr         string
+	AllowOrigins       string
+	JWTSecret          string
+	RateLimitPerMinute int
+	RateLimitBurst     int
+	CertFile           string // path to SSL/TLS certificate file
+	KeyFile            string // path to SSL/TLS private key file
+	DataDir            string // path to data directory (for audit logs)
 }
 
 // DatabaseService is the interface expected from the db package.
@@ -42,9 +53,16 @@ type DatabaseService interface {
 	Update(collection, id string, doc map[string]interface{}) error
 	Delete(collection, id string) error
 	List(collection string) ([]map[string]interface{}, error)
+	ListPaged(collection string, limit, offset int) ([]map[string]interface{}, error)
 	Query(collection string, filter map[string]interface{}, projection []string) ([]map[string]interface{}, error)
+	QueryPaged(collection string, filter map[string]interface{}, projection []string, limit, offset int) ([]map[string]interface{}, error)
+	Count(collection string) (int64, error)
+	CreateIndex(collection, field string, idxType db.IndexType) error
+	DropIndex(collection, field string) error
+	ListIndexes(collection string) ([]db.IndexConfig, error)
 	GetRules(collection string) (*db.RulesConfig, error)
 	SetRules(collection string, cfg *db.RulesConfig) error
+	Search(collection string, query string, fields []string, limit int) ([]map[string]interface{}, error)
 }
 
 // AuthService is the interface expected from the auth package.
@@ -56,6 +74,9 @@ type AuthService interface {
 	GetUser(id string) (*UserInfo, error)
 	CreateOAuthState(provider string) (string, error)
 	HandleOAuthCallback(provider, code, state string) (*UserInfo, *TokenPair, error)
+	VerifyEmail(token string) error
+	ForgotPassword(email string) (string, error)
+	ResetPassword(token, newPassword string) error
 }
 
 // StorageService is the interface expected from the storage package.
@@ -68,10 +89,12 @@ type StorageService interface {
 
 // UserInfo is a simplified user view for the API layer.
 type UserInfo struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
+	ID                string    `json:"id"`
+	Email             string    `json:"email"`
+	Role              string    `json:"role"`
+	CreatedAt         time.Time `json:"created_at"`
+	IsVerified        bool      `json:"is_verified"`
+	VerificationToken string    `json:"verification_token,omitempty"`
 }
 
 // UserClaims represents JWT claims for middleware.
@@ -104,6 +127,7 @@ type contextKey string
 const (
 	claimsKey     contextKey = "claims"
 	projectEnvKey contextKey = "projectEnv"
+	projectIDKey  contextKey = "projectID"
 )
 
 func getProjectEnv(r *http.Request) *tenant.ProjectEnv {
@@ -112,6 +136,25 @@ func getProjectEnv(r *http.Request) *tenant.ProjectEnv {
 		return nil
 	}
 	return env
+}
+
+func getProjectID(r *http.Request) string {
+	id, ok := r.Context().Value(projectIDKey).(string)
+	if !ok {
+		return ""
+	}
+	return id
+}
+
+// SetRealtimeHub attaches a realtime hub and mounts the WebSocket endpoint.
+func (s *Server) SetRealtimeHub(hub *realtime.Hub, jwtSecret string) {
+	s.realtimeHub = hub
+	s.router.Get("/realtime/v1/ws", realtime.NewWSHandler(hub, jwtSecret).ServeHTTP)
+}
+
+// SetRealtimeHubForHandler sets the hub reference (for handlers to publish events).
+func (s *Server) setRealtimeHub(hub *realtime.Hub) {
+	s.realtimeHub = hub
 }
 
 func (s *Server) getDB(r *http.Request) DatabaseService {
@@ -137,25 +180,59 @@ func (s *Server) getStorage(r *http.Request) StorageService {
 
 // NewServer creates a new API server.
 func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store StorageService, pm *tenant.ProjectManager) *Server {
+	// Rate limiter: default 100 req/min with burst of 20.
+	ratePerMin := cfg.RateLimitPerMinute
+	if ratePerMin <= 0 {
+		ratePerMin = 100
+	}
+	burst := cfg.RateLimitBurst
+	if burst <= 0 {
+		burst = 20
+	}
+	rl := newTenantRateLimiter(float64(ratePerMin)/60.0, burst)
+
 	s := &Server{
-		config:   cfg,
-		db:       db,
-		auth:     authSvc,
-		store:    store,
-		projects: pm,
-		logger:   slog.Default(),
+		config:       cfg,
+		db:           db,
+		auth:         authSvc,
+		store:        store,
+		projects:     pm,
+		rateLimiters: rl,
+		logger:       slog.Default(),
 	}
 
 	r := chi.NewRouter()
 
-	// Middleware
+	// Global middleware
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{cfg.AllowOrigins},
+		AllowOriginFunc: func(r *http.Request, origin string) bool {
+			// First check global allowed origins
+			if cfg.AllowOrigins == "*" || strings.EqualFold(cfg.AllowOrigins, origin) {
+				return true
+			}
+			// For preflight, allow if origin matches global
+			if r.Method == http.MethodOptions {
+				return cfg.AllowOrigins == "*"
+			}
+			// Check per-project CORS
+			projectKey := r.Header.Get("X-Project-Key")
+			if projectKey != "" {
+				proj, err := pm.GetProjectBySecret(projectKey)
+				if err == nil && proj.AllowOrigins != "" {
+					for _, allowed := range strings.Split(proj.AllowOrigins, ",") {
+						if strings.TrimSpace(allowed) == origin || strings.TrimSpace(allowed) == "*" {
+							return true
+						}
+					}
+				}
+			}
+			return false
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Project-Key"},
 		ExposedHeaders:   []string{"Link"},
@@ -163,10 +240,11 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		MaxAge:           300,
 	}))
 
-	// Health
+	// Health & Metrics (no auth, no project middleware needed)
 	r.Get("/health", s.handleHealth)
+	r.Get("/metrics", s.handleMetrics)
 
-	// Auth routes (public)
+	// Auth routes (public, no rate limit)
 	r.Route("/auth/v1", func(r chi.Router) {
 		r.Use(s.projectMiddleware)
 		r.Post("/signup", s.handleSignUp)
@@ -174,23 +252,37 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		r.Post("/refresh", s.handleRefresh)
 		r.Get("/oauth/{provider}", s.handleOAuthRedirect)
 		r.Get("/oauth/{provider}/callback", s.handleOAuthCallback)
+		r.Post("/verify-email", s.handleVerifyEmail)
+		r.Post("/forgot-password", s.handleForgotPassword)
+		r.Post("/reset-password", s.handleResetPassword)
 	})
 
-	// API routes (protected)
+	// API routes (rate limited + auth)
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(s.rateLimitMiddleware)
 		r.Use(s.projectMiddleware)
 		r.Use(s.authMiddleware)
 		r.Get("/me", s.handleGetMe)
 
 		// Database
 		r.Route("/collections/{collection}", func(r chi.Router) {
-			r.Post("/", s.handleInsert)
+			// Non-mutation endpoints
 			r.Get("/", s.handleList)
 			r.Post("/query", s.handleQuery)
 			r.Get("/{id}", s.handleGet)
-			r.Put("/{id}", s.handleUpdate)
-			r.Patch("/{id}", s.handleUpdate)
-			r.Delete("/{id}", s.handleDelete)
+
+			// Batch and search (non-mutation, but need audit logging)
+			r.Post("/batch", s.handleBatch)
+			r.Post("/search", s.handleSearch)
+
+			// Mutation endpoints (with audit logging)
+			r.Group(func(r chi.Router) {
+				r.Use(s.auditLoggerMiddleware)
+				r.Post("/", s.handleInsert)
+				r.Put("/{id}", s.handleUpdate)
+				r.Patch("/{id}", s.handleUpdate)
+				r.Delete("/{id}", s.handleDelete)
+			})
 		})
 
 		// Storage
@@ -222,8 +314,27 @@ func (s *Server) SetDashboard(handler http.Handler) {
 
 // ListenAndServe starts the HTTP server.
 func (s *Server) ListenAndServe() error {
-	s.logger.Info("Sovrabase server starting", "addr", s.config.ListenAddr)
-	return http.ListenAndServe(s.config.ListenAddr, s.router)
+	s.httpServer = &http.Server{
+		Addr:    s.config.ListenAddr,
+		Handler: s.router,
+	}
+
+	if s.config.CertFile != "" && s.config.KeyFile != "" {
+		s.logger.Info("Sovrabase server starting with TLS (HTTPS)", "addr", s.config.ListenAddr, "cert", s.config.CertFile)
+		return s.httpServer.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile)
+	}
+
+	s.logger.Info("Sovrabase server starting (HTTP)", "addr", s.config.ListenAddr)
+	return s.httpServer.ListenAndServe()
+}
+
+// Shutdown gracefully shuts down the server.
+func (s *Server) Shutdown(ctx context.Context) error {
+	if s.httpServer != nil {
+		s.logger.Info("Stopping API server gracefully...")
+		return s.httpServer.Shutdown(ctx)
+	}
+	return nil
 }
 
 // Handler returns the HTTP handler (for testing).
@@ -233,6 +344,11 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	SetActiveProjects(s.projects.ProjectCount())
+	HandleMetrics(w, r)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

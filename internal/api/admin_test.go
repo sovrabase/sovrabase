@@ -22,7 +22,7 @@ func TestAdminFileDownload(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// 2. Initialize project manager
-	pm, err := tenant.NewProjectManager(dir)
+	pm, err := tenant.NewProjectManager(dir, nil)
 	if err != nil {
 		t.Fatalf("failed to create project manager: %v", err)
 	}

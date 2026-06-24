@@ -1,12 +1,7 @@
-// Package config handles all Sovrabase server configuration.
-//
-// Priority (highest to lowest):
-//  1. Environment variables
-//  2. config.yaml in the data directory
-//  3. Hard-coded defaults
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,14 +13,31 @@ import (
 // Config holds all configuration for the Sovrabase server.
 type Config struct {
 	// Core
-	DataDir       string `yaml:"data_dir"       json:"data_dir"`
-	ListenAddr    string `yaml:"listen_addr"    json:"listen_addr"`
-	JWTSecret     string `yaml:"jwt_secret"     json:"jwt_secret"`
-	StorageDir    string `yaml:"storage_dir"    json:"storage_dir"`
-	AllowOrigins  string `yaml:"allow_origins"  json:"allow_origins"`
-	AdminEmail    string `yaml:"admin_email"    json:"admin_email"`
-	AdminPassword string `yaml:"admin_password" json:"admin_password"`
-	SessionDuration time.Duration `yaml:"session_duration" json:"session_duration"` // e.g. 24h, 168h
+	DataDir         string        `yaml:"data_dir"       json:"data_dir"`
+	ListenAddr      string        `yaml:"listen_addr"    json:"listen_addr"`
+	JWTSecret       string        `yaml:"jwt_secret"     json:"jwt_secret"`
+	StorageDir      string        `yaml:"storage_dir"    json:"storage_dir"`
+	AllowOrigins    string        `yaml:"allow_origins"  json:"allow_origins"`
+	AdminEmail      string        `yaml:"admin_email"    json:"admin_email"`
+	AdminPassword   string        `yaml:"admin_password" json:"admin_password"`
+	SessionDuration time.Duration `yaml:"session_duration" json:"session_duration"`
+
+	// Security / HTTPS
+	CertFile        string        `yaml:"cert_file"        json:"cert_file"`
+	KeyFile         string        `yaml:"key_file"         json:"key_file"`
+	Env             string        `yaml:"env"              json:"env"`
+
+	// SMTP / Email verification config
+	SMTPHost          string        `yaml:"smtp_host"          json:"smtp_host"`
+	SMTPPort          int           `yaml:"smtp_port"          json:"smtp_port"`
+	SMTPUser          string        `yaml:"smtp_user"          json:"smtp_user"`
+	SMTPPassword      string        `yaml:"smtp_password"      json:"smtp_password"`
+	SMTPSender        string        `yaml:"smtp_sender"        json:"smtp_sender"`
+	EmailVerification bool          `yaml:"email_verification" json:"email_verification"`
+
+	// Rate Limiting
+	RateLimitPerMinute int `yaml:"rate_limit_per_minute" json:"rate_limit_per_minute"`
+	RateLimitBurst     int `yaml:"rate_limit_burst"     json:"rate_limit_burst"`
 
 	// S3 Storage
 	S3Enabled      bool   `yaml:"s3_enabled"       json:"s3_enabled"`
@@ -49,18 +61,21 @@ type Config struct {
 // defaults returns a Config with hard-coded fallback values.
 func defaults() *Config {
 	return &Config{
-		DataDir:         filepath.Join(".", "data"),
-		ListenAddr:      ":6070",
-		JWTSecret:       "change-me-in-production",
-		AllowOrigins:    "*",
-		AdminEmail:      "admin@sovrabase.eu",
-		AdminPassword:   "admin1234",
-		SessionDuration: 24 * time.Hour,
-		S3UseSSL:        true,
-		S3BucketPrefix:  "sovrabase",
-		NodeID:          "node-1",
-		ReplAddr:        ":9090",
-		LeaseTTL:        5 * time.Second,
+		DataDir:            filepath.Join(".", "data"),
+		ListenAddr:         ":6070",
+		JWTSecret:          "change-me-in-production",
+		AllowOrigins:       "*",
+		AdminEmail:         "admin@sovrabase.eu",
+		AdminPassword:      "admin1234",
+		SessionDuration:    24 * time.Hour,
+		RateLimitPerMinute: 100,
+		RateLimitBurst:     20,
+		S3UseSSL:           true,
+		S3BucketPrefix:     "sovrabase",
+		NodeID:             "node-1",
+		ReplAddr:           ":9090",
+		LeaseTTL:           5 * time.Second,
+		Env:                "development",
 	}
 }
 
@@ -109,6 +124,11 @@ func Load() *Config {
 		_ = cfg.SaveToFile(cfgPath)
 	}
 
+	// Warn if default JWT secret is used in production environment
+	if cfg.JWTSecret == "change-me-in-production" && (strings.ToLower(cfg.Env) == "production" || strings.ToLower(cfg.Env) == "prod") {
+		_, _ = fmt.Fprintln(os.Stderr, "WARNING: Using default JWT secret ('change-me-in-production') in PRODUCTION environment! This is a major security risk. Please change it immediately.")
+	}
+
 	return cfg
 }
 
@@ -118,7 +138,7 @@ func Default() *Config {
 }
 
 // SaveToFile persists the config as YAML to the given path.
-// Secrets that equal the sentinel mask "••••••••" are NOT written.
+// Secrets that equal the sentinel mask "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" are NOT written.
 func (c *Config) SaveToFile(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
@@ -147,6 +167,13 @@ func applyEnvOverrides(cfg *Config) {
 			*dest = v == "true" || v == "1" || v == "yes"
 		}
 	}
+	setInt := func(env string, dest *int) {
+		if v := os.Getenv(env); v != "" {
+			if n, err := parseInt(v); err == nil {
+				*dest = n
+			}
+		}
+	}
 
 	setStr("SOVRABASE_DATA_DIR", &cfg.DataDir)
 	setStr("SOVRABASE_LISTEN_ADDR", &cfg.ListenAddr)
@@ -158,6 +185,9 @@ func applyEnvOverrides(cfg *Config) {
 	setStr("SOVRABASE_ROLE", &cfg.Role)
 	setStr("SOVRABASE_NODE_ID", &cfg.NodeID)
 	setStr("SOVRABASE_REPL_ADDR", &cfg.ReplAddr)
+
+	setInt("SOVRABASE_RATE_LIMIT_PER_MINUTE", &cfg.RateLimitPerMinute)
+	setInt("SOVRABASE_RATE_LIMIT_BURST", &cfg.RateLimitBurst)
 
 	if v := os.Getenv("SOVRABASE_PEERS"); v != "" {
 		cfg.Peers = parsePeers(v)
@@ -172,6 +202,30 @@ func applyEnvOverrides(cfg *Config) {
 	setStr("S3_ENDPOINT", &cfg.S3Endpoint)
 	setStr("S3_BUCKET_PREFIX", &cfg.S3BucketPrefix)
 	setBool("S3_USE_SSL", &cfg.S3UseSSL)
+
+	setStr("SOVRABASE_CERT_FILE", &cfg.CertFile)
+	setStr("SOVRABASE_KEY_FILE", &cfg.KeyFile)
+	setStr("SOVRABASE_ENV", &cfg.Env)
+
+	setStr("SOVRABASE_SMTP_HOST", &cfg.SMTPHost)
+	setInt("SOVRABASE_SMTP_PORT", &cfg.SMTPPort)
+	setStr("SOVRABASE_SMTP_USER", &cfg.SMTPUser)
+	setStr("SOVRABASE_SMTP_PASSWORD", &cfg.SMTPPassword)
+	setStr("SOVRABASE_SMTP_SENDER", &cfg.SMTPSender)
+	setBool("SOVRABASE_EMAIL_VERIFICATION", &cfg.EmailVerification)
+	setStr("ENV", &cfg.Env)
+	setStr("APP_ENV", &cfg.Env)
+}
+
+func parseInt(s string) (int, error) {
+	var n int
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, nil
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
 }
 
 func setEnvIfEmpty(key, val string) {

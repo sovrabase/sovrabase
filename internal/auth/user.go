@@ -17,12 +17,17 @@ const (
 
 // User represents a Sovrabase user account.
 type User struct {
-	ID           string    `json:"id"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	Role         Role      `json:"role"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                  string    `json:"id"`
+	Email               string    `json:"email"`
+	PasswordHash        string    `json:"-"`
+	Role                Role      `json:"role"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	IsVerified          bool      `json:"is_verified"`
+	VerificationToken   string    `json:"verification_token,omitempty"`
+	VerificationExpires time.Time `json:"verification_expires,omitempty"`
+	ResetToken          string    `json:"reset_token,omitempty"`
+	ResetExpires        time.Time `json:"reset_expires,omitempty"`
 }
 
 // TokenPair contains the access and refresh tokens returned on login/signup.

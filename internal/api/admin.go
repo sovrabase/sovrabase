@@ -1,6 +1,7 @@
 package api
 
 import (
+	"archive/zip"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -29,6 +30,8 @@ type AdminServer struct {
 	jwtSecret     string
 	adminEmail    string
 	adminPassword string
+	// BackupsHandler handles backup operations.
+	BackupsHandler http.Handler
 	// OnRestart is called when the dashboard requests a server restart.
 	OnRestart func()
 }
@@ -132,6 +135,7 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/projects", a.authMiddleware(http.HandlerFunc(a.handleCreateProject)))
 	mux.Handle("DELETE /admin/projects/{id}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteProject))))
 	mux.Handle("GET /admin/projects/{id}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleGetProject))))
+	mux.Handle("PUT /admin/projects/{id}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUpdateProject))))
 	mux.Handle("GET /admin/stats", a.authMiddleware(http.HandlerFunc(a.handleStats)))
 
 	// Server config & restart
@@ -151,6 +155,11 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /admin/projects/{id}/collections/{name}/rules", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleGetRules))))
 	mux.Handle("POST /admin/projects/{id}/collections/{name}/rules", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleSetRules))))
 
+	// Index management endpoints
+	mux.Handle("GET /admin/projects/{id}/collections/{name}/indexes", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListIndexes))))
+	mux.Handle("POST /admin/projects/{id}/collections/{name}/indexes", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateIndex))))
+	mux.Handle("DELETE /admin/projects/{id}/collections/{name}/indexes/{field}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDropIndex))))
+
 	// Auth management endpoints
 	mux.Handle("GET /admin/projects/{id}/users", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListUsers))))
 	mux.Handle("POST /admin/projects/{id}/users", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateUser))))
@@ -168,6 +177,12 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	// Request logs endpoint
 	mux.Handle("GET /admin/projects/{id}/logs", a.authMiddleware(http.HandlerFunc(a.handleListLogs)))
 	mux.Handle("DELETE /admin/projects/{id}/logs", a.authMiddleware(http.HandlerFunc(a.handleFlushLogs)))
+
+	// Backup endpoints
+	mux.Handle("GET /admin/backups", a.authMiddleware(http.HandlerFunc(a.handleListBackups)))
+	mux.Handle("POST /admin/backups", a.authMiddleware(http.HandlerFunc(a.handleCreateBackup)))
+	mux.Handle("DELETE /admin/backups/{name}", a.authMiddleware(http.HandlerFunc(a.handleDeleteBackup)))
+	mux.Handle("GET /admin/backups/{name}/download", a.authMiddleware(http.HandlerFunc(a.handleDownloadBackup)))
 }
 
 func (a *AdminServer) handleCreateProject(w http.ResponseWriter, r *http.Request) {
@@ -206,10 +221,55 @@ func (a *AdminServer) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"project":    proj,
-		"api_key":    proj.JWTSecret,
-		"api_url":    r.Host + "/api/v1",
-		"project_id": proj.ID,
+		"project":       proj,
+		"api_key":       proj.JWTSecret,
+		"api_url":       r.Host + "/api/v1",
+		"project_id":    proj.ID,
+		"storage_quota": proj.StorageQuota,
+		"allow_origins": proj.AllowOrigins,
+	})
+}
+
+func (a *AdminServer) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	proj, err := a.projects.GetProject(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	var req struct {
+		AllowOrigins *string `json:"allow_origins"`
+		StorageQuota *int64  `json:"storage_quota"`
+		Name         *string `json:"name"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.AllowOrigins != nil {
+		proj.AllowOrigins = *req.AllowOrigins
+	}
+	if req.StorageQuota != nil {
+		proj.StorageQuota = *req.StorageQuota
+	}
+	if req.Name != nil && *req.Name != "" {
+		proj.Name = *req.Name
+	}
+
+	if err := a.projects.UpdateProject(proj); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"project":       proj,
+		"api_key":       proj.JWTSecret,
+		"api_url":       r.Host + "/api/v1",
+		"project_id":    proj.ID,
+		"storage_quota": proj.StorageQuota,
+		"allow_origins": proj.AllowOrigins,
 	})
 }
 
@@ -869,13 +929,16 @@ func (a *AdminServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		// Core (read-only display)
-		"listen_addr":     a.cfg.ListenAddr,
-		"data_dir":        a.cfg.DataDir,
-		"config_file":     a.cfg.ConfigFile,
-		"admin_email":     a.cfg.AdminEmail,
-		"admin_password":  masked(a.cfg.AdminPassword),
-		"jwt_secret":      masked(a.cfg.JWTSecret),
+		"listen_addr":      a.cfg.ListenAddr,
+		"data_dir":         a.cfg.DataDir,
+		"config_file":      a.cfg.ConfigFile,
+		"admin_email":      a.cfg.AdminEmail,
+		"admin_password":   masked(a.cfg.AdminPassword),
+		"jwt_secret":       masked(a.cfg.JWTSecret),
 		"session_duration": a.cfg.SessionDuration.String(),
+		"env":              a.cfg.Env,
+		"cert_file":        a.cfg.CertFile,
+		"key_file":         a.cfg.KeyFile,
 		// S3
 		"s3_enabled":       a.cfg.S3Enabled,
 		"s3_endpoint":      a.cfg.S3Endpoint,
@@ -883,6 +946,13 @@ func (a *AdminServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		"s3_secret_key":    masked(a.cfg.S3SecretKey),
 		"s3_bucket_prefix": a.cfg.S3BucketPrefix,
 		"s3_use_ssl":       a.cfg.S3UseSSL,
+		// SMTP / Email verification
+		"email_verification": a.cfg.EmailVerification,
+		"smtp_host":          a.cfg.SMTPHost,
+		"smtp_port":          a.cfg.SMTPPort,
+		"smtp_sender":        a.cfg.SMTPSender,
+		"smtp_user":          a.cfg.SMTPUser,
+		"smtp_password":      masked(a.cfg.SMTPPassword),
 		// Replication
 		"role":      a.cfg.Role,
 		"node_id":   a.cfg.NodeID,
@@ -902,6 +972,11 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		AdminEmail      *string `json:"admin_email"`
 		AdminPassword   *string `json:"admin_password"`   // ignored if == secretMask or empty
 		SessionDuration *string `json:"session_duration"` // e.g. "24h", "168h"
+		// Security / HTTPS
+		JWTSecret *string `json:"jwt_secret"` // ignored if == secretMask
+		CertFile  *string `json:"cert_file"`
+		KeyFile   *string `json:"key_file"`
+		Env       *string `json:"env"`
 		// S3
 		S3Enabled      *bool   `json:"s3_enabled"`
 		S3Endpoint     *string `json:"s3_endpoint"`
@@ -909,6 +984,13 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		S3SecretKey    *string `json:"s3_secret_key"` // ignored if == secretMask
 		S3BucketPrefix *string `json:"s3_bucket_prefix"`
 		S3UseSSL       *bool   `json:"s3_use_ssl"`
+		// SMTP / Email verification
+		EmailVerification *bool   `json:"email_verification"`
+		SMTPHost          *string `json:"smtp_host"`
+		SMTPPort          *int    `json:"smtp_port"`
+		SMTPSender        *string `json:"smtp_sender"`
+		SMTPUser          *string `json:"smtp_user"`
+		SMTPPassword      *string `json:"smtp_password"` // ignored if == secretMask
 		// Replication
 		Role     *string  `json:"role"`
 		NodeID   *string  `json:"node_id"`
@@ -934,6 +1016,20 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 			a.cfg.SessionDuration = d
 		}
 	}
+	// Security / HTTPS
+	if req.JWTSecret != nil && *req.JWTSecret != "" && *req.JWTSecret != secretMask {
+		a.cfg.JWTSecret = *req.JWTSecret
+	}
+	if req.CertFile != nil {
+		a.cfg.CertFile = *req.CertFile
+	}
+	if req.KeyFile != nil {
+		a.cfg.KeyFile = *req.KeyFile
+	}
+	if req.Env != nil {
+		a.cfg.Env = *req.Env
+	}
+	// S3
 	if req.S3Enabled != nil {
 		a.cfg.S3Enabled = *req.S3Enabled
 	}
@@ -951,6 +1047,24 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.S3UseSSL != nil {
 		a.cfg.S3UseSSL = *req.S3UseSSL
+	}
+	if req.EmailVerification != nil {
+		a.cfg.EmailVerification = *req.EmailVerification
+	}
+	if req.SMTPHost != nil {
+		a.cfg.SMTPHost = *req.SMTPHost
+	}
+	if req.SMTPPort != nil {
+		a.cfg.SMTPPort = *req.SMTPPort
+	}
+	if req.SMTPSender != nil {
+		a.cfg.SMTPSender = *req.SMTPSender
+	}
+	if req.SMTPUser != nil {
+		a.cfg.SMTPUser = *req.SMTPUser
+	}
+	if req.SMTPPassword != nil && *req.SMTPPassword != secretMask {
+		a.cfg.SMTPPassword = *req.SMTPPassword
 	}
 	if req.Role != nil {
 		a.cfg.Role = *req.Role
@@ -993,4 +1107,229 @@ func (a *AdminServer) handleRestart(w http.ResponseWriter, r *http.Request) {
 	if a.OnRestart != nil {
 		a.OnRestart()
 	}
+}
+
+// ─── Index Handlers ──────────────────────────────────────────────────────────
+
+type createIndexRequest struct {
+	Field string `json:"field"`
+	Type  string `json:"type"` // "simple" or "unique"
+}
+
+func (a *AdminServer) handleListIndexes(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	name := r.PathValue("name")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	idxs, err := env.Engine.ListIndexes(name)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if idxs == nil {
+		idxs = []db.IndexConfig{}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"indexes": idxs})
+}
+
+func (a *AdminServer) handleCreateIndex(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	name := r.PathValue("name")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	var req createIndexRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Field == "" {
+		writeError(w, http.StatusBadRequest, "field is required")
+		return
+	}
+
+	idxType := db.IndexSimple
+	if req.Type == "unique" {
+		idxType = db.IndexUnique
+	}
+
+	if err := env.Engine.CreateIndex(name, req.Field, idxType); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"status": "created",
+		"index":  db.IndexConfig{Field: req.Field, Type: idxType},
+	})
+}
+
+func (a *AdminServer) handleDropIndex(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	name := r.PathValue("name")
+	field := r.PathValue("field")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if err := env.Engine.DropIndex(name, field); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// ─── Backup Handlers ───────────────────────────────────────────────────────────
+
+func (a *AdminServer) handleListBackups(w http.ResponseWriter, r *http.Request) {
+	backupDir := filepath.Join(a.dataDir, "backups")
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		writeJSON(w, http.StatusOK, []interface{}{})
+		return
+	}
+	var backups []map[string]interface{}
+	for _, e := range entries {
+		info, _ := e.Info()
+		backups = append(backups, map[string]interface{}{
+			"name":       e.Name(),
+			"size":       info.Size(),
+			"modified":   info.ModTime().Format(time.RFC3339),
+			"is_dir":     e.IsDir(),
+		})
+	}
+	if backups == nil {
+		backups = []map[string]interface{}{}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"backups": backups,
+		"count":   len(backups),
+	})
+}
+
+func (a *AdminServer) handleCreateBackup(w http.ResponseWriter, r *http.Request) {
+	backupDir := filepath.Join(a.dataDir, "backups")
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create backup dir: "+err.Error())
+		return
+	}
+
+	timestamp := time.Now().UTC().Format("20060102T150405Z")
+	backupName := "backup-" + timestamp
+	backupPath := filepath.Join(backupDir, backupName)
+	if err := os.MkdirAll(backupPath, 0755); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create backup: "+err.Error())
+		return
+	}
+
+	// Copy each project's data directory into the backup
+	projectsDir := filepath.Join(a.dataDir, "projects")
+	entries, _ := os.ReadDir(projectsDir)
+	for _, e := range entries {
+		if e.IsDir() {
+			src := filepath.Join(projectsDir, e.Name())
+			dst := filepath.Join(backupPath, e.Name())
+			copyDir(src, dst)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":      "created",
+		"backup_name": backupName,
+		"path":        backupPath,
+	})
+}
+
+func (a *AdminServer) handleDeleteBackup(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	backupPath := filepath.Join(a.dataDir, "backups", name)
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		writeError(w, http.StatusNotFound, "backup not found")
+		return
+	}
+	if err := os.RemoveAll(backupPath); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete backup: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (a *AdminServer) handleDownloadBackup(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	backupPath := filepath.Join(a.dataDir, "backups", name)
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		writeError(w, http.StatusNotFound, "backup not found")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, name))
+
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	filepath.Walk(backupPath, func(filePath string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		relPath, _ := filepath.Rel(backupPath, filePath)
+		if fi.IsDir() {
+			return nil
+		}
+		header, err := zip.FileInfoHeader(fi)
+		if err != nil {
+			return err
+		}
+		header.Name = relPath
+		header.Method = zip.Deflate
+		writer, err := zw.CreateHeader(header)
+		if err != nil {
+			return err
+		}
+		f, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(writer, f)
+		return err
+	})
+}
+
+// copyDir recursively copies a directory.
+func copyDir(src, dst string) error {
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		srcPath := filepath.Join(src, e.Name())
+		dstPath := filepath.Join(dst, e.Name())
+		if e.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			data, err := os.ReadFile(srcPath)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(dstPath, data, 0644); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

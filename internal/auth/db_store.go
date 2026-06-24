@@ -58,6 +58,30 @@ func (s *DBUserStore) GetByEmail(email string) (*User, error) {
 	return mapToUser(docs[0])
 }
 
+// GetByVerificationToken retrieves a user by their email verification token.
+func (s *DBUserStore) GetByVerificationToken(token string) (*User, error) {
+	docs, err := s.engine.Query("_users", map[string]interface{}{"verification_token": token}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("auth: query user by verification token: %w", err)
+	}
+	if len(docs) == 0 {
+		return nil, fmt.Errorf("user with verification token %q not found", token)
+	}
+	return mapToUser(docs[0])
+}
+
+// GetByResetToken retrieves a user by their password reset token.
+func (s *DBUserStore) GetByResetToken(token string) (*User, error) {
+	docs, err := s.engine.Query("_users", map[string]interface{}{"reset_token": token}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("auth: query user by reset token: %w", err)
+	}
+	if len(docs) == 0 {
+		return nil, fmt.Errorf("user with reset token %q not found", token)
+	}
+	return mapToUser(docs[0])
+}
+
 // Update persists changes to an existing user.
 func (s *DBUserStore) Update(user *User) error {
 	// Check that the user exists first
@@ -105,14 +129,24 @@ func (s *DBUserStore) List() ([]*User, error) {
 
 // Helper functions to map User to/from map[string]interface{}
 func userToMap(u *User) map[string]interface{} {
-	return map[string]interface{}{
+	m := map[string]interface{}{
 		"_id":           u.ID,
 		"email":          u.Email,
 		"password_hash":  u.PasswordHash,
 		"role":           string(u.Role),
 		"created_at":     u.CreatedAt.Format(time.RFC3339Nano),
 		"updated_at":     u.UpdatedAt.Format(time.RFC3339Nano),
+		"is_verified":    u.IsVerified,
 	}
+	if u.VerificationToken != "" {
+		m["verification_token"] = u.VerificationToken
+		m["verification_expires"] = u.VerificationExpires.Format(time.RFC3339Nano)
+	}
+	if u.ResetToken != "" {
+		m["reset_token"] = u.ResetToken
+		m["reset_expires"] = u.ResetExpires.Format(time.RFC3339Nano)
+	}
+	return m
 }
 
 func mapToUser(m map[string]interface{}) (*User, error) {
@@ -120,6 +154,9 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 	email, _ := m["email"].(string)
 	pwHash, _ := m["password_hash"].(string)
 	roleStr, _ := m["role"].(string)
+	isVerified, _ := m["is_verified"].(bool)
+	verificationToken, _ := m["verification_token"].(string)
+	resetToken, _ := m["reset_token"].(string)
 
 	var createdAt, updatedAt time.Time
 	if caStr, ok := m["created_at"].(string); ok {
@@ -129,12 +166,27 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 		updatedAt, _ = time.Parse(time.RFC3339Nano, uaStr)
 	}
 
+	var verificationExpires time.Time
+	if veStr, ok := m["verification_expires"].(string); ok && veStr != "" {
+		verificationExpires, _ = time.Parse(time.RFC3339Nano, veStr)
+	}
+
+	var resetExpires time.Time
+	if reStr, ok := m["reset_expires"].(string); ok && reStr != "" {
+		resetExpires, _ = time.Parse(time.RFC3339Nano, reStr)
+	}
+
 	return &User{
-		ID:           id,
-		Email:        email,
-		PasswordHash: pwHash,
-		Role:         Role(roleStr),
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
+		ID:                  id,
+		Email:               email,
+		PasswordHash:        pwHash,
+		Role:                Role(roleStr),
+		CreatedAt:           createdAt,
+		UpdatedAt:           updatedAt,
+		IsVerified:          isVerified,
+		VerificationToken:   verificationToken,
+		VerificationExpires: verificationExpires,
+		ResetToken:          resetToken,
+		ResetExpires:        resetExpires,
 	}, nil
 }

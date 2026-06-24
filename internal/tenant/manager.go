@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -19,21 +20,24 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ketsuna-org/sovrabase/internal/auth"
+	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 )
 
 // Project represents an isolated Sovrabase project (tenant).
 type Project struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	OwnerID     string    `json:"owner_id"`
-	JWTSecret   string    `json:"jwt_secret"`
-	DataDir     string    `json:"data_dir"`
-	StorageDir  string    `json:"storage_dir"`
-	CreatedAt   time.Time `json:"created_at"`
-	Status      string    `json:"status"` // "active", "suspended", "deleted"
-	ReplGroup   string    `json:"repl_group"` // replication group identifier
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	OwnerID      string    `json:"owner_id"`
+	JWTSecret    string    `json:"jwt_secret"`
+	DataDir      string    `json:"data_dir"`
+	StorageDir   string    `json:"storage_dir"`
+	CreatedAt    time.Time `json:"created_at"`
+	Status       string    `json:"status"` // "active", "suspended", "deleted"
+	ReplGroup    string    `json:"repl_group"` // replication group identifier
+	StorageQuota int64  `json:"storage_quota"`   // in bytes
+	AllowOrigins string `json:"allow_origins"` // comma-separated allowed origins for CORS
 }
 
 // ProjectEnv holds project-specific database, auth service, and storage driver.
@@ -48,13 +52,14 @@ type ProjectManager struct {
 	mu       sync.RWMutex
 	db       *pebble.DB
 	baseDir  string
+	cfg      *config.Config
 	projects map[string]*Project // in-memory cache
 	envs     map[string]*ProjectEnv // project ID -> active environment cache
 }
 
 // NewProjectManager creates a new project manager backed by the master database
 // stored at {baseDir}/_master.
-func NewProjectManager(baseDir string) (*ProjectManager, error) {
+func NewProjectManager(baseDir string, cfg *config.Config) (*ProjectManager, error) {
 	masterDir := filepath.Join(baseDir, "_master")
 	if err := os.MkdirAll(masterDir, 0755); err != nil {
 		return nil, fmt.Errorf("tenant: create master dir: %w", err)
@@ -68,6 +73,7 @@ func NewProjectManager(baseDir string) (*ProjectManager, error) {
 	pm := &ProjectManager{
 		db:       db,
 		baseDir:  baseDir,
+		cfg:      cfg,
 		projects: make(map[string]*Project),
 		envs:     make(map[string]*ProjectEnv),
 	}
@@ -112,15 +118,17 @@ func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) 
 
 	projectDir := filepath.Join(pm.baseDir, "projects", id)
 	proj := &Project{
-		ID:         id,
-		Name:       name,
-		OwnerID:    ownerID,
-		JWTSecret:  jwtSecret,
-		DataDir:    filepath.Join(projectDir, "db"),
-		StorageDir: filepath.Join(projectDir, "storage"),
-		CreatedAt:  time.Now().UTC(),
-		Status:     "active",
-		ReplGroup:  "default",
+		ID:           id,
+		Name:         name,
+		OwnerID:      ownerID,
+		JWTSecret:    jwtSecret,
+		DataDir:      filepath.Join(projectDir, "db"),
+		StorageDir:   filepath.Join(projectDir, "storage"),
+		CreatedAt:    time.Now().UTC(),
+		Status:       "active",
+		ReplGroup:    "default",
+		StorageQuota: 100 * 1024 * 1024, // 100MB default quota
+		AllowOrigins: "*",               // allow all origins by default
 	}
 
 	// Create project directories
@@ -175,6 +183,23 @@ func (pm *ProjectManager) ListProjects() []*Project {
 	return result
 }
 
+// UpdateProject saves changes to an existing project.
+func (pm *ProjectManager) UpdateProject(proj *Project) error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	existing, ok := pm.projects[proj.ID]
+	if !ok {
+		return fmt.Errorf("tenant: project %q not found", proj.ID)
+	}
+	if existing.Status == "deleted" {
+		return fmt.Errorf("tenant: project %q is deleted", proj.ID)
+	}
+
+	pm.projects[proj.ID] = proj
+	return pm.saveProject(proj)
+}
+
 // DeleteProject marks a project as deleted and removes its data.
 func (pm *ProjectManager) DeleteProject(id string) error {
 	pm.mu.Lock()
@@ -218,6 +243,45 @@ func (pm *ProjectManager) ProjectCount() int {
 		}
 	}
 	return count
+}
+
+// Backup creates Pebble checkpoints of the master database and all active
+// project databases into the given destination directory.
+func (pm *ProjectManager) Backup(destDir string) error {
+	// Snapshot the list of active projects under read lock.
+	pm.mu.RLock()
+	var activeIDs []string
+	for _, p := range pm.projects {
+		if p.Status == "active" {
+			activeIDs = append(activeIDs, p.ID)
+		}
+	}
+	pm.mu.RUnlock()
+
+	// Create the destination directory.
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("tenant: create backup dir %q: %w", destDir, err)
+	}
+
+	// Create a checkpoint of the master database.
+	masterCp := filepath.Join(destDir, "_master")
+	if err := pm.db.Checkpoint(masterCp); err != nil {
+		return fmt.Errorf("tenant: master checkpoint: %w", err)
+	}
+
+	// Create checkpoints for each active project.
+	for _, id := range activeIDs {
+		env, err := pm.GetProjectEnv(id)
+		if err != nil {
+			continue // skip projects that fail to load
+		}
+		projCp := filepath.Join(destDir, id)
+		if err := env.Engine.DB().Checkpoint(projCp); err != nil {
+			return fmt.Errorf("tenant: project %q checkpoint: %w", id, err)
+		}
+	}
+
+	return nil
 }
 
 // saveProject persists a project to the master database.
@@ -287,6 +351,14 @@ func (pm *ProjectManager) GetProjectEnv(id string) (*ProjectEnv, error) {
 	// 4. Initialize auth service
 	userStore := auth.NewDBUserStore(engine)
 	authSvc := auth.NewService(proj.JWTSecret, userStore)
+	authSvc.EmailVerificationEnabled = os.Getenv("SOVRABASE_EMAIL_VERIFICATION") == "true"
+	authSvc.SMTPHost = os.Getenv("SOVRABASE_SMTP_HOST")
+	if portVal, err := strconv.Atoi(os.Getenv("SOVRABASE_SMTP_PORT")); err == nil {
+		authSvc.SMTPPort = portVal
+	}
+	authSvc.SMTPUser = os.Getenv("SOVRABASE_SMTP_USER")
+	authSvc.SMTPPassword = os.Getenv("SOVRABASE_SMTP_PASSWORD")
+	authSvc.SMTPSender = os.Getenv("SOVRABASE_SMTP_SENDER")
 
 	// 5. Initialize storage driver
 	var storageDriver storage.Driver

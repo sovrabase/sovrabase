@@ -284,6 +284,8 @@ async function openProjectDetailView(id) {
       <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value mono">${escapeHtml(p.id)}</span></div>
       <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value"><span class="badge badge-${p.status || 'active'}"><span class="badge-dot"></span>${escapeHtml(p.status || 'active')}</span></span></div>
       <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${formatDate(p.created_at)}</span></div>
+      <div class="detail-row"><span class="detail-label">Storage Quota</span><span class="detail-value">${escapeHtml(formatBytes(data.storage_quota || 0))}</span></div>
+      <div class="detail-row"><span class="detail-label">Allow Origins</span><span class="detail-value mono">${escapeHtml(data.allow_origins || '*')}</span></div>
       <div class="detail-row"><span class="detail-label">API URL</span><span class="detail-value mono">${escapeHtml(data.api_url || p.api_url || '')}</span></div>
       <div class="detail-row">
         <span class="detail-label">API Key</span>
@@ -291,6 +293,22 @@ async function openProjectDetailView(id) {
           <span class="mask-toggle" id="pdtab-apikey-mask" onclick="toggleApiKeyReveal()">•••••••••••• (click to reveal)</span>
           <span id="pdtab-apikey-full" style="display:none;font-family:var(--font-mono);font-size:12px;word-break:break-all;"></span>
         </span>
+      </div>
+      <div class="detail-row" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px;">
+        <span class="detail-label">Edit Settings</span>
+        <span class="detail-value"></span>
+      </div>
+      <div class="form-group" style="margin-top: 8px;">
+        <label for="pd-allow-origins" style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted);">Allowed Origins (comma-separated)</label>
+        <input type="text" id="pd-allow-origins" value="${escapeHtml(data.allow_origins || '*')}" style="width:100%; font-family: var(--font-mono); font-size: 12px;">
+      </div>
+      <div class="form-group" style="margin-top: 8px;">
+        <label for="pd-storage-quota" style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted);">Storage Quota (bytes)</label>
+        <input type="number" id="pd-storage-quota" value="${data.storage_quota || 104857600}" style="width:100%; font-family: var(--font-mono); font-size: 12px;">
+      </div>
+      <div style="margin-top: 12px;">
+        <button class="btn btn-primary btn-sm" id="btn-save-project-settings" onclick="saveProjectSettings()">💾 Save Settings</button>
+        <span id="pd-save-status" style="font-size: 12px; margin-left: 10px; color: var(--text-secondary);"></span>
       </div>`;
 
     // Update API code snippets
@@ -327,6 +345,41 @@ function toggleApiKeyReveal() {
   } else {
     mask.style.display = 'inline';
     full.style.display = 'none';
+  }
+}
+
+async function saveProjectSettings() {
+  if (!detailProjectId) return;
+  const btn = document.getElementById('btn-save-project-settings');
+  const status = document.getElementById('pd-save-status');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  status.textContent = '';
+
+  try {
+    const allowOrigins = document.getElementById('pd-allow-origins').value.trim();
+    const storageQuota = parseInt(document.getElementById('pd-storage-quota').value, 10);
+
+    const data = await api('/admin/projects/' + encodeURIComponent(detailProjectId), {
+      method: 'PUT',
+      body: JSON.stringify({
+        allow_origins: allowOrigins,
+        storage_quota: storageQuota
+      })
+    });
+
+    showToast('Project settings saved');
+    status.textContent = '✓ Saved';
+    status.style.color = 'var(--success)';
+    // Refresh the view to show updated values
+    openProjectDetailView(detailProjectId);
+  } catch (e) {
+    showToast('Failed to save settings: ' + e.message, 'error');
+    status.textContent = '✗ ' + e.message;
+    status.style.color = 'var(--danger)';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Save Settings';
   }
 }
 
@@ -505,12 +558,32 @@ async function loadSettings() {
     document.getElementById('cfg-s3-secret-key').value = cfg.s3_secret_key || '';
     document.getElementById('cfg-s3-ssl').checked = cfg.s3_use_ssl !== false;
 
+    // SMTP / Email Verification fields
+    const emailVerify = cfg.email_verification === true;
+    document.getElementById('cfg-email-verification').checked = emailVerify;
+    document.getElementById('smtp-form-fields').style.display = emailVerify ? 'grid' : 'none';
+    document.getElementById('cfg-smtp-host').value = cfg.smtp_host || '';
+    document.getElementById('cfg-smtp-port').value = cfg.smtp_port || 587;
+    document.getElementById('cfg-smtp-sender').value = cfg.smtp_sender || '';
+    document.getElementById('cfg-smtp-user').value = cfg.smtp_user || '';
+    document.getElementById('cfg-smtp-password').value = '';
+
     // Replication fields
     const roleEl = document.getElementById('cfg-role');
     roleEl.value = cfg.role || '';
     document.getElementById('cfg-node-id').value = cfg.node_id || '';
     document.getElementById('cfg-repl-addr').value = cfg.repl_addr || '';
     document.getElementById('cfg-peers').value = (cfg.peers || []).join('\n');
+
+    // Security & HTTPS fields
+    const envEl = document.getElementById('cfg-env');
+    if (envEl) envEl.value = cfg.env || 'development';
+    document.getElementById('cfg-jwt-secret').value = cfg.jwt_secret || '';
+    document.getElementById('cfg-cert-file').value = cfg.cert_file || '';
+    document.getElementById('cfg-key-file').value = cfg.key_file || '';
+
+    // Load backups
+    loadBackups();
 
   } catch (e) {
     showToast('Failed to load config: ' + e.message, 'error');
@@ -520,6 +593,11 @@ async function loadSettings() {
 function toggleS3Form() {
   const enabled = document.getElementById('cfg-s3-enabled').checked;
   document.getElementById('s3-form-fields').style.display = enabled ? 'grid' : 'none';
+}
+
+function toggleSMTPForm() {
+  const enabled = document.getElementById('cfg-email-verification').checked;
+  document.getElementById('smtp-form-fields').style.display = enabled ? 'grid' : 'none';
 }
 
 async function saveConfig() {
@@ -542,22 +620,33 @@ async function saveConfig() {
   const secretKey = document.getElementById('cfg-s3-secret-key').value;
 
   try {
+    const smtpPwd = document.getElementById('cfg-smtp-password').value;
     await api('/admin/config', {
       method: 'POST',
       body: JSON.stringify({
-        admin_email:      document.getElementById('cfg-admin-email').value,
-        admin_password:   newPwd || '••••••••',
-        session_duration: document.getElementById('cfg-session-duration').value || '24h',
-        s3_enabled:       document.getElementById('cfg-s3-enabled').checked,
-        s3_endpoint:      document.getElementById('cfg-s3-endpoint').value,
-        s3_access_key:    document.getElementById('cfg-s3-access-key').value,
-        s3_secret_key:    secretKey || '••••••••',
-        s3_bucket_prefix: document.getElementById('cfg-s3-prefix').value,
-        s3_use_ssl:       document.getElementById('cfg-s3-ssl').checked,
-        role:             document.getElementById('cfg-role').value,
-        node_id:          document.getElementById('cfg-node-id').value,
-        repl_addr:        document.getElementById('cfg-repl-addr').value,
-        peers:            peers,
+        admin_email:        document.getElementById('cfg-admin-email').value,
+        admin_password:     newPwd || '••••••••',
+        env:               document.getElementById('cfg-env').value,
+        jwt_secret:        document.getElementById('cfg-jwt-secret').value || '••••••••',
+        cert_file:         document.getElementById('cfg-cert-file').value,
+        key_file:          document.getElementById('cfg-key-file').value,
+        session_duration:   document.getElementById('cfg-session-duration').value || '24h',
+        s3_enabled:         document.getElementById('cfg-s3-enabled').checked,
+        s3_endpoint:        document.getElementById('cfg-s3-endpoint').value,
+        s3_access_key:      document.getElementById('cfg-s3-access-key').value,
+        s3_secret_key:      secretKey || '••••••••',
+        s3_bucket_prefix:   document.getElementById('cfg-s3-prefix').value,
+        s3_use_ssl:         document.getElementById('cfg-s3-ssl').checked,
+        email_verification: document.getElementById('cfg-email-verification').checked,
+        smtp_host:          document.getElementById('cfg-smtp-host').value,
+        smtp_port:          parseInt(document.getElementById('cfg-smtp-port').value || '587', 10),
+        smtp_sender:        document.getElementById('cfg-smtp-sender').value,
+        smtp_user:          document.getElementById('cfg-smtp-user').value,
+        smtp_password:      smtpPwd || '••••••••',
+        role:               document.getElementById('cfg-role').value,
+        node_id:            document.getElementById('cfg-node-id').value,
+        repl_addr:          document.getElementById('cfg-repl-addr').value,
+        peers:              peers,
       })
     });
     showToast('Config saved to config.yaml ✓', 'success');
@@ -643,6 +732,90 @@ document.addEventListener('keydown', function(e) {
     }
   }
 });
+
+// ===== BACKUPS =====
+async function loadBackups() {
+  try {
+    const data = await api('/admin/backups');
+    const list = document.getElementById('backups-list');
+    if (!list) return;
+    
+    const backups = data.backups || [];
+    if (backups.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;">No backups yet. Create one above.</div>';
+      return;
+    }
+    
+    list.innerHTML = backups.map(b => {
+      const date = b.modified ? new Date(b.modified).toLocaleString() : '—';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-card-elevated);border:1px solid var(--border);border-radius:var(--radius);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">📦</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;">${escapeHtml(b.name)}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${date}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-xs btn-secondary" onclick="downloadBackup('${escapeHtml(b.name)}')">⬇ Download</button>
+          <button class="btn btn-xs btn-danger" onclick="deleteBackup('${escapeHtml(b.name)}')">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    const list = document.getElementById('backups-list');
+    if (list) list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--danger);font-size:12px;">Failed to load backups</div>';
+  }
+}
+
+async function createBackup() {
+  const btn = document.getElementById('btn-create-backup');
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  try {
+    await api('/admin/backups', { method: 'POST' });
+    showToast('Backup created successfully', 'success');
+    await loadBackups();
+  } catch (e) {
+    showToast('Backup failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '+ Create Backup';
+  }
+}
+
+async function downloadBackup(name) {
+  try {
+    const token = localStorage.getItem('sovrabase_admin_token');
+    const res = await fetch('/admin/backups/' + encodeURIComponent(name) + '/download', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Download failed');
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name + '.zip';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    showToast('Download failed: ' + e.message, 'error');
+  }
+}
+
+async function deleteBackup(name) {
+  if (!await showConfirm('Delete Backup', 'Delete backup "' + name + '"? This cannot be undone.', 'Delete', true)) return;
+  try {
+    await api('/admin/backups/' + encodeURIComponent(name), { method: 'DELETE' });
+    showToast('Backup deleted', 'success');
+    await loadBackups();
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
 
 // ===== INITIAL LOAD =====
 function checkAuth() {

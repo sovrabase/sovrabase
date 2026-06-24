@@ -13,11 +13,17 @@ import (
 // AuthService is the main authentication service. It coordinates user
 // management, JWT issuance, and OAuth flows.
 type AuthService struct {
-	jwtSecret     string
-	store         UserStore
-	oauthStates   map[string]stateEntry // state token → provider name
-	oauthStatesMu sync.Mutex
-	providers     map[string]OAuthProvider
+	jwtSecret                string
+	store                    UserStore
+	oauthStates              map[string]stateEntry // state token → provider name
+	oauthStatesMu            sync.Mutex
+	providers                map[string]OAuthProvider
+	EmailVerificationEnabled bool
+	SMTPHost                 string
+	SMTPPort                 int
+	SMTPUser                 string
+	SMTPPassword             string
+	SMTPSender               string
 }
 
 type stateEntry struct {
@@ -60,6 +66,26 @@ func (s *AuthService) SignUp(email, password string) (*User, *TokenPair, error) 
 
 	user := NewUser(email, hash)
 
+	// If email verification is enabled and SMTP is set up, enforce verification
+	if s.EmailVerificationEnabled && s.SMTPHost != "" {
+		verifyBytes := make([]byte, 16)
+		if _, randErr := rand.Read(verifyBytes); randErr != nil {
+			return nil, nil, fmt.Errorf("generating verification token: %w", randErr)
+		}
+		user.VerificationToken = hex.EncodeToString(verifyBytes)
+		user.VerificationExpires = time.Now().Add(24 * time.Hour)
+		user.IsVerified = false
+
+		if err := s.store.Create(user); err != nil {
+			return nil, nil, err
+		}
+
+		// Return nil tokens because verification is required
+		return user, nil, nil
+	}
+
+	// Otherwise, mark user as verified immediately and log them in
+	user.IsVerified = true
 	if err := s.store.Create(user); err != nil {
 		return nil, nil, err
 	}
@@ -82,6 +108,11 @@ func (s *AuthService) SignIn(email, password string) (*TokenPair, error) {
 	user, err := s.store.GetByEmail(email)
 	if err != nil {
 		return nil, fmt.Errorf("invalid email or password")
+	}
+
+	// Only enforce verification check if verification is enabled and SMTP is set up
+	if s.EmailVerificationEnabled && s.SMTPHost != "" && !user.IsVerified {
+		return nil, fmt.Errorf("email not verified")
 	}
 
 	if err := CheckPassword(user.PasswordHash, password); err != nil {
@@ -199,9 +230,13 @@ func (s *AuthService) HandleOAuthCallback(provider, code, state string) (*User, 
 		}
 
 		user = NewUser(oauthInfo.Email, hash)
+		user.IsVerified = true // OAuth users are verified!
 		if createErr := s.store.Create(user); createErr != nil {
 			return nil, nil, fmt.Errorf("creating oauth user: %w", createErr)
 		}
+	} else if !user.IsVerified {
+		user.IsVerified = true
+		_ = s.store.Update(user)
 	}
 
 	tokens, err := s.generateTokenPair(user)
@@ -251,4 +286,90 @@ func generateRandomString(length int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// VerifyEmail validates a verification token and marks the user as verified.
+func (s *AuthService) VerifyEmail(token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("token is required")
+	}
+
+	user, err := s.store.GetByVerificationToken(token)
+	if err != nil {
+		return fmt.Errorf("invalid or expired verification token")
+	}
+
+	if time.Now().After(user.VerificationExpires) {
+		return fmt.Errorf("verification token has expired")
+	}
+
+	user.IsVerified = true
+	user.VerificationToken = ""
+	user.VerificationExpires = time.Time{}
+
+	return s.store.Update(user)
+}
+
+// ForgotPassword generates a password reset token for the given email.
+// It returns the reset token for delivery (mocked/API output).
+func (s *AuthService) ForgotPassword(email string) (string, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return "", fmt.Errorf("email is required")
+	}
+
+	user, err := s.store.GetByEmail(email)
+	if err != nil {
+		return "", fmt.Errorf("user with email %q not found", email)
+	}
+
+	resetBytes := make([]byte, 16)
+	if _, randErr := rand.Read(resetBytes); randErr != nil {
+		return "", fmt.Errorf("generating reset token: %w", randErr)
+	}
+	token := hex.EncodeToString(resetBytes)
+
+	user.ResetToken = token
+	user.ResetExpires = time.Now().Add(1 * time.Hour) // valid for 1 hour
+
+	if err := s.store.Update(user); err != nil {
+		return "", fmt.Errorf("saving reset token: %w", err)
+	}
+
+	return token, nil
+}
+
+// ResetPassword validates a reset token and updates the user's password.
+func (s *AuthService) ResetPassword(token, newPassword string) error {
+	token = strings.TrimSpace(token)
+	newPassword = strings.TrimSpace(newPassword)
+	if token == "" {
+		return fmt.Errorf("token is required")
+	}
+	if len(newPassword) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+
+	user, err := s.store.GetByResetToken(token)
+	if err != nil {
+		return fmt.Errorf("invalid or expired reset token")
+	}
+
+	if time.Now().After(user.ResetExpires) {
+		return fmt.Errorf("reset token has expired")
+	}
+
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hashing password: %w", err)
+	}
+
+	user.PasswordHash = hash
+	user.ResetToken = ""
+	user.ResetExpires = time.Time{}
+	// Also mark user as verified if they successfully reset password
+	user.IsVerified = true
+
+	return s.store.Update(user)
 }

@@ -1,13 +1,22 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/realtime"
 )
 
 // ─── Auth Handlers ───────────────────────────────────────────────────────────
@@ -123,6 +132,82 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type verifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
+func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req verifyEmailRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Token == "" {
+		writeError(w, http.StatusBadRequest, "token is required")
+		return
+	}
+
+	err := s.getAuth(r).VerifyEmail(req.Token)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "email verified successfully"})
+}
+
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req forgotPasswordRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	token, err := s.getAuth(r).ForgotPassword(req.Email)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "password reset email sent",
+		"token":   token,
+	})
+}
+
+type resetPasswordRequest struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
+func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req resetPasswordRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Token == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "token and password are required")
+		return
+	}
+
+	err := s.getAuth(r).ResetPassword(req.Token, req.Password)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "password reset successfully"})
+}
+
 func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	if claims == nil {
@@ -229,6 +314,32 @@ func (s *Server) filterDocs(r *http.Request, collection string, docs []map[strin
 	return filtered, nil
 }
 
+// publishRealtime sends a realtime event for a data mutation.
+func (s *Server) publishRealtime(eventType realtime.EventType, projectID, collection, docID string, data map[string]interface{}) {
+	if s.realtimeHub == nil {
+		return
+	}
+	s.realtimeHub.Publish(&realtime.Event{
+		Type:       eventType,
+		Collection: collection,
+		DocID:      docID,
+		Data:       data,
+		ProjectID:  projectID,
+		Timestamp:  time.Now().UTC(),
+	})
+}
+
+// getProjectIDFromRequest extracts the project ID from the request context.
+func (s *Server) getProjectIDFromRequest(r *http.Request) string {
+	if env := getProjectEnv(r); env != nil {
+		// Walk through the projects to find the matching env.
+		// For now, use a simple empty string — the realtime filter will use
+		// the project key from the environment.
+		return ""
+	}
+	return ""
+}
+
 func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
@@ -239,7 +350,7 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := uuid.New().String()
-	doc["_id"] = id // Set the ID beforehand for rule evaluation
+	doc["_id"] = id
 
 	allowed, err := s.checkRLS(r, collection, "create", id, doc)
 	if err != nil {
@@ -257,6 +368,13 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	created, _ := s.getDB(r).Get(collection, id)
+
+	// Publish realtime event.
+	if s.realtimeHub != nil {
+		projectID := getProjectID(r)
+		s.publishRealtime(realtime.EventInsert, projectID, collection, id, created)
+	}
+
 	writeJSON(w, http.StatusCreated, created)
 }
 
@@ -309,12 +427,22 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated, _ := s.getDB(r).Get(collection, id)
+
+	// Publish realtime event.
+	if s.realtimeHub != nil {
+		projectID := getProjectID(r)
+		s.publishRealtime(realtime.EventUpdate, projectID, collection, id, updated)
+	}
+
 	writeJSON(w, http.StatusOK, updated)
 }
 
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 	id := chi.URLParam(r, "id")
+
+	// Fetch existing doc before delete (for RLS + realtime event).
+	existing, _ := s.getDB(r).Get(collection, id)
 
 	allowed, err := s.checkRLS(r, collection, "delete", id, nil)
 	if err != nil {
@@ -329,6 +457,12 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if err := s.getDB(r).Delete(collection, id); err != nil {
 		writeError(w, http.StatusNotFound, "document not found")
 		return
+	}
+
+	// Publish realtime event.
+	if s.realtimeHub != nil && existing != nil {
+		projectID := getProjectID(r)
+		s.publishRealtime(realtime.EventDelete, projectID, collection, id, existing)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -348,9 +482,14 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Parse pagination params.
+	limit := parseIntParam(q.Get("limit"), 50)
+	offset := parseIntParam(q.Get("offset"), 0)
+	hasPagination := q.Has("limit") || q.Has("offset")
+
 	filter := make(map[string]interface{})
 	for key, values := range q {
-		if key == "select" {
+		if key == "select" || key == "limit" || key == "offset" {
 			continue
 		}
 		if len(values) > 0 {
@@ -360,10 +499,19 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 
 	var docs []map[string]interface{}
 	var err error
-	if len(filter) > 0 || len(projection) > 0 {
-		docs, err = s.getDB(r).Query(collection, filter, projection)
+
+	if hasPagination || limit > 0 || offset > 0 {
+		if len(filter) > 0 || len(projection) > 0 {
+			docs, err = s.getDB(r).QueryPaged(collection, filter, projection, limit, offset)
+		} else {
+			docs, err = s.getDB(r).ListPaged(collection, limit, offset)
+		}
 	} else {
-		docs, err = s.getDB(r).List(collection)
+		if len(filter) > 0 || len(projection) > 0 {
+			docs, err = s.getDB(r).Query(collection, filter, projection)
+		} else {
+			docs, err = s.getDB(r).List(collection)
+		}
 	}
 
 	if err != nil {
@@ -381,6 +529,18 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 		docs = []map[string]interface{}{}
 	}
 
+	// Return paginated response when pagination params are present.
+	if hasPagination {
+		total, _ := s.getDB(r).Count(collection)
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"data":   docs,
+			"limit":  limit,
+			"offset": offset,
+			"total":  total,
+		})
+		return
+	}
+
 	writeJSON(w, http.StatusOK, docs)
 }
 
@@ -388,6 +548,8 @@ type queryRequest struct {
 	Filter     map[string]interface{} `json:"filter"`
 	Select     []string               `json:"select"`
 	Projection []string               `json:"projection"`
+	Limit      int                    `json:"limit"`
+	Offset     int                    `json:"offset"`
 }
 
 func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -404,7 +566,17 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		proj = req.Projection
 	}
 
-	docs, err := s.getDB(r).Query(collection, req.Filter, proj)
+	hasPagination := req.Limit > 0 || req.Offset > 0
+
+	var docs []map[string]interface{}
+	var err error
+
+	if hasPagination {
+		docs, err = s.getDB(r).QueryPaged(collection, req.Filter, proj, req.Limit, req.Offset)
+	} else {
+		docs, err = s.getDB(r).Query(collection, req.Filter, proj)
+	}
+
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -420,7 +592,34 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		docs = []map[string]interface{}{}
 	}
 
+	if hasPagination {
+		total, _ := s.getDB(r).Count(collection)
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"data":   docs,
+			"limit":  req.Limit,
+			"offset": req.Offset,
+			"total":  total,
+		})
+		return
+	}
+
 	writeJSON(w, http.StatusOK, docs)
+}
+
+// parseIntParam parses an integer from a string, returning defaultVal on failure.
+func parseIntParam(s string, defaultVal int) int {
+	if s == "" {
+		return defaultVal
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 0 {
+		return defaultVal
+	}
+	// Cap at 1000 for safety.
+	if v > 1000 {
+		v = 1000
+	}
+	return v
 }
 
 // ─── Storage Handlers ────────────────────────────────────────────────────────
@@ -440,6 +639,30 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
+	// Enforce project storage quota
+	projectID := getProjectID(r)
+	if projectID != "" {
+		proj, err := s.projects.GetProject(projectID)
+		if err == nil && proj != nil && proj.StorageQuota > 0 {
+			var currentUsage int64
+			if _, statErr := os.Stat(proj.StorageDir); statErr == nil {
+				_ = filepath.Walk(proj.StorageDir, func(path string, info os.FileInfo, walkErr error) error {
+					if walkErr != nil {
+						return nil
+					}
+					if !info.IsDir() {
+						currentUsage += info.Size()
+					}
+					return nil
+				})
+			}
+			if currentUsage+header.Size > proj.StorageQuota {
+				writeError(w, http.StatusForbidden, fmt.Sprintf("storage quota exceeded (used %d/%d bytes, attempting to upload %d bytes)", currentUsage, proj.StorageQuota, header.Size))
+				return
+			}
+		}
+	}
 
 	path := r.FormValue("path")
 	if path == "" {
@@ -502,4 +725,247 @@ func (s *Server) handleStorageList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, files)
+}
+
+// ─── Batch Handler ─────────────────────────────────────────────────────────────
+
+type batchOperation struct {
+	Op   string                 `json:"op"`   // "insert", "update", "delete"
+	ID   string                 `json:"id"`   // document ID (optional for insert)
+	Data map[string]interface{} `json:"data"` // document data
+}
+
+type batchRequest struct {
+	Operations []batchOperation `json:"operations"`
+}
+
+type batchResult struct {
+	Index   int         `json:"index"`
+	Op      string      `json:"op"`
+	ID      string      `json:"id"`
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
+}
+
+func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
+	collection := chi.URLParam(r, "collection")
+
+	var req batchRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	engine := s.getDB(r)
+	projectID := getProjectID(r)
+	results := make([]batchResult, 0, len(req.Operations))
+
+	for i, op := range req.Operations {
+		result := batchResult{
+			Index:   i,
+			Op:      op.Op,
+			ID:      op.ID,
+			Success: false,
+		}
+
+		switch op.Op {
+		case "insert":
+			id := op.ID
+			if id == "" {
+				id = uuid.New().String()
+			}
+			op.Data["_id"] = id
+			result.ID = id
+
+			allowed, err := s.checkRLS(r, collection, "create", id, op.Data)
+			if err != nil || !allowed {
+				result.Error = "RLS policy restricts insertion"
+				results = append(results, result)
+				continue
+			}
+
+			if err := engine.Insert(collection, id, op.Data); err != nil {
+				result.Error = err.Error()
+				results = append(results, result)
+				continue
+			}
+
+			created, _ := engine.Get(collection, id)
+			result.Success = true
+			result.Data = created
+
+			// Realtime event
+			if s.realtimeHub != nil {
+				s.publishRealtime(realtime.EventInsert, projectID, collection, id, created)
+			}
+
+			// Webhook trigger
+			s.fireWebhooks(r, collection, "insert", id, created)
+
+		case "update":
+			if op.ID == "" {
+				result.Error = "id is required for update"
+				results = append(results, result)
+				continue
+			}
+
+			allowed, err := s.checkRLS(r, collection, "update", op.ID, op.Data)
+			if err != nil || !allowed {
+				result.Error = "RLS policy restricts update"
+				results = append(results, result)
+				continue
+			}
+
+			if err := engine.Update(collection, op.ID, op.Data); err != nil {
+				result.Error = err.Error()
+				results = append(results, result)
+				continue
+			}
+
+			updated, _ := engine.Get(collection, op.ID)
+			result.Success = true
+			result.Data = updated
+
+			// Realtime event
+			if s.realtimeHub != nil {
+				s.publishRealtime(realtime.EventUpdate, projectID, collection, op.ID, updated)
+			}
+
+			// Webhook trigger
+			s.fireWebhooks(r, collection, "update", op.ID, updated)
+
+		case "delete":
+			if op.ID == "" {
+				result.Error = "id is required for delete"
+				results = append(results, result)
+				continue
+			}
+
+			existing, _ := engine.Get(collection, op.ID)
+
+			allowed, err := s.checkRLS(r, collection, "delete", op.ID, nil)
+			if err != nil || !allowed {
+				result.Error = "RLS policy restricts deletion"
+				results = append(results, result)
+				continue
+			}
+
+			if err := engine.Delete(collection, op.ID); err != nil {
+				result.Error = err.Error()
+				results = append(results, result)
+				continue
+			}
+
+			result.Success = true
+			result.Data = map[string]string{"status": "deleted"}
+
+			// Realtime event
+			if s.realtimeHub != nil && existing != nil {
+				s.publishRealtime(realtime.EventDelete, projectID, collection, op.ID, existing)
+			}
+
+			// Webhook trigger
+			s.fireWebhooks(r, collection, "delete", op.ID, existing)
+
+		default:
+			result.Error = "unknown operation: " + op.Op
+			results = append(results, result)
+			continue
+		}
+
+		results = append(results, result)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"results": results,
+		"total":   len(results),
+	})
+}
+
+// ─── Search Handler ────────────────────────────────────────────────────────────
+
+type searchRequest struct {
+	Query  string   `json:"query"`
+	Fields []string `json:"fields"`
+	Limit  int      `json:"limit"`
+}
+
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	collection := chi.URLParam(r, "collection")
+
+	var req searchRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Query == "" {
+		writeError(w, http.StatusBadRequest, "query is required")
+		return
+	}
+
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+
+	docs, err := s.getDB(r).Search(collection, req.Query, req.Fields, req.Limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Apply list RLS filtering
+	docs, err = s.filterDocs(r, collection, docs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if docs == nil {
+		docs = []map[string]interface{}{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  docs,
+		"count": len(docs),
+	})
+}
+
+// ─── Webhook Triggers ─────────────────────────────────────────────────────────
+
+func (s *Server) fireWebhooks(r *http.Request, collection, eventType, docID string, data map[string]interface{}) {
+	go func() {
+		engine := s.getDB(r)
+		webhookDocs, err := engine.List("_webhooks")
+		if err != nil || len(webhookDocs) == 0 {
+			return
+		}
+
+		payload, _ := json.Marshal(map[string]interface{}{
+			"event":      eventType,
+			"collection": collection,
+			"doc_id":     docID,
+			"data":       data,
+			"timestamp":  time.Now().UTC().Format(time.RFC3339Nano),
+		})
+
+		for _, wh := range webhookDocs {
+			url, ok := wh["url"].(string)
+			if !ok || url == "" {
+				continue
+			}
+
+			// Fire in a sub-goroutine per webhook
+			go func(webhookURL string) {
+				client := &http.Client{Timeout: 10 * time.Second}
+				resp, err := client.Post(webhookURL, "application/json", bytes.NewReader(payload))
+				if err != nil {
+					// Silently ignore webhook errors
+					return
+				}
+				resp.Body.Close()
+			}(url)
+		}
+	}()
 }

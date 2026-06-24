@@ -268,6 +268,35 @@ curl -X POST \
         </div>
       </div>
 
+      <!-- Security & HTTPS -->
+      <div class="card">
+        <div class="card-title mb-3">🔒 Security &amp; HTTPS</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          TLS certificate, environment mode, and JWT secret configuration. Changes apply after restart.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label for="cfg-env">Environment</label>
+            <select id="cfg-env">
+              <option value="development">Development</option>
+              <option value="production">Production</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="cfg-jwt-secret">JWT Secret</label>
+            <input type="password" id="cfg-jwt-secret" placeholder="Leave blank to keep current" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="cfg-cert-file">TLS Cert File Path</label>
+            <input type="text" id="cfg-cert-file" placeholder="/etc/ssl/certs/server.crt" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-key-file">TLS Key File Path</label>
+            <input type="text" id="cfg-key-file" placeholder="/etc/ssl/private/server.key" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
       <!-- S3 Storage Configuration -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
@@ -306,6 +335,42 @@ curl -X POST \
             <input type="checkbox" id="cfg-s3-ssl" checked>
             Use SSL/TLS
           </label>
+        </div>
+      </div>
+
+      <!-- SMTP & Email Verification Configuration -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div class="card-title" style="margin-bottom:0">✉️ SMTP & Email Verification</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary);">
+            <input type="checkbox" id="cfg-email-verification" onchange="toggleSMTPForm()">
+            Enable Email Verification
+          </label>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px 0;">
+          Require users to verify their email address via SMTP before they can authenticate. If disabled or SMTP is not set, users are validated immediately.
+        </p>
+        <div id="smtp-form-fields" style="display:none;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="grid-column: span 2">
+            <label for="cfg-smtp-host">SMTP Host</label>
+            <input type="text" id="cfg-smtp-host" placeholder="smtp.example.com" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-smtp-port">SMTP Port</label>
+            <input type="number" id="cfg-smtp-port" placeholder="587" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-smtp-sender">Sender Email (From)</label>
+            <input type="email" id="cfg-smtp-sender" placeholder="noreply@example.com" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-smtp-user">SMTP Username</label>
+            <input type="text" id="cfg-smtp-user" placeholder="username" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-smtp-password">SMTP Password</label>
+            <input type="password" id="cfg-smtp-password" placeholder="Leave blank to keep current" autocomplete="new-password">
+          </div>
         </div>
       </div>
 
@@ -354,6 +419,20 @@ curl -X POST \
               ⚡ Save &amp; Restart
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Backups -->
+      <div class="card" id="backups-card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="card-title">💾 Database Backups</div>
+          <button class="btn btn-sm btn-primary" id="btn-create-backup" onclick="createBackup()">+ Create Backup</button>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          Point-in-time snapshots of all project databases. Backups are stored under the data directory.
+        </p>
+        <div id="backups-list" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;">Loading backups...</div>
         </div>
       </div>
 

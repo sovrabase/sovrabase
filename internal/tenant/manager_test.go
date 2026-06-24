@@ -17,7 +17,7 @@ func newTestManager(t *testing.T) *ProjectManager {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 
-	pm, err := NewProjectManager(dir)
+	pm, err := NewProjectManager(dir, nil)
 	if err != nil {
 		t.Fatalf("NewProjectManager: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	dir := t.TempDir()
 
 	// First instance
-	pm1, err := NewProjectManager(dir)
+	pm1, err := NewProjectManager(dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	pm1.Close()
 
 	// Second instance (simulates restart)
-	pm2, err := NewProjectManager(dir)
+	pm2, err := NewProjectManager(dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestAutoRepairEmptyJWTSecret(t *testing.T) {
 	dir := t.TempDir()
 
 	// 1. Create a project using a ProjectManager
-	pm1, err := NewProjectManager(dir)
+	pm1, err := NewProjectManager(dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestAutoRepairEmptyJWTSecret(t *testing.T) {
 	db.Close()
 
 	// 3. Re-open with a new ProjectManager. It should auto-repair the empty JWTSecret.
-	pm2, err := NewProjectManager(dir)
+	pm2, err := NewProjectManager(dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

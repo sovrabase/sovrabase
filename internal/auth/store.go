@@ -10,6 +10,8 @@ type UserStore interface {
 	Create(user *User) error
 	GetByID(id string) (*User, error)
 	GetByEmail(email string) (*User, error)
+	GetByVerificationToken(token string) (*User, error)
+	GetByResetToken(token string) (*User, error)
 	Update(user *User) error
 	Delete(id string) error
 	List() ([]*User, error)
@@ -125,4 +127,30 @@ func (s *InMemoryUserStore) List() ([]*User, error) {
 		list = append(list, &copied)
 	}
 	return list, nil
+}
+
+// GetByVerificationToken returns the user with the given verification token.
+func (s *InMemoryUserStore) GetByVerificationToken(token string) (*User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, u := range s.users {
+		if u.VerificationToken == token {
+			return u, nil
+		}
+	}
+	return nil, fmt.Errorf("user with verification token %q not found", token)
+}
+
+// GetByResetToken returns the user with the given password reset token.
+func (s *InMemoryUserStore) GetByResetToken(token string) (*User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, u := range s.users {
+		if u.ResetToken == token {
+			return u, nil
+		}
+	}
+	return nil, fmt.Errorf("user with reset token %q not found", token)
 }
