@@ -84,6 +84,38 @@ Sovrabase resolves config in this order (highest wins):
 
 If no `config.yaml` exists at startup, one is auto-created with defaults.
 
+Example `config.yaml`:
+
+```yaml
+data_dir: /data
+listen_addr: :6070
+jwt_secret: "use-openssl-rand-hex-32"
+storage_dir: /data/storage
+allow_origins: '*'
+admin_email: admin@example.com
+admin_password: your-secure-password
+session_duration: 24h
+env: production
+rate_limit_per_minute: 100
+rate_limit_burst: 20
+# SMTP (optional)
+# smtp_host: smtp.example.com
+# smtp_port: 587
+# smtp_user: noreply@example.com
+# smtp_password: "..."
+# smtp_sender: "Sovrabase <noreply@example.com>"
+# email_verification: true
+# S3 storage (optional)
+# s3_enabled: true
+# s3_endpoint: https://s3.example.com
+# s3_access_key: "..."
+# s3_secret_key: "..."
+# s3_bucket_prefix: sovrabase
+# s3_use_ssl: true
+```
+
+Place it alongside your `docker-compose.yml` and mount it read-only:
+
 #### Volumes explained
 
 | Mount | Purpose | Required |
