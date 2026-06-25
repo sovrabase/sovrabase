@@ -68,6 +68,9 @@ window.onerror = function(message, source, lineno, colno, error) {
       <div class="nav-item" data-view="settings" onclick="navigateTo('settings')">
         <span class="nav-icon">⚙</span> Settings
       </div>
+      <div class="nav-item" data-view="plugins" onclick="navigateTo('plugins')">
+        <span class="nav-icon">🧩</span> Plugins
+      </div>
       <div class="nav-item" onclick="logout()" style="color:var(--danger);">
         <span class="nav-icon" style="color:var(--danger);">⎋</span> Logout
       </div>
@@ -1190,6 +1193,60 @@ curl -H "Authorization: Bearer API_KEY" \
       </div>
     </div>
 
+    <!-- ===== PLUGINS VIEW ===== -->
+    <div id="view-plugins" class="view">
+      <div class="page-hero">
+        <h1>🧩 Plugins</h1>
+        <p class="hero-sub">Registered plugins, hooks, and custom routes</p>
+      </div>
+
+      <!-- Registered plugins -->
+      <div class="card">
+        <div class="card-title mb-3">📦 Registered Plugins</div>
+        <div id="plugins-list" style="font-size:13px;color:var(--text-secondary);">
+          <span class="text-muted">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Active hooks -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title mb-3">🪝 Active Hooks</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Action</th>
+                <th>Collection</th>
+                <th>Count</th>
+              </tr>
+            </thead>
+            <tbody id="hooks-tbody">
+              <tr><td colspan="4" class="text-muted" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Custom routes -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title mb-3">🔗 Custom Routes</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Path</th>
+              </tr>
+            </thead>
+            <tbody id="routes-tbody">
+              <tr><td colspan="2" class="text-muted" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -1642,5 +1699,6 @@ curl -H "Authorization: Bearer API_KEY" \
 <script src="/js/database.js" defer></script>
 <script src="/js/storage.js" defer></script>
 <script src="/js/app.js" defer></script>
+<script src="/js/plugins.js" defer></script>
 </body>
 </html>

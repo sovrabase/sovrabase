@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
@@ -27,6 +28,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/ketsuna-org/sovrabase/internal/api"
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/captcha"
@@ -120,6 +122,7 @@ func main() {
 	if err := statusPlugin.Register(app); err != nil {
 		logger.Error("Failed to register status-plugin", "error", err)
 	}
+	app.RegisterPlugin(statusPlugin.Name())
 
 	// Create API server
 	server := api.NewServer(
@@ -186,6 +189,28 @@ func main() {
 
 	adminServer.RegisterRoutes(adminMux)
 	server.RegisterAdmin(adminMux)
+
+	// Plugin introspection endpoint.
+	adminMux.HandleFunc("/admin/plugins", func(w http.ResponseWriter, r *http.Request) {
+		info := plugin.PluginInfo{
+			Plugins: app.Plugins(),
+			Hooks:   hookManager.Info(),
+		}
+		// Extract routes from the chi router.
+		if hr, ok := server.Handler().(interface{ Routes() []chi.Route }); ok {
+			for _, rt := range hr.Routes() {
+				for method := range rt.Handlers {
+					info.Routes = append(info.Routes, plugin.RouteInfo{
+						Method: method,
+						Path:   rt.Pattern,
+					})
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(info)
+	})
+
 	logger.Info("Admin API registered")
 
 	// Serve embedded dashboard

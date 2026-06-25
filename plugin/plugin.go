@@ -19,12 +19,24 @@ type App struct {
 	manager *HookManager
 	db      DB
 	storage Storage
+
+	plugins []string // names of registered plugins
 }
 
 // NewApp creates a new App with the given hook manager.
 // Use SetRouter, SetDB, SetStorage to configure additional accessors.
 func NewApp(manager *HookManager) *App {
 	return &App{manager: manager}
+}
+
+// RegisterPlugin records a plugin as active. Called internally by the Plugin.Register flow.
+func (a *App) RegisterPlugin(name string) {
+	a.plugins = append(a.plugins, name)
+}
+
+// Plugins returns the list of registered plugin names.
+func (a *App) Plugins() []string {
+	return a.plugins
 }
 
 // SetRouter sets the chi router (available after server creation).

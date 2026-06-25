@@ -94,6 +94,7 @@ function navigateTo(view) {
   if (view === 'dashboard') loadDashboard();
   if (view === 'projects') loadProjects();
   if (view === 'settings') loadSettings();
+  if (view === 'plugins') loadPlugins();
 }
 
 // ===== DASHBOARD STATS =====

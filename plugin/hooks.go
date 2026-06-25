@@ -330,7 +330,93 @@ func (m *HookManager) RunServeHooks(router chi.Router) {
 	}
 }
 
-// ─── HookBuilder (fluent API) ────────────────────────────────────────
+// ─── Introspection ──────────────────────────────────────────────────
+
+// HookInfo describes a single registered hook.
+type HookInfo struct {
+	Type       string `json:"type"`       // "record", "auth", "realtime", "storage", "email", "serve", "terminate", "log", "collection"
+	Action     string `json:"action"`     // "create", "update", "signup", etc.
+	Collection string `json:"collection"` // collection name, empty for non-collection hooks
+	Count      int    `json:"count"`      // number of registered callbacks
+}
+
+// RouteInfo describes a registered HTTP route.
+type RouteInfo struct {
+	Method string `json:"method"`
+	Path   string `json:"path"`
+}
+
+// PluginInfo is the full introspection payload returned by the admin API.
+type PluginInfo struct {
+	Plugins []string   `json:"plugins"`
+	Hooks   []HookInfo `json:"hooks"`
+	Routes  []RouteInfo `json:"routes"`
+}
+
+// Info returns a summary of all registered hooks and plugins.
+func (m *HookManager) Info() []HookInfo {
+	var hooks []HookInfo
+
+	for key, fns := range m.recordHooks {
+		parts := splitKey(key) // "posts:create" → col="posts", action="create"
+		hooks = append(hooks, HookInfo{
+			Type:       "record",
+			Action:     parts[1],
+			Collection: parts[0],
+			Count:      len(fns),
+		})
+	}
+	for action, fns := range m.collectionHooks {
+		hooks = append(hooks, HookInfo{
+			Type:   "collection",
+			Action: action,
+			Count:  len(fns),
+		})
+	}
+	for action, fns := range m.authHooks {
+		hooks = append(hooks, HookInfo{
+			Type:   "auth",
+			Action: action,
+			Count:  len(fns),
+		})
+	}
+	for action, fns := range m.storageHooks {
+		hooks = append(hooks, HookInfo{
+			Type:   "storage",
+			Action: action,
+			Count:  len(fns),
+		})
+	}
+	for col, fns := range m.realtimeHooks {
+		hooks = append(hooks, HookInfo{
+			Type:       "realtime",
+			Collection: col,
+			Count:      len(fns),
+		})
+	}
+	if len(m.emailHooks) > 0 {
+		hooks = append(hooks, HookInfo{Type: "email", Count: len(m.emailHooks)})
+	}
+	if len(m.terminateHooks) > 0 {
+		hooks = append(hooks, HookInfo{Type: "terminate", Count: len(m.terminateHooks)})
+	}
+	if len(m.logHooks) > 0 {
+		hooks = append(hooks, HookInfo{Type: "log", Count: len(m.logHooks)})
+	}
+	if len(m.serveHooks) > 0 {
+		hooks = append(hooks, HookInfo{Type: "serve", Count: len(m.serveHooks)})
+	}
+	return hooks
+}
+
+func splitKey(key string) [2]string {
+	for i := len(key) - 1; i >= 0; i-- {
+		if key[i] == ':' {
+			return [2]string{key[:i], key[i+1:]}
+		}
+	}
+	return [2]string{key, ""}
+}
 
 type HookBuilder[T any] struct {
 	register func(T)
