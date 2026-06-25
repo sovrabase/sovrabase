@@ -39,7 +39,7 @@ Full OpenAPI 3.0 documentation is served at **`/docs`** (Redoc) and **`/docs/swa
 The swagger spec is generated from source annotations via [swaggo/swag](https://github.com/swaggo/swag) and lives in the `docs/` directory. Regenerate with:
 
 ```bash
-swag init -g cmd/sovrabase/main.go -o docs/
+make swagger
 ```
 
 ### Client generation

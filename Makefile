@@ -3,7 +3,7 @@ SOVRABASE_LISTEN_ADDR ?= :6070
 export SOVRABASE_DATA_DIR
 export SOVRABASE_LISTEN_ADDR
 
-.PHONY: build run test clean deps fmt lint dev
+.PHONY: build run test clean deps fmt lint dev swagger
 
 BINARY_NAME=sovrabase
 BUILD_DIR=build
@@ -40,3 +40,7 @@ lint:
 
 dev: build
 	$(BUILD_DIR)/$(BINARY_NAME)
+
+swagger:
+	swag init -g cmd/sovrabase/main.go -o docs/
+	python3 scripts/fix-swagger-security.py docs/swagger.json

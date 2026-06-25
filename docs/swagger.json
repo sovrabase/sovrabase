@@ -5,7 +5,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Sovereign European BaaS — lightweight open-source Supabase alternative. Provides JSON document database (PebbleDB), JWT/OAuth authentication, file storage (local + S3), realtime WebSocket, queues, and config maps — all in a single ~40 MB binary.",
+        "description": "Sovereign European BaaS \u2014 lightweight open-source Supabase alternative. Provides JSON document database (PebbleDB), JWT/OAuth authentication, file storage (local + S3), realtime WebSocket, queues, and config maps \u2014 all in a single ~40 MB binary.",
         "title": "Sovrabase API",
         "contact": {
             "name": "Sovrabase",
@@ -25,9 +25,7 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -91,9 +89,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -169,9 +165,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -228,9 +222,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -296,9 +288,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -364,9 +354,7 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -428,9 +416,7 @@
             "put": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -511,9 +497,7 @@
             "delete": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -579,9 +563,7 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -615,9 +597,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -684,7 +664,7 @@
                         "ProjectKey": []
                     }
                 ],
-                "description": "Returns all public config entries as a simple key→value map. No authentication required.",
+                "description": "Returns all public config entries as a simple key\u2192value map. No authentication required.",
                 "produces": [
                     "application/json"
                 ],
@@ -716,9 +696,7 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -769,9 +747,7 @@
             "put": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -839,9 +815,7 @@
             "delete": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -897,9 +871,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -968,9 +940,7 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1017,9 +987,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1097,9 +1065,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1166,9 +1132,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1238,9 +1202,7 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1296,9 +1258,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1376,9 +1336,7 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1460,9 +1418,7 @@
             "delete": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1611,9 +1567,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1676,9 +1630,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1743,9 +1695,7 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -1796,9 +1746,7 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": []
-                    },
-                    {
+                        "BearerAuth": [],
                         "ProjectKey": []
                     }
                 ],
@@ -2616,7 +2564,7 @@
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "JWT access token: \"Bearer \u003ctoken\u003e\"",
+            "description": "JWT access token: \"Bearer <token>\"",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
