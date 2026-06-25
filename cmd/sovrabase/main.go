@@ -17,6 +17,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/dashboard"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
+	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
 )
@@ -128,7 +129,8 @@ func main() {
 
 	// Start replication node if configured
 	if cfg.IsReplicationEnabled() {
-		if err := startReplication(ctx, cfg, engine); err != nil {
+		replNode, err := startReplication(ctx, cfg, engine)
+		if err != nil {
 			logger.Error("Failed to start replication", "error", err)
 			os.Exit(1)
 		}
@@ -139,6 +141,11 @@ func main() {
 			Peers:   len(cfg.Peers),
 		})
 		logger.Info("Replication node started", "role", cfg.Role)
+
+		// Wrap system engine with ReplicatedDB so API routes go through WAL
+		replicatedDB := replication.NewReplicatedDB(engine, replNode)
+		server.SetReplicatedDB(replicatedDB)
+		logger.Info("ReplicatedDB set on API server")
 	}
 
 	// Start backup scheduler (every 1 hour)

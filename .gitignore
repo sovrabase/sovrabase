@@ -15,6 +15,7 @@ go.work.sum
 
 # Data directory
 /data/
+/data_tmp/
 
 # Environment
 .env

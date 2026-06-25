@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"nhooyr.io/websocket"
@@ -309,6 +310,10 @@ type StreamClient struct {
 	reconnect  bool // whether auto-reconnect is enabled
 
 	backoff time.Duration // current backoff for reconnection
+
+	// lastRecvTime is an atomic UnixNano timestamp updated on every
+	// successful WebSocket read (entries and control messages).
+	lastRecvTime atomic.Int64
 }
 
 // NewStreamClient creates a new StreamClient. It does not connect until
@@ -365,6 +370,7 @@ func (c *StreamClient) dial(ctx context.Context) error {
 	c.conn = conn
 	c.cancel = readCancel
 	c.backoff = 1 * time.Second // reset backoff on successful connect
+	c.lastRecvTime.Store(time.Now().UnixNano())
 	c.mu.Unlock()
 
 	// Start read loop.
@@ -410,6 +416,9 @@ func (c *StreamClient) readLoop(ctx context.Context, conn *websocket.Conn) {
 				return
 			}
 		}
+
+		// Update last receive time on any successful read.
+		c.lastRecvTime.Store(time.Now().UnixNano())
 
 		// Try to parse as control message first.
 		var ctrl controlMsg
@@ -476,6 +485,23 @@ func (c *StreamClient) Close() error {
 	}
 
 	return nil
+}
+
+// LastRecvTime returns the time of the last successful WebSocket read.
+// Returns the zero time if no data has been received yet.
+func (c *StreamClient) LastRecvTime() time.Time {
+	nano := c.lastRecvTime.Load()
+	if nano == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, nano)
+}
+
+// SetReconnect enables or disables automatic reconnection on disconnect.
+func (c *StreamClient) SetReconnect(enabled bool) {
+	c.mu.Lock()
+	c.reconnect = enabled
+	c.mu.Unlock()
 }
 
 // Reconnect reconnects to the Master with exponential backoff. On success,

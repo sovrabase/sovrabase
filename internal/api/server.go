@@ -16,6 +16,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
+	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
 )
 
@@ -24,6 +25,7 @@ type Server struct {
 	router       chi.Router
 	config       *Config
 	db           DatabaseService
+	replicatedDB *replication.ReplicatedDB
 	auth         AuthService
 	store        StorageService
 	projects     *tenant.ProjectManager
@@ -169,9 +171,19 @@ func (s *Server) setRealtimeHub(hub *realtime.Hub) {
 	s.realtimeHub = hub
 }
 
+// SetReplicatedDB sets the replication-aware database service.
+// When set, getDB returns the ReplicatedDB for non-project requests,
+// routing all mutations through the WAL/replication pipeline.
+func (s *Server) SetReplicatedDB(db *replication.ReplicatedDB) {
+	s.replicatedDB = db
+}
+
 func (s *Server) getDB(r *http.Request) DatabaseService {
 	if env := getProjectEnv(r); env != nil {
 		return env.Engine
+	}
+	if s.replicatedDB != nil {
+		return s.replicatedDB
 	}
 	return s.db
 }

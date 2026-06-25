@@ -26,6 +26,8 @@ type Node struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	lsnCounter uint64 // monotonically increasing, atomic
+
+	onPromote func() // called after successful promotion to Master (Heir→Master)
 }
 
 // NewNode creates a new replication Node.
@@ -96,6 +98,15 @@ func (n *Node) SetLog(log *ReplicationLog) {
 	n.log = log
 }
 
+// SetOnPromote registers a callback that is invoked after the node
+// successfully transitions from Heir to Master. The callback runs
+// while the write lock is held.
+func (n *Node) SetOnPromote(fn func()) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.onPromote = fn
+}
+
 // BecomeMaster transitions the node to the Master role.
 // It stops lease monitoring since the Master does not participate in
 // lease-based election.
@@ -116,6 +127,11 @@ func (n *Node) becomeMasterLocked() error {
 	if n.leaseManager != nil {
 		n.leaseManager.Stop()
 		n.leaseManager = nil
+	}
+
+	// Invoke the promotion callback if set (e.g. to start StreamServer).
+	if n.onPromote != nil {
+		n.onPromote()
 	}
 	return nil
 }

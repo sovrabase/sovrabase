@@ -20,7 +20,7 @@ import (
 //     engine. If Master dies, promotes to Master.
 //   - Reader: connects to Master as a StreamClient, applies entries locally,
 //     stays read-only.
-func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine) error {
+func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine) (*replication.Node, error) {
 	logger := slog.Default()
 
 	nodeCfg := &replication.NodeConfig{
@@ -35,7 +35,7 @@ func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine
 	// Create the Write-Ahead Log
 	wal, err := replication.NewReplicationLog(cfg.DataDir)
 	if err != nil {
-		return fmt.Errorf("create WAL: %w", err)
+		return nil, fmt.Errorf("create WAL: %w", err)
 	}
 
 	// Create the replication node
@@ -46,7 +46,7 @@ func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine
 	switch nodeCfg.Role {
 	case replication.RoleMaster:
 		if err := node.BecomeMaster(); err != nil {
-			return fmt.Errorf("become master: %w", err)
+			return nil, fmt.Errorf("become master: %w", err)
 		}
 
 		// Start streaming server for Readers to connect
@@ -73,21 +73,56 @@ func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine
 
 	case replication.RoleHeir, replication.RoleReader:
 		if err := node.BecomeReader(); err != nil {
-			return fmt.Errorf("become reader: %w", err)
+			return nil, fmt.Errorf("become reader: %w", err)
 		}
 		if nodeCfg.Role == replication.RoleHeir {
 			_ = node.BecomeHeir() // mark as heir candidate
 		}
 
 		if len(nodeCfg.Peers) == 0 {
-			return fmt.Errorf("reader node requires at least one peer (master address)")
+			return nil, fmt.Errorf("reader node requires at least one peer (master address)")
 		}
 
 		// Connect to master
 		masterAddr := nodeCfg.Peers[0]
 		client := replication.NewStreamClient(masterAddr, nodeCfg.NodeID, 0)
 		if err := client.Connect(ctx); err != nil {
-			return fmt.Errorf("connect to master at %s: %w", masterAddr, err)
+			return nil, fmt.Errorf("connect to master at %s: %w", masterAddr, err)
+		}
+
+		// Enable auto-reconnect after initial connection succeeds
+		client.SetReconnect(true)
+
+		// For Heir nodes, register a promotion callback that starts the
+		// StreamServer and LeaseManager when this node becomes Master.
+		if nodeCfg.Role == replication.RoleHeir {
+			heirClient := client // capture for closure
+			node.SetOnPromote(func() {
+				// Close the old client — no longer reading from the former Master.
+				heirClient.Close()
+
+				// Start StreamServer so Readers can connect to this promoted Master.
+				newStreamServer := replication.NewStreamServer(nodeCfg.ListenAddr)
+				newStreamServer.SetLogProvider(func(lsn uint64) (<-chan *replication.LogEntry, context.CancelFunc) {
+					ch, _, cancel := wal.StreamFrom(lsn)
+					return ch, cancel
+				})
+				go func() {
+					if err := newStreamServer.Start(ctx); err != nil {
+						logger.Error("Stream server error after promotion", "error", err)
+					}
+				}()
+
+				// Start a new LeaseManager for heartbeats as Master.
+				newLeaseMgr := replication.NewLeaseManager(node)
+				go func() {
+					if err := newLeaseMgr.Start(ctx); err != nil {
+						logger.Error("Lease manager error after promotion", "error", err)
+					}
+				}()
+
+				logger.Info("Promoted Heir: StreamServer and LeaseManager started")
+			})
 		}
 
 		// Apply incoming entries
@@ -129,13 +164,15 @@ func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine
 		)
 
 	default:
-		return fmt.Errorf("unknown replication role: %s", nodeCfg.Role)
+		return nil, fmt.Errorf("unknown replication role: %s", nodeCfg.Role)
 	}
 
-	return nil
+	return node, nil
 }
 
 // monitorMasterHealth watches for Master failure and promotes Heir to Master.
+// It uses the StreamClient's last-received-time to detect liveness without
+// consuming log entries from the Entries channel (which belong to the apply loop).
 func monitorMasterHealth(ctx context.Context, node *replication.Node, nodeID string, leaseTTL time.Duration, client *replication.StreamClient) {
 	logger := slog.Default()
 	ticker := time.NewTicker(leaseTTL)
@@ -149,16 +186,13 @@ func monitorMasterHealth(ctx context.Context, node *replication.Node, nodeID str
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// Check if we're still receiving entries (connection alive)
-			select {
-			case _, ok := <-client.Entries():
-				if !ok {
-					failures++
-				} else {
-					failures = 0
-				}
-			default:
-				// No entry queued, that's fine
+			// Check liveness via last successful WebSocket read time instead of
+			// consuming from client.Entries() — entries must stay in the channel
+			// for the apply goroutine.
+			lastRecv := client.LastRecvTime()
+			if lastRecv.IsZero() || time.Since(lastRecv) > leaseTTL*3 {
+				failures++
+			} else {
 				failures = 0
 			}
 
@@ -167,6 +201,8 @@ func monitorMasterHealth(ctx context.Context, node *replication.Node, nodeID str
 					"node_id", nodeID,
 					"failures", failures,
 				)
+				// node.BecomeMaster() triggers the onPromote callback set in
+				// startReplication, which starts StreamServer + LeaseManager.
 				if err := node.BecomeMaster(); err != nil {
 					logger.Error("Failed to promote to Master", "error", err)
 				} else {
