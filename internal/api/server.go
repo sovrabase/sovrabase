@@ -162,14 +162,22 @@ func getProjectID(r *http.Request) string {
 	return id
 }
 
-// SetMeterStore attaches a metering store for tracking API usage.
+// SetMeterStore attaches a metering store for per-project usage tracking.
 func (s *Server) SetMeterStore(ms *metering.MeterStore) {
 	s.meterStore = ms
 }
 
-// MeterStore returns the current meter store (may be nil).
+// MeterStore returns the current meter store, or nil if not set.
 func (s *Server) MeterStore() *metering.MeterStore {
 	return s.meterStore
+}
+
+// meteringMiddleware wraps the MeteringMiddleware for use in the chi router.
+func (s *Server) meteringMiddleware(next http.Handler) http.Handler {
+	if s.meterStore == nil || s.projects == nil {
+		return next
+	}
+	return metering.MeteringMiddleware(s.meterStore, s.projects)(next)
 }
 
 // SetRealtimeHub attaches a realtime hub and mounts the WebSocket endpoint.
@@ -301,6 +309,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		r.Use(s.rateLimitMiddleware)
 		r.Use(s.projectMiddleware)
 		r.Use(s.authMiddleware)
+		r.Use(s.meteringMiddleware)
 		r.Get("/me", s.handleGetMe)
 
 		// Database
