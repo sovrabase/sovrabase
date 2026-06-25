@@ -7,7 +7,7 @@ package main
 // @contact.url     https://sovrabase.eu
 // @contact.email   hello@sovrabase.eu
 // @license.name    AGPL-3.0
-// @license.url     https://github.com/ketsuna-org/sovrabase/blob/main/LICENSE
+// @license.url     https://github.com/sovrabase/sovrabase/blob/main/LICENSE
 // @host            localhost:6070
 // @BasePath        /
 // @schemes         http https

@@ -17,7 +17,7 @@ All in ~40 MB, consuming ~30 MB RAM at idle.
 
 ```bash
 # Pull the multi-arch image (amd64 + arm64)
-docker pull ghcr.io/ketsuna-org/sovrabase:latest
+docker pull ghcr.io/sovrabase/sovrabase:latest
 
 # Run with a persistent data volume
 docker run -d \
@@ -27,7 +27,7 @@ docker run -d \
   -e SOVRABASE_JWT_SECRET="$(openssl rand -hex 32)" \
   -e SOVRABASE_ADMIN_EMAIL="admin@example.com" \
   -e SOVRABASE_ADMIN_PASSWORD="your-secure-password" \
-  ghcr.io/ketsuna-org/sovrabase:latest
+  ghcr.io/sovrabase/sovrabase:latest
 ```
 
 Server starts at `http://localhost:6070`. Open `http://localhost:6070/docs` for the full interactive API reference (Redoc).
@@ -90,7 +90,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   sovrabase:
-    image: ghcr.io/ketsuna-org/sovrabase:latest
+    image: ghcr.io/sovrabase/sovrabase:latest
     container_name: sovrabase
     restart: unless-stopped
     ports:
@@ -185,7 +185,7 @@ Place it alongside your `docker-compose.yml` and mount it read-only:
 ### From source
 
 ```bash
-git clone https://github.com/ketsuna-org/sovrabase.git
+git clone https://github.com/sovrabase/sovrabase.git
 cd sovrabase
 
 export SOVRABASE_JWT_SECRET="your-secret-key"
