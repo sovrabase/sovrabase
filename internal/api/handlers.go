@@ -800,8 +800,11 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := uuid.New().String()
-	doc["_id"] = id
+	id, ok := doc["_id"].(string)
+	if !ok || id == "" {
+		id = uuid.New().String()
+		doc["_id"] = id
+	}
 
 	allowed, err := s.checkRLS(r, collection, "create", id, doc)
 	if err != nil {
