@@ -103,13 +103,15 @@ type StorageService interface {
 	List(bucket, prefix string) ([]FileInfo, error)
 }
 
-// ProviderMetaInfo is the public view of a linked OAuth provider (tokens excluded).
+// ProviderMetaInfo public OAuth provider info (tokens excluded).
+// @name ProviderMetaInfo
 type ProviderMetaInfo struct {
 	Provider   string `json:"provider"`
 	ProviderID string `json:"provider_id"`
 }
 
-// UserInfo is a simplified user view for the API layer.
+// UserInfo public user view.
+// @name UserInfo
 type UserInfo struct {
 	ID                string             `json:"id"`
 	Email             string             `json:"email"`
@@ -122,21 +124,24 @@ type UserInfo struct {
 	VerificationToken string             `json:"verification_token,omitempty"`
 }
 
-// UserClaims represents JWT claims for middleware.
+// UserClaims JWT claims for middleware.
+// @name UserClaims
 type UserClaims struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email"`
 	Role   string `json:"role"`
 }
 
-// TokenPair holds access and refresh tokens.
+// TokenPair access and refresh tokens.
+// @name TokenPair
 type TokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int    `json:"expires_in"`
 }
 
-// FileInfo holds file metadata.
+// FileInfo file metadata.
+// @name FileInfo
 type FileInfo struct {
 	Bucket      string    `json:"bucket"`
 	Path        string    `json:"path"`
@@ -301,6 +306,10 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	// Health & Metrics (no auth, no project middleware needed)
 	r.Get("/health", s.handleHealth)
 	r.Get("/metrics", s.handleMetrics)
+
+	// API Documentation (Redoc)
+	r.Get("/docs", s.handleDocs)
+	r.Get("/docs/swagger.json", s.handleSwaggerJSON)
 
 	// Auth routes (public, no rate limit)
 	r.Route("/auth/v1", func(r chi.Router) {

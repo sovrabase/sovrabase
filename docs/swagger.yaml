@@ -1,0 +1,1675 @@
+basePath: /
+definitions:
+  analytics.Event:
+    properties:
+      name:
+        type: string
+      properties:
+        additionalProperties: true
+        type: object
+      timestamp:
+        type: string
+      user_id:
+        type: string
+    type: object
+  api.FileInfo:
+    properties:
+      bucket:
+        type: string
+      content_type:
+        type: string
+      created_at:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+      updated_at:
+        type: string
+      url:
+        type: string
+    type: object
+  api.ProviderMetaInfo:
+    properties:
+      provider:
+        type: string
+      provider_id:
+        type: string
+    type: object
+  api.TokenPair:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+    type: object
+  api.UserInfo:
+    properties:
+      _metadata:
+        items:
+          $ref: '#/definitions/api.ProviderMetaInfo'
+        type: array
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_verified:
+        type: boolean
+      name:
+        type: string
+      role:
+        type: string
+      verification_token:
+        type: string
+    type: object
+  api.batchOperation:
+    properties:
+      data:
+        additionalProperties: true
+        description: document data
+        type: object
+      id:
+        description: document ID (optional for insert)
+        type: string
+      op:
+        description: '"insert", "update", "delete"'
+        type: string
+    type: object
+  api.batchRequest:
+    properties:
+      operations:
+        items:
+          $ref: '#/definitions/api.batchOperation'
+        type: array
+    type: object
+  api.configSetRequest:
+    properties:
+      description:
+        type: string
+      key:
+        type: string
+      public:
+        type: boolean
+      type:
+        type: string
+      value: {}
+    type: object
+  api.forgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  api.magicLinkRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  api.queryRequest:
+    properties:
+      filter:
+        additionalProperties: true
+        type: object
+      limit:
+        type: integer
+      offset:
+        type: integer
+      projection:
+        items:
+          type: string
+        type: array
+      select:
+        items:
+          type: string
+        type: array
+    type: object
+  api.refreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  api.resetPasswordRequest:
+    properties:
+      password:
+        type: string
+      token:
+        type: string
+    type: object
+  api.searchRequest:
+    properties:
+      fields:
+        items:
+          type: string
+        type: array
+      limit:
+        type: integer
+      query:
+        type: string
+    type: object
+  api.signInRequest:
+    properties:
+      captcha_token:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  api.signUpRequest:
+    properties:
+      captcha_token:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  api.verifyEmailRequest:
+    properties:
+      token:
+        type: string
+    type: object
+  api.verifyMagicLinkRequest:
+    properties:
+      email:
+        type: string
+      token:
+        type: string
+    type: object
+  configmaps.Entry:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      key:
+        type: string
+      public:
+        type: boolean
+      type:
+        $ref: '#/definitions/configmaps.ValueType'
+      updated_at:
+        type: string
+      value: {}
+    type: object
+  configmaps.ValueType:
+    enum:
+    - string
+    - number
+    - boolean
+    - json
+    type: string
+    x-enum-varnames:
+    - ValueString
+    - ValueNumber
+    - ValueBoolean
+    - ValueJSON
+host: localhost:6070
+info:
+  contact:
+    email: hello@sovrabase.eu
+    name: Sovrabase
+    url: https://sovrabase.eu
+  description: Sovereign European BaaS — lightweight open-source Supabase alternative.
+    Provides JSON document database (PebbleDB), JWT/OAuth authentication, file storage
+    (local + S3), realtime WebSocket, queues, and config maps — all in a single ~40
+    MB binary.
+  license:
+    name: AGPL-3.0
+    url: https://github.com/ketsuna-org/sovrabase/blob/main/LICENSE
+  title: Sovrabase API
+  version: "1.0"
+paths:
+  /api/v1/collections/{collection}:
+    get:
+      consumes:
+      - application/json
+      description: List documents in a collection with optional filtering, field selection,
+        and pagination. Query parameters are treated as filter fields.
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Comma-separated list of fields to return
+        in: query
+        name: select
+        type: string
+      - description: Maximum number of documents to return (paginated response)
+        in: query
+        name: limit
+        type: integer
+      - description: Number of documents to skip (paginated response)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of documents or paginated response
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List documents
+      tags:
+      - database
+    post:
+      consumes:
+      - application/json
+      description: Insert a new document into the specified collection. An _id is
+        auto-generated if not provided.
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document to insert
+        in: body
+        name: document
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created document
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid document
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: RLS policy restricts insertion
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Insert a document
+      tags:
+      - database
+  /api/v1/collections/{collection}/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a document by ID from the specified collection.
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Document deleted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: RLS policy restricts deletion
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Document not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a document
+      tags:
+      - database
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a single document by its ID from the specified collection.
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Retrieved document
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: RLS policy restricts access
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Document not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a document by ID
+      tags:
+      - database
+    put:
+      consumes:
+      - application/json
+      description: Partially update an existing document by ID. Supports both PUT
+        and PATCH methods.
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Partial document update
+        in: body
+        name: document
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated document
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid document
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: RLS policy restricts update
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Document not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a document
+      tags:
+      - database
+  /api/v1/collections/{collection}/batch:
+    post:
+      consumes:
+      - application/json
+      description: Execute multiple insert, update, and delete operations in a single
+        atomic batch.
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Batch operations
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.batchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Batch results
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Batch operations
+      tags:
+      - database
+  /api/v1/collections/{collection}/query:
+    post:
+      consumes:
+      - application/json
+      description: Query documents in a collection with a structured filter, field
+        projection, and pagination.
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Query parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.queryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Query results or paginated response
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid query
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Query documents
+      tags:
+      - database
+  /api/v1/collections/{collection}/search:
+    post:
+      consumes:
+      - application/json
+      description: Perform a full-text search on documents in a collection.
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Search parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.searchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Search results
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or query required
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Full-text search
+      tags:
+      - database
+  /api/v1/config:
+    get:
+      description: Returns all config entries for the project.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List config entries
+      tags:
+      - config
+    post:
+      consumes:
+      - application/json
+      description: Creates a new config entry (POST) or updates an existing one (PUT).
+        On successful create returns 201, on update returns 200.
+      parameters:
+      - description: Config entry
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.configSetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/configmaps.Entry'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/configmaps.Entry'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create or update config entry
+      tags:
+      - config
+  /api/v1/config/{key}:
+    delete:
+      description: Deletes a config entry by its key.
+      parameters:
+      - description: Config key
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete config entry
+      tags:
+      - config
+    get:
+      description: Returns a single config entry by its key.
+      parameters:
+      - description: Config key
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/configmaps.Entry'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get config entry
+      tags:
+      - config
+    put:
+      consumes:
+      - application/json
+      description: Creates a new config entry (POST) or updates an existing one (PUT).
+        On successful create returns 201, on update returns 200.
+      parameters:
+      - description: Config key (for PUT)
+        in: path
+        name: key
+        type: string
+      - description: Config entry
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.configSetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/configmaps.Entry'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/configmaps.Entry'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create or update config entry
+      tags:
+      - config
+  /api/v1/config/public:
+    get:
+      description: Returns all public config entries as a simple key→value map. No
+        authentication required.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List public config
+      tags:
+      - config
+  /api/v1/events:
+    post:
+      consumes:
+      - application/json
+      description: Accepts a batch of analytics events for processing. Returns 202
+        with count of accepted events.
+      parameters:
+      - description: Analytics events
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            events:
+              items:
+                $ref: '#/definitions/analytics.Event'
+              type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ingest analytics events
+      tags:
+      - analytics
+  /api/v1/me:
+    get:
+      consumes:
+      - application/json
+      description: Get the profile of the currently authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User profile
+          schema:
+            $ref: '#/definitions/api.UserInfo'
+        "401":
+          description: Not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: User not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - auth
+  /api/v1/queues/delete:
+    post:
+      consumes:
+      - application/json
+      description: Deletes a message by its ID from the specified queue (acknowledges
+        receipt).
+      parameters:
+      - description: Delete request
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            id:
+              type: string
+            queue:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete message from queue
+      tags:
+      - queues
+  /api/v1/queues/receive:
+    post:
+      consumes:
+      - application/json
+      description: Receives up to `limit` messages from the specified queue. Messages
+        are made invisible until deleted or timeout.
+      parameters:
+      - description: Receive request
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            limit:
+              type: integer
+            queue:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Receive messages from queue
+      tags:
+      - queues
+  /api/v1/queues/send:
+    post:
+      consumes:
+      - application/json
+      description: Sends a JSON message to the specified queue. Returns the message
+        ID and queue name.
+      parameters:
+      - description: Queue message
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            body:
+              additionalProperties: true
+              type: object
+            queue:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send message to queue
+      tags:
+      - queues
+  /api/v1/storage/{bucket}/{path}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a file from the specified storage bucket.
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      - description: File path
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File deleted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a file
+      tags:
+      - storage
+    get:
+      consumes:
+      - application/json
+      description: Download a file from the specified storage bucket. Supports optional
+        image transformation parameters.
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      - description: File path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: Image width for transformation
+        in: query
+        name: w
+        type: integer
+      - description: Image height for transformation
+        in: query
+        name: h
+        type: integer
+      - description: Image output format (e.g., webp, jpeg)
+        in: query
+        name: format
+        type: string
+      - description: Image fit mode (e.g., cover, contain)
+        in: query
+        name: fit
+        type: string
+      - description: Image quality (1-100)
+        in: query
+        name: quality
+        type: integer
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: File content
+          schema:
+            type: file
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Download a file
+      tags:
+      - storage
+  /api/v1/storage/{bucket}/list:
+    get:
+      consumes:
+      - application/json
+      description: List files in a storage bucket, optionally filtered by prefix.
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      - description: Path prefix to filter by
+        in: query
+        name: prefix
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of files
+          schema:
+            items:
+              $ref: '#/definitions/api.FileInfo'
+            type: array
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List files in bucket
+      tags:
+      - storage
+  /api/v1/storage/{bucket}/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a file to the specified storage bucket. Supports multipart
+        form data with optional path.
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Custom file path (defaults to filename)
+        in: formData
+        name: path
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Uploaded file info
+          schema:
+            $ref: '#/definitions/api.FileInfo'
+        "400":
+          description: Invalid form data
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Storage quota exceeded
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Upload failed
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload a file
+      tags:
+      - storage
+  /auth/v1/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Send a password reset email to the specified address. Returns a
+        reset token.
+      parameters:
+      - description: Forgot password request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.forgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password reset email sent
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Request password reset
+      tags:
+      - auth
+  /auth/v1/magic-link:
+    post:
+      consumes:
+      - application/json
+      description: Generate a magic link for passwordless authentication. Returns
+        a token for the magic link.
+      parameters:
+      - description: Magic link request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.magicLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Magic link generated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create magic link
+      tags:
+      - auth
+  /auth/v1/mfa/confirm:
+    post:
+      consumes:
+      - application/json
+      description: Confirm MFA setup by providing a valid TOTP code. Returns backup
+        codes. Requires authentication.
+      parameters:
+      - description: MFA confirmation with code
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: MFA enabled with backup codes
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid code
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Authentication required
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Confirm MFA setup
+      tags:
+      - auth
+      - mfa
+  /auth/v1/mfa/disable:
+    post:
+      consumes:
+      - application/json
+      description: Disable MFA for the authenticated user. Requires a valid TOTP code.
+        Requires authentication.
+      parameters:
+      - description: MFA disable with code
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: MFA disabled
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid code
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Authentication required
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Disable MFA
+      tags:
+      - auth
+      - mfa
+  /auth/v1/mfa/setup:
+    post:
+      consumes:
+      - application/json
+      description: Generate an MFA secret and URI for TOTP setup. Requires authentication.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: MFA setup data
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Setup failed
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Authentication required
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Setup MFA
+      tags:
+      - auth
+      - mfa
+  /auth/v1/mfa/status:
+    get:
+      consumes:
+      - application/json
+      description: Check whether MFA is enabled for the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: MFA status
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "401":
+          description: Authentication required
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: User not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get MFA status
+      tags:
+      - auth
+      - mfa
+  /auth/v1/oauth/{provider}:
+    get:
+      consumes:
+      - application/json
+      description: Get the OAuth authorization URL for the specified provider. Optionally
+        redirects the browser if redirect=true.
+      parameters:
+      - description: OAuth provider name
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: URL to redirect after authentication
+        in: query
+        name: final_redirect
+        type: string
+      - description: Set to 'true' for HTTP redirect instead of JSON response
+        in: query
+        name: redirect
+        type: string
+      - description: Project key for frontend embedding
+        in: query
+        name: project_key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OAuth redirect info
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "302":
+          description: Browser redirect to OAuth provider
+        "400":
+          description: Invalid provider
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Initiate OAuth redirect
+      tags:
+      - auth
+  /auth/v1/oauth/{provider}/callback:
+    get:
+      consumes:
+      - application/json
+      description: Called by the OAuth provider after user authentication. Reads code
+        and state from query params, exchanges for tokens, and redirects the browser
+        with tokens in the URL fragment.
+      parameters:
+      - description: OAuth provider name
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: Authorization code from OAuth provider
+        in: query
+        name: code
+        required: true
+        type: string
+      - description: State token from OAuth redirect
+        in: query
+        name: state
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "302":
+          description: Redirect with tokens in fragment
+        "400":
+          description: Missing code or state
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Authentication failed
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: OAuth callback handler
+      tags:
+      - auth
+  /auth/v1/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Exchange a refresh token for a new access and refresh token pair.
+      parameters:
+      - description: Refresh token request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: New token pair
+          schema:
+            $ref: '#/definitions/api.TokenPair'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid refresh token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Refresh authentication tokens
+      tags:
+      - auth
+  /auth/v1/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Reset a user's password using a reset token and new password.
+      parameters:
+      - description: Reset password request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.resetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password reset successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid token or password
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Reset password
+      tags:
+      - auth
+  /auth/v1/signin:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate a user with email and password. Returns access and
+        refresh tokens.
+      parameters:
+      - description: Sign in request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.signInRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Authentication tokens
+          schema:
+            $ref: '#/definitions/api.TokenPair'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid credentials
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Captcha verification failed
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Sign in an existing user
+      tags:
+      - auth
+  /auth/v1/signup:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account with email and password. Returns the
+        created user and authentication tokens.
+      parameters:
+      - description: Sign up request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.signUpRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Captcha verification failed
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: User already exists
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Sign up a new user
+      tags:
+      - auth
+  /auth/v1/verify-email:
+    post:
+      consumes:
+      - application/json
+      description: Verify a user's email address using a verification token.
+      parameters:
+      - description: Email verification request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.verifyEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Verification successful
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid or expired token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Verify email address
+      tags:
+      - auth
+  /auth/v1/verify-magic-link:
+    post:
+      consumes:
+      - application/json
+      description: Verify a magic link token and return authentication tokens.
+      parameters:
+      - description: Verify magic link request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.verifyMagicLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Authentication tokens
+          schema:
+            $ref: '#/definitions/api.TokenPair'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid or expired token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Verify magic link
+      tags:
+      - auth
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT access token: "Bearer <token>"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

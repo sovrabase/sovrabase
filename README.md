@@ -30,7 +30,58 @@ docker run -d \
   ghcr.io/ketsuna-org/sovrabase:latest
 ```
 
-Server starts at `http://localhost:6070`.
+Server starts at `http://localhost:6070`. Open `http://localhost:6070/docs` for the full interactive API reference (Redoc).
+
+## API Reference
+
+Full OpenAPI 3.0 documentation is served at **`/docs`** (Redoc) and **`/docs/swagger.json`** (raw spec) on any running instance.
+
+The swagger spec is generated from source annotations via [swaggo/swag](https://github.com/swaggo/swag) and lives in the `docs/` directory. Regenerate with:
+
+```bash
+swag init -g cmd/sovrabase/main.go -o docs/
+```
+
+### Client generation
+
+Use the OpenAPI spec to generate typed clients for any language:
+
+```bash
+# TypeScript / JavaScript
+npx openapi-typescript-codegen --input http://localhost:6070/docs/swagger.json --output ./client
+
+# Python
+openapi-python-client generate --url http://localhost:6070/docs/swagger.json
+
+# Go
+oapi-codegen -package client http://localhost:6070/docs/swagger.json > client/client.go
+
+# Dart / Flutter
+dart run swagger_dart_code_generator -i http://localhost:6070/docs/swagger.json -o ./lib/client
+```
+
+### Quick endpoints
+
+```
+POST   /auth/v1/signup                # Create account
+POST   /auth/v1/signin                # Login
+POST   /auth/v1/refresh               # Refresh tokens
+GET    /auth/v1/oauth/{provider}      # OAuth redirect
+POST   /auth/v1/magic-link            # Passwordless login
+POST   /auth/v1/mfa/setup             # Enable 2FA
+POST   /api/v1/collections/{name}     # Insert document
+GET    /api/v1/collections/{name}     # List documents
+POST   /api/v1/collections/{name}/query  # Query with filter
+GET    /api/v1/collections/{name}/{id}   # Get document
+PUT    /api/v1/collections/{name}/{id}   # Update document
+DELETE /api/v1/collections/{name}/{id}   # Delete document
+POST   /api/v1/storage/{bucket}/upload   # Upload file
+GET    /api/v1/storage/{bucket}/list     # List files
+GET    /api/v1/storage/{bucket}/{path}   # Download file
+POST   /api/v1/queues/send            # Enqueue message
+POST   /api/v1/queues/receive         # Dequeue messages
+POST   /api/v1/events                 # Ingest analytics
+```
 
 ### docker-compose
 
@@ -139,34 +190,6 @@ cd sovrabase
 
 export SOVRABASE_JWT_SECRET="your-secret-key"
 make dev
-```
-
-## API Overview
-
-### Auth
-```
-POST /auth/v1/signup          # Create account
-POST /auth/v1/signin          # Login
-POST /auth/v1/refresh         # Refresh tokens
-GET  /auth/v1/oauth/:provider # OAuth redirect
-```
-
-### Database (protected)
-```
-POST   /api/v1/collections/:name         # Insert document
-GET    /api/v1/collections/:name         # List all documents
-POST   /api/v1/collections/:name/query   # Query with filter
-GET    /api/v1/collections/:name/:id     # Get document
-PUT    /api/v1/collections/:name/:id     # Update document
-DELETE /api/v1/collections/:name/:id     # Delete document
-```
-
-### Storage (protected)
-```
-POST   /api/v1/storage/:bucket/upload    # Upload file
-GET    /api/v1/storage/:bucket/list      # List files
-GET    /api/v1/storage/:bucket/:path     # Download file
-DELETE /api/v1/storage/:bucket/:path     # Delete file
 ```
 
 ## Why Sovrabase?

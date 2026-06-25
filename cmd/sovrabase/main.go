@@ -1,5 +1,21 @@
 package main
 
+// @title           Sovrabase API
+// @version         1.0
+// @description     Sovereign European BaaS — lightweight open-source Supabase alternative. Provides JSON document database (PebbleDB), JWT/OAuth authentication, file storage (local + S3), realtime WebSocket, queues, and config maps — all in a single ~40 MB binary.
+// @contact.name    Sovrabase
+// @contact.url     https://sovrabase.eu
+// @contact.email   hello@sovrabase.eu
+// @license.name    AGPL-3.0
+// @license.url     https://github.com/ketsuna-org/sovrabase/blob/main/LICENSE
+// @host            localhost:6070
+// @BasePath        /
+// @schemes         http https
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+// @description     JWT access token: "Bearer <token>"
+
 import (
 	"context"
 	"log/slog"

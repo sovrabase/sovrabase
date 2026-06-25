@@ -39,6 +39,18 @@ func getQueueStore(projectID string, projects *tenant.ProjectManager) (*queue.St
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+// handleQueueSend sends a message to a queue.
+// @Summary      Send message to queue
+// @Description  Sends a JSON message to the specified queue. Returns the message ID and queue name.
+// @Tags         queues
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body  object{queue=string,body=map[string]interface{}}  true  "Queue message"
+// @Success      201   {object}  map[string]string
+// @Failure      400   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /api/v1/queues/send [post]
 func (s *Server) handleQueueSend(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)
 	store, err := getQueueStore(projectID, s.projects)
@@ -68,6 +80,18 @@ func (s *Server) handleQueueSend(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id, "queue": req.Queue})
 }
 
+// handleQueueReceive receives messages from a queue.
+// @Summary      Receive messages from queue
+// @Description  Receives up to `limit` messages from the specified queue. Messages are made invisible until deleted or timeout.
+// @Tags         queues
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body  object{queue=string,limit=int}  true  "Receive request"
+// @Success      200   {object}  map[string]interface{}
+// @Failure      400   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /api/v1/queues/receive [post]
 func (s *Server) handleQueueReceive(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)
 	store, err := getQueueStore(projectID, s.projects)
@@ -103,6 +127,19 @@ func (s *Server) handleQueueReceive(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleQueueDelete deletes a message from a queue.
+// @Summary      Delete message from queue
+// @Description  Deletes a message by its ID from the specified queue (acknowledges receipt).
+// @Tags         queues
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body  object{queue=string,id=string}  true  "Delete request"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  map[string]string
+// @Failure      404   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /api/v1/queues/delete [post]
 func (s *Server) handleQueueDelete(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)
 	store, err := getQueueStore(projectID, s.projects)

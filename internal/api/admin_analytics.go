@@ -51,6 +51,17 @@ func (a *AdminServer) handleAdminAnalyticsSummary(w http.ResponseWriter, r *http
 }
 
 // handleIngestEvents ingests analytics events from the public API.
+// @Summary      Ingest analytics events
+// @Description  Accepts a batch of analytics events for processing. Returns 202 with count of accepted events.
+// @Tags         analytics
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body  object{events=[]analytics.Event}  true  "Analytics events"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /api/v1/events [post]
 func (s *Server) handleIngestEvents(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)
 	var req struct {

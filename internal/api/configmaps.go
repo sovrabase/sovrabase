@@ -43,6 +43,14 @@ func (s *Server) RegisterConfigMapsRoutes() {
 
 // ─── Public endpoint ──────────────────────────────────────────────────────────
 
+// handleConfigPublic returns all public config entries as a key→value map.
+// @Summary      List public config
+// @Description  Returns all public config entries as a simple key→value map. No authentication required.
+// @Tags         config
+// @Produce      json
+// @Success      200  {object}  map[string]interface{}
+// @Failure      500  {object}  map[string]string
+// @Router       /api/v1/config/public [get]
 func (s *Server) handleConfigPublic(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
 	if store == nil {
@@ -64,6 +72,15 @@ func (s *Server) handleConfigPublic(w http.ResponseWriter, r *http.Request) {
 
 // ─── Authenticated endpoints ──────────────────────────────────────────────────
 
+// handleConfigList lists all config entries.
+// @Summary      List config entries
+// @Description  Returns all config entries for the project.
+// @Tags         config
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  map[string]interface{}
+// @Failure      500  {object}  map[string]string
+// @Router       /api/v1/config [get]
 func (s *Server) handleConfigList(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
 	if store == nil {
@@ -84,6 +101,17 @@ func (s *Server) handleConfigList(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleConfigGet returns a single config entry by key.
+// @Summary      Get config entry
+// @Description  Returns a single config entry by its key.
+// @Tags         config
+// @Produce      json
+// @Security     BearerAuth
+// @Param        key  path  string  true  "Config key"
+// @Success      200  {object}  configmaps.Entry
+// @Failure      404  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Router       /api/v1/config/{key} [get]
 func (s *Server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
 	if store == nil {
@@ -107,6 +135,21 @@ type configSetRequest struct {
 	Public      bool        `json:"public"`
 }
 
+// handleConfigSet creates or updates a config entry.
+// @Summary      Create or update config entry
+// @Description  Creates a new config entry (POST) or updates an existing one (PUT). On successful create returns 201, on update returns 200.
+// @Tags         config
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        key    path      string            false  "Config key (for PUT)"
+// @Param        body   body      configSetRequest  true   "Config entry"
+// @Success      200    {object}  configmaps.Entry
+// @Success      201    {object}  configmaps.Entry
+// @Failure      400    {object}  map[string]string
+// @Failure      500    {object}  map[string]string
+// @Router       /api/v1/config [post]
+// @Router       /api/v1/config/{key} [put]
 func (s *Server) handleConfigSet(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
 	if store == nil {
@@ -154,6 +197,17 @@ func (s *Server) handleConfigSet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, entry)
 }
 
+// handleConfigDelete deletes a config entry.
+// @Summary      Delete config entry
+// @Description  Deletes a config entry by its key.
+// @Tags         config
+// @Produce      json
+// @Security     BearerAuth
+// @Param        key  path  string  true  "Config key"
+// @Success      200  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Router       /api/v1/config/{key} [delete]
 func (s *Server) handleConfigDelete(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
 	if store == nil {

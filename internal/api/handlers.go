@@ -29,6 +29,17 @@ type signUpRequest struct {
 	CaptchaToken string `json:"captcha_token"`
 }
 
+// @Summary Sign up a new user
+// @Description Create a new user account with email and password. Returns the created user and authentication tokens.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body signUpRequest true "Sign up request"
+// @Success 201 {object} map[string]interface{} "User created"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 409 {object} map[string]string "User already exists"
+// @Failure 403 {object} map[string]string "Captcha verification failed"
+// @Router /auth/v1/signup [post]
 func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 	var req signUpRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -73,6 +84,17 @@ type signInRequest struct {
 	CaptchaToken string `json:"captcha_token"`
 }
 
+// @Summary Sign in an existing user
+// @Description Authenticate a user with email and password. Returns access and refresh tokens.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body signInRequest true "Sign in request"
+// @Success 200 {object} TokenPair "Authentication tokens"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 401 {object} map[string]string "Invalid credentials"
+// @Failure 403 {object} map[string]string "Captcha verification failed"
+// @Router /auth/v1/signin [post]
 func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	var req signInRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -111,6 +133,16 @@ type refreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// @Summary Refresh authentication tokens
+// @Description Exchange a refresh token for a new access and refresh token pair.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body refreshRequest true "Refresh token request"
+// @Success 200 {object} TokenPair "New token pair"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 401 {object} map[string]string "Invalid refresh token"
+// @Router /auth/v1/refresh [post]
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -127,6 +159,19 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tokens)
 }
 
+// @Summary Initiate OAuth redirect
+// @Description Get the OAuth authorization URL for the specified provider. Optionally redirects the browser if redirect=true.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param provider path string true "OAuth provider name"
+// @Param final_redirect query string false "URL to redirect after authentication"
+// @Param redirect query string false "Set to 'true' for HTTP redirect instead of JSON response"
+// @Param project_key query string false "Project key for frontend embedding"
+// @Success 200 {object} map[string]string "OAuth redirect info"
+// @Success 302 "Browser redirect to OAuth provider"
+// @Failure 400 {object} map[string]string "Invalid provider"
+// @Router /auth/v1/oauth/{provider} [get]
 func (s *Server) handleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 	projectID := getProjectID(r)
@@ -161,6 +206,18 @@ func (s *Server) handleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 // handleOAuthCallback is called by the OAuth provider after the user authenticates.
 // It reads ?code and ?state from query params (standard browser redirect).
 // The project ID and redirect preferences are decoded from the state token itself.
+// @Summary OAuth callback handler
+// @Description Called by the OAuth provider after user authentication. Reads code and state from query params, exchanges for tokens, and redirects the browser with tokens in the URL fragment.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param provider path string true "OAuth provider name"
+// @Param code query string true "Authorization code from OAuth provider"
+// @Param state query string true "State token from OAuth redirect"
+// @Success 302 "Redirect with tokens in fragment"
+// @Failure 400 {object} map[string]string "Missing code or state"
+// @Failure 401 {object} map[string]string "Authentication failed"
+// @Router /auth/v1/oauth/{provider}/callback [get]
 func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 	code := r.URL.Query().Get("code")
@@ -216,6 +273,15 @@ type verifyEmailRequest struct {
 	Token string `json:"token"`
 }
 
+// @Summary Verify email address
+// @Description Verify a user's email address using a verification token.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body verifyEmailRequest true "Email verification request"
+// @Success 200 {object} map[string]string "Verification successful"
+// @Failure 400 {object} map[string]string "Invalid or expired token"
+// @Router /auth/v1/verify-email [post]
 func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	var req verifyEmailRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -240,6 +306,15 @@ type forgotPasswordRequest struct {
 	Email string `json:"email"`
 }
 
+// @Summary Request password reset
+// @Description Send a password reset email to the specified address. Returns a reset token.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body forgotPasswordRequest true "Forgot password request"
+// @Success 200 {object} map[string]string "Password reset email sent"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Router /auth/v1/forgot-password [post]
 func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req forgotPasswordRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -268,6 +343,15 @@ type resetPasswordRequest struct {
 	Password string `json:"password"`
 }
 
+// @Summary Reset password
+// @Description Reset a user's password using a reset token and new password.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body resetPasswordRequest true "Reset password request"
+// @Success 200 {object} map[string]string "Password reset successfully"
+// @Failure 400 {object} map[string]string "Invalid token or password"
+// @Router /auth/v1/reset-password [post]
 func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	var req resetPasswordRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -294,6 +378,15 @@ type magicLinkRequest struct {
 	Email string `json:"email"`
 }
 
+// @Summary Create magic link
+// @Description Generate a magic link for passwordless authentication. Returns a token for the magic link.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body magicLinkRequest true "Magic link request"
+// @Success 200 {object} map[string]string "Magic link generated"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Router /auth/v1/magic-link [post]
 func (s *Server) handleCreateMagicLink(w http.ResponseWriter, r *http.Request) {
 	var req magicLinkRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -325,6 +418,16 @@ type verifyMagicLinkRequest struct {
 	Token string `json:"token"`
 }
 
+// @Summary Verify magic link
+// @Description Verify a magic link token and return authentication tokens.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body verifyMagicLinkRequest true "Verify magic link request"
+// @Success 200 {object} TokenPair "Authentication tokens"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 401 {object} map[string]string "Invalid or expired token"
+// @Router /auth/v1/verify-magic-link [post]
 func (s *Server) handleVerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 	var req verifyMagicLinkRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -347,6 +450,16 @@ func (s *Server) handleVerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 
 // ─── MFA Handlers ────────────────────────────────────────────────────────────
 
+// @Summary Setup MFA
+// @Description Generate an MFA secret and URI for TOTP setup. Requires authentication.
+// @Tags auth,mfa
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]string "MFA setup data"
+// @Failure 400 {object} map[string]string "Setup failed"
+// @Failure 401 {object} map[string]string "Authentication required"
+// @Router /auth/v1/mfa/setup [post]
 func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	if claims == nil {
@@ -366,6 +479,17 @@ func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// @Summary Confirm MFA setup
+// @Description Confirm MFA setup by providing a valid TOTP code. Returns backup codes. Requires authentication.
+// @Tags auth,mfa
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body map[string]string true "MFA confirmation with code"
+// @Success 200 {object} map[string]interface{} "MFA enabled with backup codes"
+// @Failure 400 {object} map[string]string "Invalid code"
+// @Failure 401 {object} map[string]string "Authentication required"
+// @Router /auth/v1/mfa/confirm [post]
 func (s *Server) handleMFAConfirm(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	if claims == nil {
@@ -397,6 +521,17 @@ func (s *Server) handleMFAConfirm(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// @Summary Disable MFA
+// @Description Disable MFA for the authenticated user. Requires a valid TOTP code. Requires authentication.
+// @Tags auth,mfa
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body map[string]string true "MFA disable with code"
+// @Success 200 {object} map[string]string "MFA disabled"
+// @Failure 400 {object} map[string]string "Invalid code"
+// @Failure 401 {object} map[string]string "Authentication required"
+// @Router /auth/v1/mfa/disable [post]
 func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	if claims == nil {
@@ -420,6 +555,16 @@ func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "MFA disabled"})
 }
 
+// @Summary Get MFA status
+// @Description Check whether MFA is enabled for the authenticated user.
+// @Tags auth,mfa
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]bool "MFA status"
+// @Failure 401 {object} map[string]string "Authentication required"
+// @Failure 404 {object} map[string]string "User not found"
+// @Router /auth/v1/mfa/status [get]
 func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	if claims == nil {
@@ -436,6 +581,16 @@ func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"enabled": enabled})
 }
 
+// @Summary Get current user
+// @Description Get the profile of the currently authenticated user.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} UserInfo "User profile"
+// @Failure 401 {object} map[string]string "Not authenticated"
+// @Failure 404 {object} map[string]string "User not found"
+// @Router /api/v1/me [get]
 func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	if claims == nil {
@@ -557,6 +712,19 @@ func (s *Server) publishRealtime(eventType realtime.EventType, projectID, collec
 	})
 }
 
+// @Summary Insert a document
+// @Description Insert a new document into the specified collection. An _id is auto-generated if not provided.
+// @Tags database
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param collection path string true "Collection name"
+// @Param document body map[string]interface{} true "Document to insert"
+// @Success 201 {object} map[string]interface{} "Created document"
+// @Failure 400 {object} map[string]string "Invalid document"
+// @Failure 403 {object} map[string]string "RLS policy restricts insertion"
+// @Failure 500 {object} map[string]string "Internal error"
+// @Router /api/v1/collections/{collection} [post]
 func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
@@ -604,6 +772,18 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, created)
 }
 
+// @Summary Get a document by ID
+// @Description Retrieve a single document by its ID from the specified collection.
+// @Tags database
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param collection path string true "Collection name"
+// @Param id path string true "Document ID"
+// @Success 200 {object} map[string]interface{} "Retrieved document"
+// @Failure 403 {object} map[string]string "RLS policy restricts access"
+// @Failure 404 {object} map[string]string "Document not found"
+// @Router /api/v1/collections/{collection}/{id} [get]
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 	id := chi.URLParam(r, "id")
@@ -632,6 +812,20 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, doc)
 }
 
+// @Summary Update a document
+// @Description Partially update an existing document by ID. Supports both PUT and PATCH methods.
+// @Tags database
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param collection path string true "Collection name"
+// @Param id path string true "Document ID"
+// @Param document body map[string]interface{} true "Partial document update"
+// @Success 200 {object} map[string]interface{} "Updated document"
+// @Failure 400 {object} map[string]string "Invalid document"
+// @Failure 403 {object} map[string]string "RLS policy restricts update"
+// @Failure 404 {object} map[string]string "Document not found"
+// @Router /api/v1/collections/{collection}/{id} [put]
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 	id := chi.URLParam(r, "id")
@@ -677,6 +871,18 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, updated)
 }
 
+// @Summary Delete a document
+// @Description Delete a document by ID from the specified collection.
+// @Tags database
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param collection path string true "Collection name"
+// @Param id path string true "Document ID"
+// @Success 200 {object} map[string]string "Document deleted"
+// @Failure 403 {object} map[string]string "RLS policy restricts deletion"
+// @Failure 404 {object} map[string]string "Document not found"
+// @Router /api/v1/collections/{collection}/{id} [delete]
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 	id := chi.URLParam(r, "id")
@@ -717,6 +923,19 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// @Summary List documents
+// @Description List documents in a collection with optional filtering, field selection, and pagination. Query parameters are treated as filter fields.
+// @Tags database
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param collection path string true "Collection name"
+// @Param select query string false "Comma-separated list of fields to return"
+// @Param limit query int false "Maximum number of documents to return (paginated response)"
+// @Param offset query int false "Number of documents to skip (paginated response)"
+// @Success 200 {object} map[string]interface{} "List of documents or paginated response"
+// @Failure 500 {object} map[string]string "Internal error"
+// @Router /api/v1/collections/{collection} [get]
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
@@ -811,6 +1030,18 @@ type queryRequest struct {
 	Offset     int                    `json:"offset"`
 }
 
+// @Summary Query documents
+// @Description Query documents in a collection with a structured filter, field projection, and pagination.
+// @Tags database
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param collection path string true "Collection name"
+// @Param request body queryRequest true "Query parameters"
+// @Success 200 {object} map[string]interface{} "Query results or paginated response"
+// @Failure 400 {object} map[string]string "Invalid query"
+// @Failure 500 {object} map[string]string "Internal error"
+// @Router /api/v1/collections/{collection}/query [post]
 func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
@@ -893,6 +1124,20 @@ func parseIntParam(s string, defaultVal int) int {
 
 // ─── Storage Handlers ────────────────────────────────────────────────────────
 
+// @Summary Upload a file
+// @Description Upload a file to the specified storage bucket. Supports multipart form data with optional path.
+// @Tags storage
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param bucket path string true "Bucket name"
+// @Param file formData file true "File to upload"
+// @Param path formData string false "Custom file path (defaults to filename)"
+// @Success 201 {object} FileInfo "Uploaded file info"
+// @Failure 400 {object} map[string]string "Invalid form data"
+// @Failure 403 {object} map[string]string "Storage quota exceeded"
+// @Failure 500 {object} map[string]string "Upload failed"
+// @Router /api/v1/storage/{bucket}/upload [post]
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
 
@@ -951,6 +1196,22 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, info)
 }
 
+// @Summary Download a file
+// @Description Download a file from the specified storage bucket. Supports optional image transformation parameters.
+// @Tags storage
+// @Accept json
+// @Produce octet-stream
+// @Security BearerAuth
+// @Param bucket path string true "Bucket name"
+// @Param path path string true "File path"
+// @Param w query int false "Image width for transformation"
+// @Param h query int false "Image height for transformation"
+// @Param format query string false "Image output format (e.g., webp, jpeg)"
+// @Param fit query string false "Image fit mode (e.g., cover, contain)"
+// @Param quality query int false "Image quality (1-100)"
+// @Success 200 {file} binary "File content"
+// @Failure 404 {object} map[string]string "File not found"
+// @Router /api/v1/storage/{bucket}/{path} [get]
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
 	path := chi.URLParam(r, "path")
@@ -998,6 +1259,17 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, reader)
 }
 
+// @Summary Delete a file
+// @Description Delete a file from the specified storage bucket.
+// @Tags storage
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param bucket path string true "Bucket name"
+// @Param path path string true "File path"
+// @Success 200 {object} map[string]string "File deleted"
+// @Failure 404 {object} map[string]string "File not found"
+// @Router /api/v1/storage/{bucket}/{path} [delete]
 func (s *Server) handleStorageDelete(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
 	path := chi.URLParam(r, "path")
@@ -1010,6 +1282,17 @@ func (s *Server) handleStorageDelete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// @Summary List files in bucket
+// @Description List files in a storage bucket, optionally filtered by prefix.
+// @Tags storage
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param bucket path string true "Bucket name"
+// @Param prefix query string false "Path prefix to filter by"
+// @Success 200 {array} FileInfo "List of files"
+// @Failure 500 {object} map[string]string "Internal error"
+// @Router /api/v1/storage/{bucket}/list [get]
 func (s *Server) handleStorageList(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
 	prefix := r.URL.Query().Get("prefix")
@@ -1047,6 +1330,17 @@ type batchResult struct {
 	Error   string      `json:"error,omitempty"`
 }
 
+// @Summary Batch operations
+// @Description Execute multiple insert, update, and delete operations in a single atomic batch.
+// @Tags database
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param collection path string true "Collection name"
+// @Param request body batchRequest true "Batch operations"
+// @Success 200 {object} map[string]interface{} "Batch results"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Router /api/v1/collections/{collection}/batch [post]
 func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
@@ -1207,6 +1501,18 @@ type searchRequest struct {
 	Limit  int      `json:"limit"`
 }
 
+// @Summary Full-text search
+// @Description Perform a full-text search on documents in a collection.
+// @Tags database
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param collection path string true "Collection name"
+// @Param request body searchRequest true "Search parameters"
+// @Success 200 {object} map[string]interface{} "Search results"
+// @Failure 400 {object} map[string]string "Invalid request or query required"
+// @Failure 500 {object} map[string]string "Internal error"
+// @Router /api/v1/collections/{collection}/search [post]
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
