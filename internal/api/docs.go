@@ -21,7 +21,7 @@ const redocTemplate = `<!DOCTYPE html>
   <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
   <script>
     Redoc.init(
-      {{.SpecURL}},
+      "{{.SpecURL}}",
       {
         scrollYOffset: 0,
         hideDownloadButton: false,
