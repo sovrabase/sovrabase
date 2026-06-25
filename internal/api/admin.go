@@ -191,7 +191,7 @@ func (a *AdminServer) adminAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		if claims.AdminRole == "" {
-			writeError(w, http.StatusForbidden, "forbidden: admin token required")
+			writeError(w, http.StatusUnauthorized, "admin token required — please log in again")
 			return
 		}
 
