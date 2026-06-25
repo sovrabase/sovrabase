@@ -270,7 +270,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: List documents
       tags:
       - database
@@ -325,7 +324,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Insert a document
       tags:
       - database
@@ -373,7 +371,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Delete a document
       tags:
       - database
@@ -419,7 +416,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Get a document by ID
       tags:
       - database
@@ -479,7 +475,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Update a document
       tags:
       - database
@@ -522,7 +517,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Batch operations
       tags:
       - database
@@ -571,7 +565,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Query documents
       tags:
       - database
@@ -619,7 +612,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Full-text search
       tags:
       - database
@@ -648,7 +640,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: List config entries
       tags:
       - config
@@ -699,7 +690,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Create or update config entry
       tags:
       - config
@@ -740,7 +730,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Delete config entry
       tags:
       - config
@@ -778,7 +767,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Get config entry
       tags:
       - config
@@ -833,7 +821,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Create or update config entry
       tags:
       - config
@@ -861,8 +848,6 @@ paths:
             additionalProperties:
               type: string
             type: object
-      security:
-      - ProjectKey: []
       summary: List public config
       tags:
       - config
@@ -912,7 +897,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Ingest analytics events
       tags:
       - analytics
@@ -948,7 +932,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Get current user
       tags:
       - auth
@@ -1004,7 +987,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Delete message from queue
       tags:
       - queues
@@ -1053,7 +1035,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Receive messages from queue
       tags:
       - queues
@@ -1104,7 +1085,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Send message to queue
       tags:
       - queues
@@ -1146,7 +1126,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Delete a file
       tags:
       - storage
@@ -1206,7 +1185,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Download a file
       tags:
       - storage
@@ -1247,7 +1225,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: List files in bucket
       tags:
       - storage
@@ -1304,7 +1281,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Upload a file
       tags:
       - storage
@@ -1422,7 +1398,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Confirm MFA setup
       tags:
       - auth
@@ -1470,7 +1445,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Disable MFA
       tags:
       - auth
@@ -1509,7 +1483,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Setup MFA
       tags:
       - auth
@@ -1548,7 +1521,6 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      - ProjectKey: []
       summary: Get MFA status
       tags:
       - auth
@@ -1809,8 +1781,6 @@ paths:
             additionalProperties:
               type: string
             type: object
-      security:
-      - ProjectKey: []
       summary: Sign up a new user
       tags:
       - auth

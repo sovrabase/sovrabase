@@ -39,7 +39,6 @@ type signUpRequest struct {
 // @Failure 400 {object} map[string]string "Invalid request"
 // @Failure 409 {object} map[string]string "User already exists"
 // @Failure 403 {object} map[string]string "Captcha verification failed"
-// @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/signup [post]
 func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +95,6 @@ type signInRequest struct {
 // @Failure 400 {object} map[string]string "Invalid request"
 // @Failure 401 {object} map[string]string "Invalid credentials"
 // @Failure 403 {object} map[string]string "Captcha verification failed"
-// // @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/signin [post]
 func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +144,6 @@ type refreshRequest struct {
 // @Success 200 {object} TokenPair "New token pair"
 // @Failure 400 {object} map[string]string "Invalid request"
 // @Failure 401 {object} map[string]string "Invalid refresh token"
-// // @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/refresh [post]
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
@@ -177,7 +174,6 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]string "OAuth redirect info"
 // @Success 302 "Browser redirect to OAuth provider"
 // @Failure 400 {object} map[string]string "Invalid provider"
-// // @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/oauth/{provider} [get]
 func (s *Server) handleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
@@ -289,7 +285,6 @@ type verifyEmailRequest struct {
 // @Param request body verifyEmailRequest true "Email verification request"
 // @Success 200 {object} map[string]string "Verification successful"
 // @Failure 400 {object} map[string]string "Invalid or expired token"
-// // @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/verify-email [post]
 func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
@@ -324,7 +319,6 @@ type forgotPasswordRequest struct {
 // @Param request body forgotPasswordRequest true "Forgot password request"
 // @Success 200 {object} map[string]string "Password reset email sent"
 // @Failure 400 {object} map[string]string "Invalid request"
-// // @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/forgot-password [post]
 func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
@@ -363,7 +357,6 @@ type resetPasswordRequest struct {
 // @Param request body resetPasswordRequest true "Reset password request"
 // @Success 200 {object} map[string]string "Password reset successfully"
 // @Failure 400 {object} map[string]string "Invalid token or password"
-// // @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/reset-password [post]
 func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
@@ -400,7 +393,6 @@ type magicLinkRequest struct {
 // @Param request body magicLinkRequest true "Magic link request"
 // @Success 200 {object} map[string]string "Magic link generated"
 // @Failure 400 {object} map[string]string "Invalid request"
-// // @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/magic-link [post]
 func (s *Server) handleCreateMagicLink(w http.ResponseWriter, r *http.Request) {
@@ -443,7 +435,6 @@ type verifyMagicLinkRequest struct {
 // @Success 200 {object} TokenPair "Authentication tokens"
 // @Failure 400 {object} map[string]string "Invalid request"
 // @Failure 401 {object} map[string]string "Invalid or expired token"
-// // @Security ProjectKey
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/verify-magic-link [post]
 func (s *Server) handleVerifyMagicLink(w http.ResponseWriter, r *http.Request) {
@@ -474,7 +465,6 @@ func (s *Server) handleVerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Success 200 {object} map[string]string "MFA setup data"
 // @Failure 400 {object} map[string]string "Setup failed"
 // @Failure 401 {object} map[string]string "Authentication required"
@@ -505,7 +495,6 @@ func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param request body map[string]string true "MFA confirmation with code"
 // @Success 200 {object} map[string]interface{} "MFA enabled with backup codes"
 // @Failure 400 {object} map[string]string "Invalid code"
@@ -549,7 +538,6 @@ func (s *Server) handleMFAConfirm(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param request body map[string]string true "MFA disable with code"
 // @Success 200 {object} map[string]string "MFA disabled"
 // @Failure 400 {object} map[string]string "Invalid code"
@@ -585,7 +573,6 @@ func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Success 200 {object} map[string]bool "MFA status"
 // @Failure 401 {object} map[string]string "Authentication required"
 // @Failure 404 {object} map[string]string "User not found"
@@ -613,7 +600,6 @@ func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Success 200 {object} UserInfo "User profile"
 // @Failure 401 {object} map[string]string "Not authenticated"
 // @Failure 404 {object} map[string]string "User not found"
@@ -746,7 +732,6 @@ func (s *Server) publishRealtime(eventType realtime.EventType, projectID, collec
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param collection path string true "Collection name"
 // @Param document body map[string]interface{} true "Document to insert"
 // @Success 201 {object} map[string]interface{} "Created document"
@@ -808,7 +793,6 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
 // @Success 200 {object} map[string]interface{} "Retrieved document"
@@ -850,7 +834,6 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
 // @Param document body map[string]interface{} true "Partial document update"
@@ -911,7 +894,6 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
 // @Success 200 {object} map[string]string "Document deleted"
@@ -965,7 +947,6 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param collection path string true "Collection name"
 // @Param select query string false "Comma-separated list of fields to return"
 // @Param limit query int false "Maximum number of documents to return (paginated response)"
@@ -1074,7 +1055,6 @@ type queryRequest struct {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param collection path string true "Collection name"
 // @Param request body queryRequest true "Query parameters"
 // @Success 200 {object} map[string]interface{} "Query results or paginated response"
@@ -1170,7 +1150,6 @@ func parseIntParam(s string, defaultVal int) int {
 // @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param bucket path string true "Bucket name"
 // @Param file formData file true "File to upload"
 // @Param path formData string false "Custom file path (defaults to filename)"
@@ -1244,7 +1223,6 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce octet-stream
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param bucket path string true "Bucket name"
 // @Param path path string true "File path"
 // @Param w query int false "Image width for transformation"
@@ -1309,7 +1287,6 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param bucket path string true "Bucket name"
 // @Param path path string true "File path"
 // @Success 200 {object} map[string]string "File deleted"
@@ -1334,7 +1311,6 @@ func (s *Server) handleStorageDelete(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param bucket path string true "Bucket name"
 // @Param prefix query string false "Path prefix to filter by"
 // @Success 200 {array} FileInfo "List of files"
@@ -1384,7 +1360,6 @@ type batchResult struct {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param collection path string true "Collection name"
 // @Param request body batchRequest true "Batch operations"
 // @Success 200 {object} map[string]interface{} "Batch results"
@@ -1557,7 +1532,6 @@ type searchRequest struct {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Security ProjectKey
 // @Param collection path string true "Collection name"
 // @Param request body searchRequest true "Search parameters"
 // @Success 200 {object} map[string]interface{} "Search results"
