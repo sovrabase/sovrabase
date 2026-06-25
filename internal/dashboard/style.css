@@ -1166,3 +1166,31 @@ textarea:focus { outline: none; border-color: var(--border-focus); }
   color: var(--text-primary);
 }
 
+/* ====== AGPL SOURCE LINK ====== */
+.license-link {
+  margin-top: 6px;
+  font-size: 10.5px;
+}
+.license-link a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+.license-link a:hover {
+  color: var(--accent);
+}
+
+.login-footer {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 11px;
+}
+.login-footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+.login-footer a:hover {
+  color: var(--accent);
+}
+
