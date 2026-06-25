@@ -158,6 +158,9 @@ func (e *Engine) DropCollection(name string) error {
 	// Delete index metadata.
 	_ = e.db.Delete(idxMetaKey(name), pebble.Sync)
 
+	// Delete RLS rules for this collection.
+	_ = e.db.Delete([]byte("__rules__:"+name), pebble.Sync)
+
 	// Remove the collection metadata.
 	if err := e.db.Delete(metaKey, pebble.Sync); err != nil {
 		return fmt.Errorf("db: delete collection meta %q: %w", name, err)
