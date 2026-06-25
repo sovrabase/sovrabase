@@ -44,7 +44,8 @@ const redocTemplate = `<!DOCTYPE html>
           sidebar: { backgroundColor: '#0d0d0f', textColor: '#e0e0e0' },
           rightPanel: { backgroundColor: '#141416' },
         },
-      }
+      },
+      document.getElementById('redoc')
     );
   </script>
 </body>
