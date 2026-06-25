@@ -18,6 +18,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/imgtransform"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
+	"github.com/ketsuna-org/sovrabase/internal/plugin"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 )
 
@@ -57,6 +58,20 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 		ok, err := s.captchaVerifier.Verify(r.Context(), req.CaptchaToken)
 		if err != nil || !ok {
 			writeError(w, http.StatusForbidden, "captcha verification failed: "+err.Error())
+			return
+		}
+	}
+
+	// Run signup hooks.
+	if s.hooks != nil {
+		authEvent := &plugin.AuthEvent{Action: "signup", Email: req.Email}
+		s.hooks.RunAuthHooks("signup", authEvent)
+		if authEvent.Abort {
+			msg := authEvent.AbortMessage
+			if msg == "" {
+				msg = "signup rejected by plugin"
+			}
+			writeError(w, http.StatusForbidden, msg)
 			return
 		}
 	}
@@ -763,6 +778,22 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	projectID := getProjectID(r)
+
+	// Run record create hooks.
+	if s.hooks != nil {
+		hookEvent := &plugin.RecordEvent{
+			Collection: collection,
+			Record:     doc,
+			Action:     "create",
+			ProjectID:  projectID,
+			UserID:     getUserID(r),
+		}
+		if err := s.hooks.RunRecordHooks(collection, "create", hookEvent); err != nil {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
+
 	if err := s.getDB(r).Insert(collection, id, doc); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -864,6 +895,26 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	projectID := getProjectID(r)
+
+	// Run record update hooks.
+	if s.hooks != nil {
+		oldDoc, _ := s.getDB(r).Get(collection, id)
+		hookEvent := &plugin.RecordEvent{
+			Collection: collection,
+			Record:     doc,
+			OldRecord:  oldDoc,
+			Action:     "update",
+			ProjectID:  projectID,
+			UserID:     getUserID(r),
+		}
+		if err := s.hooks.RunRecordHooks(collection, "update", hookEvent); err != nil {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		// Use the potentially modified record from the hook.
+		doc = hookEvent.Record
+	}
+
 	if err := s.getDB(r).Update(collection, id, doc); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -920,6 +971,22 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if !allowed {
 		writeError(w, http.StatusForbidden, "RLS policy restricts deletion")
 		return
+	}
+
+	// Run record delete hooks.
+	if s.hooks != nil {
+		existing, _ := s.getDB(r).Get(collection, id)
+		hookEvent := &plugin.RecordEvent{
+			Collection: collection,
+			OldRecord:  existing,
+			Action:     "delete",
+			ProjectID:  projectID,
+			UserID:     getUserID(r),
+		}
+		if err := s.hooks.RunRecordHooks(collection, "delete", hookEvent); err != nil {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
 	}
 
 	if err := s.getDB(r).Delete(collection, id); err != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/captcha"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
+	"github.com/ketsuna-org/sovrabase/internal/plugin"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
@@ -37,6 +38,7 @@ type Server struct {
 	realtimeHub  *realtime.Hub  // optional realtime hub
 	rateLimiters *tenantRateLimiter
 	logger       *slog.Logger
+	hooks        *plugin.HookManager
 	httpServer   *http.Server // reference for graceful shutdown
 	captchaVerifier *captcha.Verifier
 }
@@ -242,7 +244,7 @@ func (s *Server) getStorage(r *http.Request) StorageService {
 }
 
 // NewServer creates a new API server.
-func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store StorageService, pm *tenant.ProjectManager) *Server {
+func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store StorageService, pm *tenant.ProjectManager, hookManager *plugin.HookManager) *Server {
 	// Rate limiter: default 100 req/min with burst of 20.
 	ratePerMin := cfg.RateLimitPerMinute
 	if ratePerMin <= 0 {
@@ -262,6 +264,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		projects:     pm,
 		rateLimiters: rl,
 		logger:       slog.Default(),
+		hooks:        hookManager,
 	}
 
 	r := chi.NewRouter()
@@ -384,6 +387,11 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	// Remote config routes — registered on the chi router.
 	s.router = r
 	s.RegisterConfigMapsRoutes()
+
+	// Run OnServe hooks so plugins can register custom routes.
+	if s.hooks != nil {
+		s.hooks.RunServeHooks(r)
+	}
 
 	return s
 }

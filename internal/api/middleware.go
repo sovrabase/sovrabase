@@ -82,6 +82,14 @@ func getClaims(r *http.Request) *UserClaims {
 	return claims
 }
 
+// getUserID extracts the authenticated user ID from the request context.
+func getUserID(r *http.Request) string {
+	if claims := getClaims(r); claims != nil {
+		return claims.UserID
+	}
+	return ""
+}
+
 // clientRequestLoggerMiddleware logs all requests (API and Auth) to the project's requests.log file.
 func (s *Server) clientRequestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

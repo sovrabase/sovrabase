@@ -61,6 +61,9 @@ type Config struct {
 	Peers    []string      `yaml:"peers"     json:"peers"`     // peer addresses
 	LeaseTTL time.Duration `yaml:"lease_ttl" json:"lease_ttl"` // lease time-to-live for failover
 
+	// Plugins
+	PluginsDir string `yaml:"plugins_dir" json:"plugins_dir"`
+
 	// Internal: path to the loaded config file (not saved in YAML)
 	ConfigFile string `yaml:"-" json:"-"`
 }

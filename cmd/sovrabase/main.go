@@ -34,6 +34,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/dashboard"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
+	"github.com/ketsuna-org/sovrabase/internal/plugin"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
@@ -109,6 +110,15 @@ func main() {
 
 	logger.Info("Realtime hub started")
 
+	// Initialize plugin system.
+	hookManager := plugin.NewHookManager()
+
+	// Register plugins here. Example:
+	//   import "github.com/ketsuna-org/sovrabase/plugins"
+	//   statusPlugin := &plugins.StatusPlugin{}
+	//   app := &plugin.App{}
+	//   statusPlugin.Register(app)
+
 	// Create API server
 	server := api.NewServer(
 		&api.Config{
@@ -125,6 +135,7 @@ func main() {
 		api.WrapAuthService(authService),
 		api.WrapStorageDriver(storageDriver),
 		projectMgr,
+		hookManager,
 	)
 
 	// Mount realtime WebSocket endpoint.
