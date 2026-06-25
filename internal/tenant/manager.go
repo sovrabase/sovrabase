@@ -131,9 +131,9 @@ func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) 
 	}
 
 	id := uuid.New().String()
-	jwtSecret, err := generateSecureToken(32)
-	if err != nil {
-		return nil, fmt.Errorf("tenant: generate secret: %w", err)
+	jwtSecret := pm.cfg.JWTSecret
+	if jwtSecret == "" {
+		jwtSecret = "change-me-in-production"
 	}
 
 	projectDir := filepath.Join(pm.baseDir, "projects", id)
@@ -351,16 +351,17 @@ func (pm *ProjectManager) loadAll() error {
 			continue
 		}
 		if proj.JWTSecret == "" {
-			secret, err := generateSecureToken(32)
+			proj.JWTSecret = pm.cfg.JWTSecret
+			if proj.JWTSecret == "" {
+				proj.JWTSecret = "change-me-in-production"
+			}
+			// Save it back to master DB
+			data, err := json.Marshal(&proj)
 			if err == nil {
-				proj.JWTSecret = secret
-				// Save it back to master DB
-				data, err := json.Marshal(&proj)
-				if err == nil {
-					_ = pm.db.Set(projectDBKey(proj.ID), data, pebble.Sync)
-				}
+				_ = pm.db.Set(projectDBKey(proj.ID), data, pebble.Sync)
 			}
 		}
+
 		pm.projects[proj.ID] = &proj
 		// Build secret index for O(1) lookups.
 		if proj.JWTSecret != "" {
