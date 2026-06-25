@@ -324,8 +324,15 @@ async function openProjectDetailView(id) {
         <input type="text" id="pd-allow-origins" value="${escapeHtml(data.allow_origins || '*')}" style="width:100%; font-family: var(--font-mono); font-size: 12px;">
       </div>
       <div class="form-group" style="margin-top: 8px;">
-        <label for="pd-storage-quota" style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted);">Storage Quota (bytes)</label>
-        <input type="number" id="pd-storage-quota" value="${data.storage_quota || 104857600}" style="width:100%; font-family: var(--font-mono); font-size: 12px;">
+        <label for="pd-storage-quota" style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted);">Storage Quota</label>
+        <div style="display:flex;gap:8px;align-items:stretch;">
+          <input type="number" id="pd-storage-quota" value="${humanizeBytes(data.storage_quota || 104857600).val}" min="0" style="flex:1; font-family: var(--font-mono); font-size: 12px;">
+          <select id="pd-storage-quota-unit" style="width:80px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:12px; padding:9px 8px;">
+            <option value="MB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'MB' ? 'selected' : ''}>MB</option>
+            <option value="GB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'GB' ? 'selected' : ''}>GB</option>
+            <option value="TB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'TB' ? 'selected' : ''}>TB</option>
+          </select>
+        </div>
       </div>
       <div style="margin-top: 12px;">
         <button class="btn btn-primary btn-sm" id="btn-save-project-settings" onclick="saveProjectSettings()">💾 Save Settings</button>
@@ -379,7 +386,9 @@ async function saveProjectSettings() {
 
   try {
     const allowOrigins = document.getElementById('pd-allow-origins').value.trim();
-    const storageQuota = parseInt(document.getElementById('pd-storage-quota').value, 10);
+    const quotaVal = parseFloat(document.getElementById('pd-storage-quota').value) || 0;
+    const quotaUnit = document.getElementById('pd-storage-quota-unit').value;
+    const storageQuota = quotaToBytes(quotaVal, quotaUnit);
 
     const data = await api('/admin/projects/' + encodeURIComponent(detailProjectId), {
       method: 'PUT',

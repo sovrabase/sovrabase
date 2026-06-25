@@ -76,6 +76,22 @@ function formatBytes(bytes, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+// ===== HUMAN-READABLE BYTES (for form inputs) =====
+function humanizeBytes(bytes) {
+  if (bytes <= 0) return { val: 0, unit: 'MB' };
+  const mb = bytes / (1024 * 1024);
+  if (mb < 1024) return { val: parseFloat(mb.toFixed(1)), unit: 'MB' };
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb < 1024) return { val: parseFloat(gb.toFixed(2)), unit: 'GB' };
+  return { val: parseFloat((bytes / (1024 * 1024 * 1024 * 1024)).toFixed(2)), unit: 'TB' };
+}
+
+// ===== QUOTA UNIT CONVERTER =====
+function quotaToBytes(val, unit) {
+  const m = { 'MB': 1024 * 1024, 'GB': 1024 * 1024 * 1024, 'TB': 1024 * 1024 * 1024 * 1024 };
+  return Math.round(val * (m[unit] || 1));
+}
+
 // ===== COPY TEXT =====
 function copyText(elId) {
   const el = document.getElementById(elId);
