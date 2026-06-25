@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1153,6 +1154,8 @@ type queryRequest struct {
 	Projection []string               `json:"projection"`
 	Limit      int                    `json:"limit"`
 	Offset     int                    `json:"offset"`
+	OrderBy    string                 `json:"order_by"`
+	OrderDir   string                 `json:"order_dir"` // "asc" or "desc", default "asc"
 }
 
 // @Summary Query documents
@@ -1212,6 +1215,18 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Sort if requested.
+	if req.OrderBy != "" && len(docs) > 1 {
+		sort.Slice(docs, func(i, j int) bool {
+			a, _ := docs[i][req.OrderBy].(string)
+			b, _ := docs[j][req.OrderBy].(string)
+			if req.OrderDir == "desc" {
+				return a > b
+			}
+			return a < b
+		})
 	}
 
 	if docs == nil {
