@@ -47,21 +47,27 @@ func (s *Server) projectMiddleware(next http.Handler) http.Handler {
 
 
 // authMiddleware validates the Bearer token and injects user claims into the context.
+// Also supports passing the token as a ?token= query parameter for scenarios where
+// custom headers cannot be set (e.g., <img> tags, direct browser links).
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenString := ""
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
+		if authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+				tokenString = parts[1]
+			}
+		}
+		if tokenString == "" {
+			tokenString = r.URL.Query().Get("token")
+		}
+		if tokenString == "" {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-			writeError(w, http.StatusUnauthorized, "invalid authorization format, expected: Bearer <token>")
-			return
-		}
-
-		claims, err := s.getAuth(r).ValidateAccessToken(parts[1])
+		claims, err := s.getAuth(r).ValidateAccessToken(tokenString)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "invalid or expired token")
 			return
