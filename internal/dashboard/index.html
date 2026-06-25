@@ -118,6 +118,34 @@ window.onerror = function(message, source, lineno, colno, error) {
         </div>
       </div>
 
+      <!-- Usage stat cards -->
+      <div class="usage-stats-grid" id="usage-stats-grid">
+        <div class="stat-card usage-card">
+          <div class="stat-card-icon">📊</div>
+          <div class="stat-card-label">Total API Requests</div>
+          <div class="stat-card-value" id="usage-total-requests">—</div>
+          <div class="stat-card-sub">Across all projects</div>
+        </div>
+        <div class="stat-card usage-card">
+          <div class="stat-card-icon">⬆</div>
+          <div class="stat-card-label">Bandwidth Up</div>
+          <div class="stat-card-value" id="usage-bandwidth-up">0 B</div>
+          <div class="stat-card-sub">Total uploads</div>
+        </div>
+        <div class="stat-card usage-card">
+          <div class="stat-card-icon">⬇</div>
+          <div class="stat-card-label">Bandwidth Down</div>
+          <div class="stat-card-value" id="usage-bandwidth-down">0 B</div>
+          <div class="stat-card-sub">Total downloads</div>
+        </div>
+        <div class="stat-card usage-card">
+          <div class="stat-card-icon">📈</div>
+          <div class="stat-card-label">Usage Tracking</div>
+          <div class="stat-card-value" id="usage-tracking-status" style="font-size:16px;">Active</div>
+          <div class="stat-card-sub">Per-project metering</div>
+        </div>
+      </div>
+
       <!-- Replication status -->
       <div class="card" id="replication-card">
         <div class="card-header">

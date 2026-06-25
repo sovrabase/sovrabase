@@ -16,6 +16,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/dashboard"
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
@@ -116,6 +117,20 @@ func main() {
 	// Register admin API (with config reference for GET/POST /admin/config)
 	adminMux := http.NewServeMux()
 	adminServer := api.NewAdminServer(projectMgr, cfg, cfg.JWTSecret, cfg.AdminEmail, cfg.AdminPassword)
+
+	// Initialize metering store for usage tracking
+	meterStore, err := metering.OpenMeterStore(filepath.Join(cfg.DataDir, "metering"))
+	if err != nil {
+		logger.Error("Failed to initialize metering store", "error", err)
+		os.Exit(1)
+	}
+	defer meterStore.Close()
+	logger.Info("Metering store initialized")
+
+	// Wire metering into API server and admin server
+	server.SetMeterStore(meterStore)
+	adminServer.SetMeterStore(meterStore)
+
 	adminServer.RegisterRoutes(adminMux)
 	server.RegisterAdmin(adminMux)
 	logger.Info("Admin API registered")

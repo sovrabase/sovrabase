@@ -17,6 +17,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
 )
@@ -30,6 +31,7 @@ type AdminServer struct {
 	jwtSecret     string
 	adminEmail    string
 	adminPassword string
+	meterStore    *metering.MeterStore
 	// BackupsHandler handles backup operations.
 	BackupsHandler http.Handler
 	// OnRestart is called when the dashboard requests a server restart.
@@ -59,6 +61,11 @@ func NewAdminServer(pm *tenant.ProjectManager, cfg *config.Config, jwtSecret, ad
 // SetReplicationStatus sets the replication info for the stats endpoint.
 func (a *AdminServer) SetReplicationStatus(status *ReplicationStatus) {
 	a.replStatus = status
+}
+
+// SetMeterStore attaches a metering store for per-project usage tracking.
+func (a *AdminServer) SetMeterStore(ms *metering.MeterStore) {
+	a.meterStore = ms
 }
 
 // authMiddleware protects routes with admin JWT checks.
@@ -137,6 +144,8 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /admin/projects/{id}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleGetProject))))
 	mux.Handle("PUT /admin/projects/{id}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUpdateProject))))
 	mux.Handle("GET /admin/stats", a.authMiddleware(http.HandlerFunc(a.handleStats)))
+	mux.Handle("GET /admin/stats/usage", a.authMiddleware(http.HandlerFunc(a.handleUsageStats)))
+	mux.Handle("GET /admin/projects/{id}/usage", a.authMiddleware(http.HandlerFunc(a.handleProjectUsage)))
 
 	// Server config & restart
 	mux.Handle("GET /admin/config", a.authMiddleware(http.HandlerFunc(a.handleGetConfig)))
@@ -342,6 +351,91 @@ func (a *AdminServer) handleStats(w http.ResponseWriter, r *http.Request) {
 		"arch":           runtime.GOARCH,
 		"replication":    repl,
 		"uptime":         "since server start",
+	})
+}
+
+// handleUsageStats returns aggregate usage across all projects.
+func (a *AdminServer) handleUsageStats(w http.ResponseWriter, r *http.Request) {
+	if a.meterStore == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"enabled":              false,
+			"total_requests":       0,
+			"total_bandwidth_up":   0,
+			"total_bandwidth_down": 0,
+		})
+		return
+	}
+
+	records, err := a.meterStore.ListAll()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list usage records")
+		return
+	}
+
+	var totalRequests, totalBWUp, totalBWDown int64
+	projectUsage := make([]map[string]interface{}, 0, len(records))
+	for _, rec := range records {
+		projName := rec.ProjectID
+		if proj, err := a.projects.GetProject(rec.ProjectID); err == nil {
+			projName = proj.Name
+		}
+		totalRequests += rec.APIRequestsTotal
+		totalBWUp += rec.BandwidthUploadBytes
+		totalBWDown += rec.BandwidthDownloadBytes
+		projectUsage = append(projectUsage, map[string]interface{}{
+			"project_id":     rec.ProjectID,
+			"project_name":   projName,
+			"api_requests":   rec.APIRequestsTotal,
+			"bandwidth_up":   rec.BandwidthUploadBytes,
+			"bandwidth_down": rec.BandwidthDownloadBytes,
+			"storage_bytes":  rec.StorageBytes,
+			"last_updated":   rec.LastUpdated,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"enabled":              true,
+		"total_requests":       totalRequests,
+		"total_bandwidth_up":   totalBWUp,
+		"total_bandwidth_down": totalBWDown,
+		"projects":             projectUsage,
+	})
+}
+
+// handleProjectUsage returns the MeterRecord for a specific project.
+func (a *AdminServer) handleProjectUsage(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	if a.meterStore == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"enabled": false,
+		})
+		return
+	}
+
+	// Verify project exists
+	proj, err := a.projects.GetProject(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	rec, err := a.meterStore.Get(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get usage record")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"enabled":            true,
+		"project_id":         rec.ProjectID,
+		"project_name":       proj.Name,
+		"api_requests":       rec.APIRequestsTotal,
+		"bandwidth_up":       rec.BandwidthUploadBytes,
+		"bandwidth_down":     rec.BandwidthDownloadBytes,
+		"storage_bytes":      rec.StorageBytes,
+		"last_updated":       rec.LastUpdated,
+		"requests_by_method": rec.APIRequestsByMethod,
 	})
 }
 

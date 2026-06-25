@@ -15,6 +15,7 @@ import (
 
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
@@ -29,6 +30,7 @@ type Server struct {
 	auth         AuthService
 	store        StorageService
 	projects     *tenant.ProjectManager
+	meterStore   *metering.MeterStore
 	adminMux     *http.ServeMux // optional admin routes
 	dashboard    http.Handler   // optional dashboard UI
 	realtimeHub  *realtime.Hub  // optional realtime hub
@@ -158,6 +160,16 @@ func getProjectID(r *http.Request) string {
 		return ""
 	}
 	return id
+}
+
+// SetMeterStore attaches a metering store for tracking API usage.
+func (s *Server) SetMeterStore(ms *metering.MeterStore) {
+	s.meterStore = ms
+}
+
+// MeterStore returns the current meter store (may be nil).
+func (s *Server) MeterStore() *metering.MeterStore {
+	return s.meterStore
 }
 
 // SetRealtimeHub attaches a realtime hub and mounts the WebSocket endpoint.

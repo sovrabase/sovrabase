@@ -1194,3 +1194,17 @@ textarea:focus { outline: none; border-color: var(--border-focus); }
   color: var(--accent);
 }
 
+/* ====== USAGE STATS ====== */
+.usage-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.usage-card {
+  border-color: rgba(91, 91, 255, 0.15);
+}
+.usage-card::before {
+  background: linear-gradient(90deg, #22c55e, #5b5bff);
+}
+

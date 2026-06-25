@@ -121,6 +121,26 @@ async function loadDashboard() {
           </div>`;
       }
     } catch (e) { /* health endpoint may not have replication info */ }
+
+    // Load usage stats
+    try {
+      const usage = await api('/admin/stats/usage');
+      if (usage.enabled) {
+        document.getElementById('usage-total-requests').textContent = (usage.total_requests || 0).toLocaleString();
+        document.getElementById('usage-bandwidth-up').textContent = formatBytes(usage.total_bandwidth_up || 0);
+        document.getElementById('usage-bandwidth-down').textContent = formatBytes(usage.total_bandwidth_down || 0);
+        document.getElementById('usage-tracking-status').textContent = 'Active';
+        document.getElementById('usage-tracking-status').style.color = 'var(--success)';
+      } else {
+        document.getElementById('usage-total-requests').textContent = '—';
+        document.getElementById('usage-bandwidth-up').textContent = '—';
+        document.getElementById('usage-bandwidth-down').textContent = '—';
+        document.getElementById('usage-tracking-status').textContent = 'Disabled';
+        document.getElementById('usage-tracking-status').style.color = 'var(--text-muted)';
+      }
+    } catch (e) {
+      // Usage endpoint may not be available
+    }
   } catch (e) {
     document.getElementById('stat-projects').textContent = '—';
     document.getElementById('stat-storage').textContent = '— MB';

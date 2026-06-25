@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 )
 
@@ -726,6 +727,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Track bandwidth and storage in metering
+	if s.meterStore != nil && projectID != "" && info != nil {
+		_ = s.meterStore.Inc(projectID, metering.MetricBandwidthUp, info.Size)
+		_ = s.meterStore.Inc(projectID, metering.MetricStorageBytes, info.Size)
 	}
 
 	writeJSON(w, http.StatusCreated, info)
