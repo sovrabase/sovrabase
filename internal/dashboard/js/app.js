@@ -877,6 +877,179 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
+// ===== SETTINGS TABS =====
+let auditPage = 0;
+const auditPageSize = 25;
+
+function switchSettingsTab(name) {
+  document.querySelectorAll('#settings-tabs .qs-tab').forEach(el => el.classList.remove('active'));
+  const tab = document.querySelector(`#settings-tabs .qs-tab[data-stab="${name}"]`);
+  if (tab) tab.classList.add('active');
+  document.querySelectorAll('.settings-tab-panel').forEach(el => el.classList.remove('active'));
+  const panel = document.getElementById('stab-' + name);
+  if (panel) panel.classList.add('active');
+  if (name === 'admins') loadAdmins();
+  if (name === 'audit') loadAuditLogs();
+  if (name === 'backups') loadBackups();
+}
+
+// ===== ADMIN MANAGEMENT =====
+async function loadAdmins() {
+  const tbody = document.getElementById('admins-tbody');
+  if (!tbody) return;
+  try {
+    const data = await api('/admin/admins');
+    const admins = data.admins || [];
+    if (admins.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;">No admin users found</td></tr>';
+      return;
+    }
+    tbody.innerHTML = admins.map(a => {
+      const lastLogin = a.last_login ? new Date(a.last_login).toLocaleString() : '—';
+      const roleBadge = `<span class="badge badge-${a.role === 'super_admin' ? 'active' : a.role === 'admin' ? 'badge-suspended' : ''}" style="text-transform:capitalize">${escapeHtml(a.role)}</span>`;
+      return `<tr>
+        <td>${escapeHtml(a.email)}</td>
+        <td>${roleBadge}</td>
+        <td>${escapeHtml(a.name || '—')}</td>
+        <td class="td-date">${lastLogin}</td>
+        <td class="td-actions">
+          <button class="btn btn-xs btn-danger" onclick="deleteAdmin('${escapeHtml(a.id)}')">Remove</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-danger" style="text-align:center;">Failed to load: ' + escapeHtml(e.message) + '</td></tr>';
+  }
+}
+
+function openCreateAdminModal() {
+  document.getElementById('modal-create-admin').style.display = 'flex';
+  document.getElementById('new-admin-email').value = '';
+  document.getElementById('new-admin-password').value = '';
+  document.getElementById('new-admin-name').value = '';
+  document.getElementById('new-admin-role').value = 'admin';
+  setTimeout(() => document.getElementById('new-admin-email').focus(), 100);
+}
+
+function closeCreateAdminModal() {
+  const overlay = document.getElementById('modal-create-admin');
+  const inner = document.getElementById('modal-create-admin-inner');
+  inner.classList.add('closing');
+  setTimeout(() => {
+    overlay.style.display = 'none';
+    inner.classList.remove('closing');
+  }, 180);
+}
+
+async function createAdmin() {
+  const email = document.getElementById('new-admin-email').value.trim();
+  const password = document.getElementById('new-admin-password').value;
+  const name = document.getElementById('new-admin-name').value.trim();
+  const role = document.getElementById('new-admin-role').value;
+
+  if (!email || !password) {
+    showToast('Email and password are required', 'error');
+    return;
+  }
+  if (password.length < 8) {
+    showToast('Password must be at least 8 characters', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-create-admin');
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+
+  try {
+    await api('/admin/admins', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, name, role })
+    });
+    showToast('Admin user created successfully', 'success');
+    closeCreateAdminModal();
+    loadAdmins();
+  } catch (e) {
+    showToast('Failed to create admin: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Admin';
+  }
+}
+
+async function deleteAdmin(id) {
+  if (!await showConfirm('Remove Admin', 'Remove this admin user? They will lose access immediately.', 'Remove', true)) return;
+  try {
+    await api('/admin/admins/' + encodeURIComponent(id), { method: 'DELETE' });
+    showToast('Admin removed', 'success');
+    loadAdmins();
+  } catch (e) {
+    showToast('Failed to remove admin: ' + e.message, 'error');
+  }
+}
+
+// ===== AUDIT LOGS =====
+async function loadAuditLogs() {
+  const tbody = document.getElementById('audit-tbody');
+  if (!tbody) return;
+
+  const actionFilter = document.getElementById('audit-filter-action').value.trim();
+  const targetFilter = document.getElementById('audit-filter-target').value.trim();
+
+  let url = '/admin/audit-logs?limit=' + auditPageSize + '&offset=' + (auditPage * auditPageSize);
+  if (actionFilter) url += '&action=' + encodeURIComponent(actionFilter);
+  if (targetFilter) url += '&target_type=' + encodeURIComponent(targetFilter);
+
+  try {
+    const data = await api(url);
+    const entries = data.entries || [];
+    const total = data.total || 0;
+
+    const startEl = document.getElementById('audit-start');
+    const endEl = document.getElementById('audit-end');
+    const totalEl = document.getElementById('audit-total');
+    const prevBtn = document.getElementById('audit-prev-btn');
+    const nextBtn = document.getElementById('audit-next-btn');
+
+    if (startEl) startEl.textContent = total === 0 ? '0' : (auditPage * auditPageSize + 1);
+    if (endEl) endEl.textContent = Math.min((auditPage + 1) * auditPageSize, total);
+    if (totalEl) totalEl.textContent = total;
+
+    if (prevBtn) prevBtn.disabled = auditPage <= 0;
+    if (nextBtn) nextBtn.disabled = (auditPage + 1) * auditPageSize >= total;
+
+    if (entries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;">No audit log entries found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = entries.map(e => {
+      const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '—';
+      const details = e.details ? JSON.stringify(e.details).substring(0, 80) : '—';
+      return `<tr>
+        <td class="td-date" style="font-size:11px;">${escapeHtml(ts)}</td>
+        <td style="font-size:12px;">${escapeHtml(e.admin_email || '—')}</td>
+        <td style="font-size:12px;font-family:var(--font-mono);">${escapeHtml(e.action || '—')}</td>
+        <td style="font-size:12px;">${escapeHtml(e.target_type || '')}${e.target_id ? ': ' + escapeHtml(e.target_id).substring(0, 12) + '...' : ''}</td>
+        <td style="font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(details)}">${escapeHtml(details)}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-danger" style="text-align:center;">Failed to load: ' + escapeHtml(e.message) + '</td></tr>';
+  }
+}
+
+function auditPagePrev() {
+  if (auditPage > 0) {
+    auditPage--;
+    loadAuditLogs();
+  }
+}
+
+function auditPageNext() {
+  auditPage++;
+  loadAuditLogs();
+}
+
 // ===== BACKUPS =====
 async function loadBackups() {
   try {

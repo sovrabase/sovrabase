@@ -3,6 +3,7 @@ package api
 import (
 	"archive/zip"
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +21,8 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // AdminServer handles administrative (control plane) API routes.
@@ -33,10 +36,79 @@ type AdminServer struct {
 	adminPassword string
 	meterStore    *metering.MeterStore
 	teamStore     *tenant.TeamStore
+	adminStore    *auth.AdminStore
+	auditStore    *auth.AuditStore
 	// BackupsHandler handles backup operations.
 	BackupsHandler http.Handler
 	// OnRestart is called when the dashboard requests a server restart.
 	OnRestart func()
+}
+
+// adminPermissionMap defines which admin roles have access to which route patterns.
+// The key is a route pattern prefix, and the value is the minimum role required.
+// Roles are ordered: support < admin < super_admin
+var adminPermissionMap = []struct {
+	prefix  string
+	methods []string // HTTP methods this rule applies to
+	minRole auth.AdminRole
+}{
+	// super_admin only routes
+	{"/admin/admins", []string{"POST", "DELETE", "PUT"}, auth.AdminRoleSuper},
+	// Admin CRUD read — all authenticated admins
+	{"/admin/admins", []string{"GET"}, auth.AdminRoleSupport},
+	// Audit logs — all authenticated admins
+	{"/admin/audit-logs", []string{"GET"}, auth.AdminRoleSupport},
+	// Admin info (self)
+	{"/admin/admins/me", []string{"GET"}, auth.AdminRoleSupport},
+	// Config — admins and above
+	{"/admin/config", []string{"GET", "POST"}, auth.AdminRoleAdmin},
+	// Restart — admins and above
+	{"/admin/restart", []string{"POST"}, auth.AdminRoleAdmin},
+	// Project management
+	{"/admin/projects", []string{"POST", "DELETE", "PUT"}, auth.AdminRoleAdmin},
+	{"/admin/projects", []string{"GET"}, auth.AdminRoleSupport},
+	// Stats — all authenticated
+	{"/admin/stats", []string{"GET"}, auth.AdminRoleSupport},
+	// Backups
+	{"/admin/backups", []string{"POST", "DELETE"}, auth.AdminRoleAdmin},
+	{"/admin/backups", []string{"GET"}, auth.AdminRoleSupport},
+	// Invitations
+	{"/admin/invitations", []string{"GET", "POST"}, auth.AdminRoleSupport},
+}
+
+// checkAdminPermission verifies if the given admin role has permission for the route.
+// If no specific rule is found, admin role is required by default.
+func checkAdminPermission(role auth.AdminRole, path string, method string) bool {
+	// super_admin can do everything
+	if role == auth.AdminRoleSuper {
+		return true
+	}
+
+	for _, rule := range adminPermissionMap {
+		if strings.HasPrefix(path, rule.prefix) {
+			for _, m := range rule.methods {
+				if strings.EqualFold(m, method) {
+					return roleRank(role) >= roleRank(rule.minRole)
+				}
+			}
+		}
+	}
+
+	// Default: require at least admin role
+	return roleRank(role) >= roleRank(auth.AdminRoleAdmin)
+}
+
+func roleRank(role auth.AdminRole) int {
+	switch role {
+	case auth.AdminRoleSuper:
+		return 3
+	case auth.AdminRoleAdmin:
+		return 2
+	case auth.AdminRoleSupport:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // ReplicationStatus holds replication information exposed via admin API.
@@ -74,8 +146,18 @@ func (a *AdminServer) SetTeamStore(ts *tenant.TeamStore) {
 	a.teamStore = ts
 }
 
-// authMiddleware protects routes with admin JWT checks.
-func (a *AdminServer) authMiddleware(next http.Handler) http.Handler {
+// SetAdminStore attaches the admin store for admin user management and RBAC.
+func (a *AdminServer) SetAdminStore(store *auth.AdminStore) {
+	a.adminStore = store
+}
+
+// SetAuditStore attaches the audit store for logging admin actions.
+func (a *AdminServer) SetAuditStore(store *auth.AuditStore) {
+	a.auditStore = store
+}
+
+// adminAuthMiddleware protects routes with admin JWT checks and RBAC permission enforcement.
+func (a *AdminServer) adminAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString := ""
 		authHeader := r.Header.Get("Authorization")
@@ -99,16 +181,44 @@ func (a *AdminServer) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if claims.Role != string(auth.RoleAdmin) {
-			writeError(w, http.StatusForbidden, "forbidden: admin role required")
+		// For admin JWT tokens, the AdminRole claim must be set.
+		// If AdminStore is not configured, fall back to the old auth behavior.
+		if a.adminStore == nil {
+			// Backward compatibility: accept any valid JWT as admin
+			ctx := context.WithValue(r.Context(), claimsKey, claims)
+			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		if claims.AdminRole == "" {
+			writeError(w, http.StatusForbidden, "forbidden: admin token required")
+			return
+		}
+
+		// Verify the admin still exists and get latest role
+		admin, err := a.adminStore.GetByID(claims.UserID)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "admin account not found")
+			return
+		}
+		// Use the latest role from the store
+		claims.AdminRole = string(admin.Role)
+
+		// RBAC permission check
+		if !checkAdminPermission(auth.AdminRole(claims.AdminRole), r.URL.Path, r.Method) {
+			writeError(w, http.StatusForbidden, "forbidden: insufficient permissions")
+			return
+		}
+
+		// Attach claims to context
+		ctx := context.WithValue(r.Context(), claimsKey, claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // handleLogin handles admin login and issues a JWT token.
+// If AdminStore is available, it authenticates via the store; otherwise falls back
+// to the hardcoded config credentials (for backward compatibility during migration).
 func (a *AdminServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Email    string `json:"email"`
@@ -118,98 +228,530 @@ func (a *AdminServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Email != a.adminEmail || req.Password != a.adminPassword {
-		writeError(w, http.StatusUnauthorized, "invalid email or password")
-		return
+
+	var adminUser *auth.AdminUser
+	var err error
+
+	if a.adminStore != nil {
+		// Authenticate via AdminStore (bcrypt)
+		adminUser, err = a.adminStore.Authenticate(req.Email, req.Password)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "invalid email or password")
+			return
+		}
+
+		// Update last login
+		_ = a.adminStore.UpdateLastLogin(adminUser.ID)
+	} else {
+		// Fallback: hardcoded credential check (legacy)
+		if req.Email != a.adminEmail || req.Password != a.adminPassword {
+			writeError(w, http.StatusUnauthorized, "invalid email or password")
+			return
+		}
+		adminUser = &auth.AdminUser{
+			ID:    "admin",
+			Email: a.adminEmail,
+			Role:  auth.AdminRoleSuper,
+		}
 	}
 
-	adminUser := &auth.User{
-		ID:    "admin",
-		Email: a.adminEmail,
-		Role:  auth.RoleAdmin,
-	}
-
-	tokens, err := auth.GenerateAccessToken(adminUser, a.jwtSecret, a.cfg.SessionDuration)
+	// Generate JWT with AdminRole embedded in claims
+	token, err := a.generateAdminToken(adminUser)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to generate token")
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
-		"token": tokens,
+		"token": token,
 	})
+}
+
+// generateAdminToken creates a JWT for dashboard administrators with RBAC role embedded.
+func (a *AdminServer) generateAdminToken(admin *auth.AdminUser) (string, error) {
+	now := time.Now().UTC()
+	expiry := a.cfg.SessionDuration
+	if expiry <= 0 {
+		expiry = auth.DefaultAccessTokenTTL
+	}
+
+	jti := fmt.Sprintf("%d", now.UnixNano())
+	claims := &auth.Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "sovrabase-admin",
+			Subject:   admin.ID,
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
+			ID:        jti,
+		},
+		UserID:    admin.ID,
+		Email:     admin.Email,
+		Role:      "admin",
+		AdminRole: string(admin.Role),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(a.jwtSecret))
 }
 
 func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/health", a.handleHealth)
 	mux.HandleFunc("POST /admin/login", a.handleLogin)
 
-	mux.Handle("GET /admin/projects", a.authMiddleware(http.HandlerFunc(a.handleListProjects)))
-	mux.Handle("POST /admin/projects", a.authMiddleware(http.HandlerFunc(a.handleCreateProject)))
-	mux.Handle("DELETE /admin/projects/{id}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteProject))))
-	mux.Handle("GET /admin/projects/{id}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleGetProject))))
-	mux.Handle("PUT /admin/projects/{id}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUpdateProject))))
-	mux.Handle("GET /admin/stats", a.authMiddleware(http.HandlerFunc(a.handleStats)))
-	mux.Handle("GET /admin/stats/usage", a.authMiddleware(http.HandlerFunc(a.handleUsageStats)))
-	mux.Handle("GET /admin/projects/{id}/usage", a.authMiddleware(http.HandlerFunc(a.handleProjectUsage)))
+	// Admin management routes (RBAC enforced via adminAuthMiddleware)
+	mux.Handle("GET /admin/admins/me", a.adminAuthMiddleware(http.HandlerFunc(a.handleAdminMe)))
+	mux.Handle("GET /admin/admins", a.adminAuthMiddleware(http.HandlerFunc(a.handleListAdmins)))
+	mux.Handle("POST /admin/admins", a.adminAuthMiddleware(http.HandlerFunc(a.handleCreateAdmin)))
+	mux.Handle("DELETE /admin/admins/{id}", a.adminAuthMiddleware(http.HandlerFunc(a.handleDeleteAdmin)))
+	mux.Handle("PUT /admin/admins/{id}/role", a.adminAuthMiddleware(http.HandlerFunc(a.handleUpdateAdminRole)))
+
+	// Audit log endpoint
+	mux.Handle("GET /admin/audit-logs", a.adminAuthMiddleware(http.HandlerFunc(a.handleListAuditLogs)))
+
+	// Project management
+	mux.Handle("GET /admin/projects", a.adminAuthMiddleware(http.HandlerFunc(a.handleListProjects)))
+	mux.Handle("POST /admin/projects", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateProject))))
+	mux.Handle("DELETE /admin/projects/{id}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteProject))))
+	mux.Handle("GET /admin/projects/{id}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleGetProject))))
+	mux.Handle("PUT /admin/projects/{id}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUpdateProject))))
+	mux.Handle("GET /admin/stats", a.adminAuthMiddleware(http.HandlerFunc(a.handleStats)))
+	mux.Handle("GET /admin/stats/usage", a.adminAuthMiddleware(http.HandlerFunc(a.handleUsageStats)))
+	mux.Handle("GET /admin/projects/{id}/usage", a.adminAuthMiddleware(http.HandlerFunc(a.handleProjectUsage)))
 
 	// Server config & restart
-	mux.Handle("GET /admin/config", a.authMiddleware(http.HandlerFunc(a.handleGetConfig)))
-	mux.Handle("POST /admin/config", a.authMiddleware(http.HandlerFunc(a.handleSaveConfig)))
-	mux.Handle("POST /admin/restart", a.authMiddleware(http.HandlerFunc(a.handleRestart)))
+	mux.Handle("GET /admin/config", a.adminAuthMiddleware(http.HandlerFunc(a.handleGetConfig)))
+	mux.Handle("POST /admin/config", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleSaveConfig))))
+	mux.Handle("POST /admin/restart", a.adminAuthMiddleware(http.HandlerFunc(a.handleRestart)))
 
 	// Database management endpoints
-	mux.Handle("GET /admin/projects/{id}/collections", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListCollections))))
-	mux.Handle("POST /admin/projects/{id}/collections", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateCollection))))
-	mux.Handle("DELETE /admin/projects/{id}/collections/{name}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDropCollection))))
-	mux.Handle("GET /admin/projects/{id}/collections/{name}/documents", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListDocuments))))
-	mux.Handle("POST /admin/projects/{id}/collections/{name}/documents", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleInsertDocument))))
-	mux.Handle("POST /admin/projects/{id}/collections/{name}/import", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleImportCollection))))
-	mux.Handle("PUT /admin/projects/{id}/collections/{name}/documents/{docId}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUpdateDocument))))
-	mux.Handle("DELETE /admin/projects/{id}/collections/{name}/documents/{docId}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteDocument))))
-	mux.Handle("GET /admin/projects/{id}/collections/{name}/rules", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleGetRules))))
-	mux.Handle("POST /admin/projects/{id}/collections/{name}/rules", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleSetRules))))
+	mux.Handle("GET /admin/projects/{id}/collections", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleListCollections))))
+	mux.Handle("POST /admin/projects/{id}/collections", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateCollection))))
+	mux.Handle("DELETE /admin/projects/{id}/collections/{name}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDropCollection))))
+	mux.Handle("GET /admin/projects/{id}/collections/{name}/documents", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleListDocuments))))
+	mux.Handle("POST /admin/projects/{id}/collections/{name}/documents", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleInsertDocument))))
+	mux.Handle("POST /admin/projects/{id}/collections/{name}/import", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleImportCollection))))
+	mux.Handle("PUT /admin/projects/{id}/collections/{name}/documents/{docId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUpdateDocument))))
+	mux.Handle("DELETE /admin/projects/{id}/collections/{name}/documents/{docId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteDocument))))
+	mux.Handle("GET /admin/projects/{id}/collections/{name}/rules", a.adminAuthMiddleware(http.HandlerFunc(a.handleGetRules)))
+	mux.Handle("POST /admin/projects/{id}/collections/{name}/rules", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleSetRules))))
 
 	// Index management endpoints
-	mux.Handle("GET /admin/projects/{id}/collections/{name}/indexes", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListIndexes))))
-	mux.Handle("POST /admin/projects/{id}/collections/{name}/indexes", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateIndex))))
-	mux.Handle("DELETE /admin/projects/{id}/collections/{name}/indexes/{field}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDropIndex))))
+	mux.Handle("GET /admin/projects/{id}/collections/{name}/indexes", a.adminAuthMiddleware(http.HandlerFunc(a.handleListIndexes)))
+	mux.Handle("POST /admin/projects/{id}/collections/{name}/indexes", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateIndex))))
+	mux.Handle("DELETE /admin/projects/{id}/collections/{name}/indexes/{field}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDropIndex))))
 
 	// Auth management endpoints
-	mux.Handle("GET /admin/projects/{id}/users", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListUsers))))
-	mux.Handle("POST /admin/projects/{id}/users", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateUser))))
-	mux.Handle("DELETE /admin/projects/{id}/users/{userId}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteUser))))
+	mux.Handle("GET /admin/projects/{id}/users", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleListUsers))))
+	mux.Handle("POST /admin/projects/{id}/users", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateUser))))
+	mux.Handle("DELETE /admin/projects/{id}/users/{userId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteUser))))
 
 	// OAuth provider management endpoints
-	mux.Handle("GET /admin/projects/{id}/auth/providers", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListOAuthProviders))))
-	mux.Handle("PUT /admin/projects/{id}/auth/providers", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleSetOAuthProviders))))
+	mux.Handle("GET /admin/projects/{id}/auth/providers", a.adminAuthMiddleware(http.HandlerFunc(a.handleListOAuthProviders)))
+	mux.Handle("PUT /admin/projects/{id}/auth/providers", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleSetOAuthProviders))))
 
 	// Storage management endpoints
-	mux.Handle("GET /admin/projects/{id}/storage/buckets", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListBuckets))))
-	mux.Handle("POST /admin/projects/{id}/storage/buckets", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateBucket))))
-	mux.Handle("DELETE /admin/projects/{id}/storage/buckets/{bucket}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteBucket))))
-	mux.Handle("GET /admin/projects/{id}/storage/buckets/{bucket}/files", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListFiles))))
-	mux.Handle("POST /admin/projects/{id}/storage/buckets/{bucket}/files", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUploadFile))))
-	mux.Handle("GET /admin/projects/{id}/storage/buckets/{bucket}/files/{path...}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDownloadFile))))
-	mux.Handle("DELETE /admin/projects/{id}/storage/buckets/{bucket}/files/{path...}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleDeleteFile))))
+	mux.Handle("GET /admin/projects/{id}/storage/buckets", a.adminAuthMiddleware(http.HandlerFunc(a.handleListBuckets)))
+	mux.Handle("POST /admin/projects/{id}/storage/buckets", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateBucket))))
+	mux.Handle("DELETE /admin/projects/{id}/storage/buckets/{bucket}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteBucket))))
+	mux.Handle("GET /admin/projects/{id}/storage/buckets/{bucket}/files", a.adminAuthMiddleware(http.HandlerFunc(a.handleListFiles)))
+	mux.Handle("POST /admin/projects/{id}/storage/buckets/{bucket}/files", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUploadFile))))
+	mux.Handle("GET /admin/projects/{id}/storage/buckets/{bucket}/files/{path...}", a.adminAuthMiddleware(http.HandlerFunc(a.handleDownloadFile)))
+	mux.Handle("DELETE /admin/projects/{id}/storage/buckets/{bucket}/files/{path...}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteFile))))
 
 	// Request logs endpoint
-	mux.Handle("GET /admin/projects/{id}/logs", a.authMiddleware(http.HandlerFunc(a.handleListLogs)))
-	mux.Handle("DELETE /admin/projects/{id}/logs", a.authMiddleware(http.HandlerFunc(a.handleFlushLogs)))
+	mux.Handle("GET /admin/projects/{id}/logs", a.adminAuthMiddleware(http.HandlerFunc(a.handleListLogs)))
+	mux.Handle("DELETE /admin/projects/{id}/logs", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleFlushLogs))))
 
 	// Backup endpoints
-	mux.Handle("GET /admin/backups", a.authMiddleware(http.HandlerFunc(a.handleListBackups)))
-	mux.Handle("POST /admin/backups", a.authMiddleware(http.HandlerFunc(a.handleCreateBackup)))
-	mux.Handle("DELETE /admin/backups/{name}", a.authMiddleware(http.HandlerFunc(a.handleDeleteBackup)))
-	mux.Handle("GET /admin/backups/{name}/download", a.authMiddleware(http.HandlerFunc(a.handleDownloadBackup)))
+	mux.Handle("GET /admin/backups", a.adminAuthMiddleware(http.HandlerFunc(a.handleListBackups)))
+	mux.Handle("POST /admin/backups", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateBackup))))
+	mux.Handle("DELETE /admin/backups/{name}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteBackup))))
+	mux.Handle("GET /admin/backups/{name}/download", a.adminAuthMiddleware(http.HandlerFunc(a.handleDownloadBackup)))
 
 	// Team management endpoints
-	mux.Handle("GET /admin/projects/{id}/members", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListMembers))))
-	mux.Handle("POST /admin/projects/{id}/invite", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateInvitation))))
-	mux.Handle("DELETE /admin/projects/{id}/members/{userId}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleRemoveMember))))
-	mux.Handle("PUT /admin/projects/{id}/members/{userId}/role", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUpdateMemberRole))))
-	mux.Handle("GET /admin/invitations/{token}", a.authMiddleware(http.HandlerFunc(a.handleGetInvitation)))
-	mux.Handle("POST /admin/invitations/{token}/accept", a.authMiddleware(http.HandlerFunc(a.handleAcceptInvitation)))
+	mux.Handle("GET /admin/projects/{id}/members", a.adminAuthMiddleware(http.HandlerFunc(a.handleListMembers)))
+	mux.Handle("POST /admin/projects/{id}/invite", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateInvitation))))
+	mux.Handle("DELETE /admin/projects/{id}/members/{userId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleRemoveMember))))
+	mux.Handle("PUT /admin/projects/{id}/members/{userId}/role", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUpdateMemberRole))))
+	mux.Handle("GET /admin/invitations/{token}", a.adminAuthMiddleware(http.HandlerFunc(a.handleGetInvitation)))
+	mux.Handle("POST /admin/invitations/{token}/accept", a.adminAuthMiddleware(http.HandlerFunc(a.handleAcceptInvitation)))
+}
+
+// ─── Admin CRUD Handlers ─────────────────────────────────────────────────────
+
+// handleAdminMe returns the currently authenticated admin's info.
+func (a *AdminServer) handleAdminMe(w http.ResponseWriter, r *http.Request) {
+	if a.adminStore == nil {
+		writeError(w, http.StatusInternalServerError, "admin store not available")
+		return
+	}
+
+	claims := r.Context().Value(claimsKey).(*auth.Claims)
+	admin, err := a.adminStore.GetByID(claims.UserID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "admin not found")
+		return
+	}
+
+	// Mask password hash
+	safeAdmin := map[string]interface{}{
+		"id":         admin.ID,
+		"email":      admin.Email,
+		"role":       admin.Role,
+		"name":       admin.Name,
+		"created_at": admin.CreatedAt,
+		"updated_at": admin.UpdatedAt,
+	}
+	writeJSON(w, http.StatusOK, safeAdmin)
+}
+
+// handleListAdmins returns all admin users.
+func (a *AdminServer) handleListAdmins(w http.ResponseWriter, r *http.Request) {
+	if a.adminStore == nil {
+		writeError(w, http.StatusInternalServerError, "admin store not available")
+		return
+	}
+
+	admins, err := a.adminStore.List()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Mask password hashes
+	type safeAdmin struct {
+		ID        string        `json:"id"`
+		Email     string        `json:"email"`
+		Role      auth.AdminRole `json:"role"`
+		Name      string        `json:"name,omitempty"`
+		CreatedAt time.Time     `json:"created_at"`
+		UpdatedAt time.Time     `json:"updated_at"`
+		LastLogin *time.Time    `json:"last_login,omitempty"`
+	}
+	safeAdmins := make([]safeAdmin, 0, len(admins))
+	for _, admin := range admins {
+		safeAdmins = append(safeAdmins, safeAdmin{
+			ID:        admin.ID,
+			Email:     admin.Email,
+			Role:      admin.Role,
+			Name:      admin.Name,
+			CreatedAt: admin.CreatedAt,
+			UpdatedAt: admin.UpdatedAt,
+			LastLogin: admin.LastLogin,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"admins": safeAdmins,
+		"count":  len(safeAdmins),
+	})
+}
+
+// handleCreateAdmin creates a new admin user.
+func (a *AdminServer) handleCreateAdmin(w http.ResponseWriter, r *http.Request) {
+	if a.adminStore == nil {
+		writeError(w, http.StatusInternalServerError, "admin store not available")
+		return
+	}
+
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Role     string `json:"role"`
+		Name     string `json:"name"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Email == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "email and password are required")
+		return
+	}
+
+	role := auth.AdminRole(req.Role)
+	if role == "" {
+		role = auth.AdminRoleAdmin
+	}
+	if role != auth.AdminRoleSuper && role != auth.AdminRoleAdmin && role != auth.AdminRoleSupport {
+		writeError(w, http.StatusBadRequest, "invalid role: must be super_admin, admin, or support")
+		return
+	}
+
+	admin, err := a.adminStore.Create(req.Email, req.Password, string(role), req.Name)
+	if err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	a.auditAdminAction(r, "create_admin", "admin", admin.ID, map[string]interface{}{
+		"email": admin.Email,
+		"role":  admin.Role,
+	})
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"id":    admin.ID,
+		"email": admin.Email,
+		"role":  admin.Role,
+		"name":  admin.Name,
+	})
+}
+
+// handleDeleteAdmin deletes an admin user.
+func (a *AdminServer) handleDeleteAdmin(w http.ResponseWriter, r *http.Request) {
+	if a.adminStore == nil {
+		writeError(w, http.StatusInternalServerError, "admin store not available")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "admin ID is required")
+		return
+	}
+
+	// Prevent self-deletion
+	claims := r.Context().Value(claimsKey).(*auth.Claims)
+	if claims.UserID == id {
+		writeError(w, http.StatusBadRequest, "cannot delete your own account")
+		return
+	}
+
+	// Get admin info before deletion for audit logging
+	admin, err := a.adminStore.GetByID(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if err := a.adminStore.Delete(id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	a.auditAdminAction(r, "delete_admin", "admin", id, map[string]interface{}{
+		"email": admin.Email,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// handleUpdateAdminRole updates an admin's role.
+func (a *AdminServer) handleUpdateAdminRole(w http.ResponseWriter, r *http.Request) {
+	if a.adminStore == nil {
+		writeError(w, http.StatusInternalServerError, "admin store not available")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "admin ID is required")
+		return
+	}
+
+	var req struct {
+		Role string `json:"role"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	newRole := auth.AdminRole(req.Role)
+	if newRole != auth.AdminRoleSuper && newRole != auth.AdminRoleAdmin && newRole != auth.AdminRoleSupport {
+		writeError(w, http.StatusBadRequest, "invalid role: must be super_admin, admin, or support")
+		return
+	}
+
+	admin, err := a.adminStore.GetByID(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	oldRole := admin.Role
+	if err := a.adminStore.UpdateRole(id, newRole); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	a.auditAdminAction(r, "update_admin_role", "admin", id, map[string]interface{}{
+		"old_role": oldRole,
+		"new_role": newRole,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"id":    admin.ID,
+		"email": admin.Email,
+		"role":  admin.Role,
+	})
+}
+
+// ─── Audit Log Handler ────────────────────────────────────────────────────────
+
+// handleListAuditLogs returns paginated audit log entries.
+func (a *AdminServer) handleListAuditLogs(w http.ResponseWriter, r *http.Request) {
+	if a.auditStore == nil {
+		writeError(w, http.StatusInternalServerError, "audit store not available")
+		return
+	}
+
+	q := r.URL.Query()
+	limit := 50
+	if l := q.Get("limit"); l != "" {
+		if v, err := parseInt(l); err == nil && v > 0 && v <= 500 {
+			limit = v
+		}
+	}
+	offset := 0
+	if o := q.Get("offset"); o != "" {
+		if v, err := parseInt(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	filters := make(map[string]string)
+	if action := q.Get("action"); action != "" {
+		filters["action"] = action
+	}
+	if targetType := q.Get("target_type"); targetType != "" {
+		filters["target_type"] = targetType
+	}
+	if adminID := q.Get("admin_id"); adminID != "" {
+		filters["admin_id"] = adminID
+	}
+
+	entries, total, err := a.auditStore.List(limit, offset, filters)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if entries == nil {
+		entries = []*auth.AuditEntry{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"entries": entries,
+		"total":   total,
+		"limit":   limit,
+		"offset":  offset,
+	})
+}
+
+// parseInt is a helper to parse integers from strings (returns 0 on error).
+// This duplicates the one from the config package internally for convenience.
+func parseInt(s string) (int, error) {
+	var n int
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("not a number: %s", s)
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
+}
+
+// ─── Audit Logging Helpers ────────────────────────────────────────────────────
+
+// auditAdminAction logs an admin action to the audit store.
+func (a *AdminServer) auditAdminAction(r *http.Request, action, targetType, targetID string, details map[string]interface{}) {
+	if a.auditStore == nil {
+		return
+	}
+
+	claims, _ := r.Context().Value(claimsKey).(*auth.Claims)
+	adminID := ""
+	adminEmail := ""
+	if claims != nil {
+		adminID = claims.UserID
+		adminEmail = claims.Email
+	}
+
+	entry := &auth.AuditEntry{
+		Action:     action,
+		TargetType: targetType,
+		TargetID:   targetID,
+		Details:    details,
+		IP:         r.RemoteAddr,
+		AdminID:    adminID,
+		AdminEmail: adminEmail,
+		Success:    true,
+	}
+
+	_ = a.auditStore.Log(entry)
+}
+
+// adminLogger wraps a handler to auto-log admin actions for all POST/PUT/DELETE
+// requests. It derives the action name from the route path.
+func (a *AdminServer) adminLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Derive action from method + path
+		action := deriveAction(r.Method, r.URL.Path)
+
+		// Wrap response writer to capture status
+		sw := &statusWriter{ResponseWriter: w}
+		next.ServeHTTP(sw, r)
+
+		// Only audit log successful mutations (2xx/3xx)
+		if sw.status >= 200 && sw.status < 400 && a.auditStore != nil {
+			claims, _ := r.Context().Value(claimsKey).(*auth.Claims)
+			entry := &auth.AuditEntry{
+				Action:     action,
+				TargetType: deriveTargetType(r.URL.Path),
+				TargetID:   r.PathValue("id"),
+				IP:         r.RemoteAddr,
+				AdminID:    "",
+				AdminEmail: "",
+				Success:    true,
+			}
+			if claims != nil {
+				entry.AdminID = claims.UserID
+				entry.AdminEmail = claims.Email
+			}
+			_ = a.auditStore.Log(entry)
+		}
+	})
+}
+
+// deriveAction creates a human-readable action name from HTTP method and path.
+func deriveAction(method, path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	// Take the last meaningful segment
+	action := method
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] != "" && !strings.HasPrefix(parts[i], "{") {
+			action = strings.ToLower(method) + "_" + parts[i]
+			break
+		}
+	}
+	return action
+}
+
+// deriveTargetType extracts the target type from the URL path.
+func deriveTargetType(path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	for _, p := range parts {
+		switch p {
+		case "projects":
+			return "project"
+		case "collections":
+			return "collection"
+		case "documents":
+			return "document"
+		case "users":
+			return "user"
+		case "members":
+			return "member"
+		case "buckets":
+			return "bucket"
+		case "backups":
+			return "backup"
+		case "admins":
+			return "admin"
+		}
+	}
+	return "other"
 }
 
 func (a *AdminServer) handleCreateProject(w http.ResponseWriter, r *http.Request) {

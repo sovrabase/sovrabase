@@ -21,6 +21,7 @@ type Claims struct {
 	UserID      string `json:"user_id"`
 	Email       string `json:"email"`
 	Role        string `json:"role"`
+	AdminRole   string `json:"admin_role,omitempty"`   // admin RBAC role: super_admin, admin, support
 	ProjectRole string `json:"project_role,omitempty"` // team role within a specific project
 }
 

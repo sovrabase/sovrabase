@@ -118,6 +118,14 @@ func main() {
 	adminMux := http.NewServeMux()
 	adminServer := api.NewAdminServer(projectMgr, cfg, cfg.JWTSecret, cfg.AdminEmail, cfg.AdminPassword)
 
+	// Initialize admin store from master DB and seed from config
+	adminStore := auth.NewAdminStore(engine.DB(), cfg.AdminEmail, cfg.AdminPassword)
+	adminServer.SetAdminStore(adminStore)
+
+	// Initialize audit store from master DB
+	auditStore := auth.NewAuditStore(engine.DB())
+	adminServer.SetAuditStore(auditStore)
+
 	// Initialize metering store for usage tracking
 	meterStore, err := metering.OpenMeterStore(filepath.Join(cfg.DataDir, "metering"))
 	if err != nil {

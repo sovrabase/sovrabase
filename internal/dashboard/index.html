@@ -272,7 +272,20 @@ curl -X POST \
         </div>
       </div>
 
-      <!-- Admin Account -->
+      <!-- Settings Navigation Tabs -->
+      <div class="quick-start-tabs" id="settings-tabs" style="margin-bottom:20px;">
+        <button class="qs-tab active" data-stab="admin" onclick="switchSettingsTab('admin')">🔐 Admin Account</button>
+        <button class="qs-tab" data-stab="admins" onclick="switchSettingsTab('admins')">👥 Admins</button>
+        <button class="qs-tab" data-stab="security" onclick="switchSettingsTab('security')">🔒 Security &amp; HTTPS</button>
+        <button class="qs-tab" data-stab="s3" onclick="switchSettingsTab('s3')">🪣 S3 Storage</button>
+        <button class="qs-tab" data-stab="smtp" onclick="switchSettingsTab('smtp')">✉️ SMTP</button>
+        <button class="qs-tab" data-stab="replication" onclick="switchSettingsTab('replication')">🔄 Replication</button>
+        <button class="qs-tab" data-stab="audit" onclick="switchSettingsTab('audit')">📋 Audit Log</button>
+        <button class="qs-tab" data-stab="backups" onclick="switchSettingsTab('backups')">💾 Backups</button>
+      </div>
+
+      <!-- Settings Tab: Admin Account -->
+      <div class="settings-tab-panel active" id="stab-admin">
       <div class="card">
         <div class="card-title mb-3">🔐 Admin Account</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
@@ -297,8 +310,40 @@ curl -X POST \
           </div>
         </div>
       </div>
+      </div>
 
-      <!-- Security & HTTPS -->
+      <!-- Settings Tab: Admin Management -->
+      <div class="settings-tab-panel" id="stab-admins">
+      <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="card-title">👥 Admin Users</div>
+          <button class="btn btn-sm btn-primary" onclick="openCreateAdminModal()">+ Add Admin</button>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          Manage dashboard administrators. super_admin users have full access, admin users can manage projects,
+          and support users have read-only access.
+        </p>
+        <div class="table-wrap" style="margin-bottom:16px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Name</th>
+                <th>Last Login</th>
+                <th style="width:120px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admins-tbody">
+              <tr><td colspan="5" class="text-muted" style="text-align:center;">Loading admins...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </div>
+
+      <!-- Settings Tab: Security & HTTPS -->
+      <div class="settings-tab-panel" id="stab-security">
       <div class="card">
         <div class="card-title mb-3">🔒 Security &amp; HTTPS</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
@@ -326,8 +371,10 @@ curl -X POST \
           </div>
         </div>
       </div>
+      </div>
 
-      <!-- S3 Storage Configuration -->
+      <!-- Settings Tab: S3 Storage -->
+      <div class="settings-tab-panel" id="stab-s3">
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
           <div class="card-title" style="margin-bottom:0">🪣 External S3 Storage</div>
@@ -367,8 +414,10 @@ curl -X POST \
           </label>
         </div>
       </div>
+      </div>
 
-      <!-- SMTP & Email Verification Configuration -->
+      <!-- Settings Tab: SMTP & Email Verification -->
+      <div class="settings-tab-panel" id="stab-smtp">
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
           <div class="card-title" style="margin-bottom:0">✉️ SMTP & Email Verification</div>
@@ -403,8 +452,10 @@ curl -X POST \
           </div>
         </div>
       </div>
+      </div>
 
-      <!-- Replication Configuration -->
+      <!-- Settings Tab: Replication -->
+      <div class="settings-tab-panel" id="stab-replication">
       <div class="card">
         <div class="card-title mb-3">🔄 Database Replication</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
@@ -434,6 +485,74 @@ curl -X POST \
           </div>
         </div>
       </div>
+      </div>
+
+      <!-- Settings Tab: Audit Log -->
+      <div class="settings-tab-panel" id="stab-audit">
+      <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="card-title">📋 Audit Log</div>
+          <button class="btn btn-sm btn-secondary" onclick="loadAuditLogs()">🔄 Refresh</button>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          Chronological record of all administrative actions performed on this server.
+        </p>
+        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px;">
+            <label for="audit-filter-action" style="font-size:10px;">Filter by Action</label>
+            <input type="text" id="audit-filter-action" placeholder="e.g. create_project" style="padding:6px 10px;font-size:12px;" onchange="loadAuditLogs()">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px;">
+            <label for="audit-filter-target" style="font-size:10px;">Filter by Target Type</label>
+            <input type="text" id="audit-filter-target" placeholder="e.g. project, admin" style="padding:6px 10px;font-size:12px;" onchange="loadAuditLogs()">
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:8px;">
+            <button class="btn btn-xs btn-secondary" onclick="document.getElementById('audit-filter-action').value='';document.getElementById('audit-filter-target').value='';loadAuditLogs()">Clear</button>
+          </div>
+        </div>
+        <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:170px;">Timestamp</th>
+                <th style="width:100px;">Admin</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="audit-tbody">
+              <tr><td colspan="5" class="text-muted" style="text-align:center;">Loading audit logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+          <div style="font-size:12px;color:var(--text-muted);">
+            Showing <span id="audit-start">0</span>-<span id="audit-end">0</span> of <span id="audit-total">0</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-xs btn-secondary" id="audit-prev-btn" onclick="auditPagePrev()">← Previous</button>
+            <button class="btn btn-xs btn-secondary" id="audit-next-btn" onclick="auditPageNext()">Next →</button>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <!-- Settings Tab: Backups -->
+      <div class="settings-tab-panel" id="stab-backups">
+      <div class="card" id="backups-card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="card-title">💾 Database Backups</div>
+          <button class="btn btn-sm btn-primary" id="btn-create-backup" onclick="createBackup()">+ Create Backup</button>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          Point-in-time snapshots of all project databases. Backups are stored under the data directory.
+        </p>
+        <div id="backups-list" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;">Loading backups...</div>
+        </div>
+      </div>
+      </div>
 
       <!-- Save & Restart -->
       <div class="card" style="background: linear-gradient(135deg, rgba(91,91,255,0.06) 0%, rgba(91,91,255,0.02) 100%); border-color: rgba(91,91,255,0.2);">
@@ -449,20 +568,6 @@ curl -X POST \
               ⚡ Save &amp; Restart
             </button>
           </div>
-        </div>
-      </div>
-
-      <!-- Backups -->
-      <div class="card" id="backups-card">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-          <div class="card-title">💾 Database Backups</div>
-          <button class="btn btn-sm btn-primary" id="btn-create-backup" onclick="createBackup()">+ Create Backup</button>
-        </div>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
-          Point-in-time snapshots of all project databases. Backups are stored under the data directory.
-        </p>
-        <div id="backups-list" style="display:flex;flex-direction:column;gap:8px;">
-          <div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;">Loading backups...</div>
         </div>
       </div>
 
@@ -1056,6 +1161,42 @@ curl -H "Authorization: Bearer API_KEY" \
     </div>
     <div class="modal-body" id="preview-file-body" style="max-height:75vh; overflow:auto; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:200px; background:var(--bg-input); border-radius:var(--radius); padding:16px;">
       <!-- Dynamic preview content goes here -->
+    </div>
+  </div>
+</div>
+
+<!-- ========== CREATE ADMIN MODAL ========== -->
+<div class="modal-overlay" id="modal-create-admin" style="display:none" onclick="if(event.target===this)closeCreateAdminModal()">
+  <div class="modal" id="modal-create-admin-inner">
+    <div class="modal-header">
+      <h3>Create Admin User</h3>
+      <button class="modal-close" onclick="closeCreateAdminModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="new-admin-email">Email</label>
+        <input type="email" id="new-admin-email" placeholder="admin@sovrabase.eu" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="new-admin-password">Password</label>
+        <input type="password" id="new-admin-password" placeholder="Min 8 characters" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label for="new-admin-name">Name</label>
+        <input type="text" id="new-admin-name" placeholder="Display name" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="new-admin-role">Role</label>
+        <select id="new-admin-role">
+          <option value="super_admin">Super Admin</option>
+          <option value="admin" selected>Admin</option>
+          <option value="support">Support (read-only)</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeCreateAdminModal()">Cancel</button>
+        <button class="btn btn-primary" id="btn-create-admin" onclick="createAdmin()">Create Admin</button>
+      </div>
     </div>
   </div>
 </div>
