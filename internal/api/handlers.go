@@ -18,7 +18,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/imgtransform"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
-	"github.com/ketsuna-org/sovrabase/internal/plugin"
+	"github.com/ketsuna-org/sovrabase/plugin"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 )
 

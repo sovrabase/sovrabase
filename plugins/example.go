@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/ketsuna-org/sovrabase/internal/plugin"
+	"github.com/ketsuna-org/sovrabase/plugin"
 )
 
 // StatusPlugin demonstrates the Sovrabase plugin system.

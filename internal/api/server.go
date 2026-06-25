@@ -17,7 +17,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/captcha"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
-	"github.com/ketsuna-org/sovrabase/internal/plugin"
+	"github.com/ketsuna-org/sovrabase/plugin"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
