@@ -346,10 +346,24 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	return s
 }
 
-// RegisterAdmin attaches admin API routes to the server.
+// RegisterAdmin attaches admin API routes to the server, wrapped with
+// metering middleware for bandwidth tracking.
 func (s *Server) RegisterAdmin(mux *http.ServeMux) {
 	s.adminMux = mux
-	s.router.Mount("/admin", mux)
+	if s.meterStore != nil {
+		adminMW := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mw := &metering.MeterResponseWriter{ResponseWriter: w}
+				next.ServeHTTP(mw, r)
+				if mw.Written() > 0 {
+					_ = s.meterStore.Inc("__admin__", metering.MetricBandwidthDown, int64(mw.Written()))
+				}
+			})
+		}
+		s.router.Mount("/admin", adminMW(mux))
+	} else {
+		s.router.Mount("/admin", mux)
+	}
 }
 
 // SetDashboard attaches a dashboard UI handler at /.

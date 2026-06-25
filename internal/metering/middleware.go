@@ -24,7 +24,7 @@ func MeteringMiddleware(meterStore *MeterStore, projectManager *tenant.ProjectMa
 					_ = meterStore.IncMethod(proj.ID, r.Method, 1)
 
 					// Wrap response writer to track download bandwidth
-					mw := &meterResponseWriter{ResponseWriter: w}
+					mw := &MeterResponseWriter{ResponseWriter: w}
 					next.ServeHTTP(mw, r)
 
 					// Track download bandwidth for responses with content
@@ -41,23 +41,28 @@ func MeteringMiddleware(meterStore *MeterStore, projectManager *tenant.ProjectMa
 	}
 }
 
-// meterResponseWriter wraps http.ResponseWriter to track bytes written.
-type meterResponseWriter struct {
+// MeterResponseWriter wraps http.ResponseWriter to track bytes written.
+type MeterResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	written    int
 }
 
-func (mw *meterResponseWriter) WriteHeader(code int) {
+func (mw *MeterResponseWriter) WriteHeader(code int) {
 	mw.statusCode = code
 	mw.ResponseWriter.WriteHeader(code)
 }
 
-func (mw *meterResponseWriter) Write(b []byte) (int, error) {
+func (mw *MeterResponseWriter) Write(b []byte) (int, error) {
 	if mw.statusCode == 0 {
 		mw.statusCode = http.StatusOK
 	}
 	n, err := mw.ResponseWriter.Write(b)
 	mw.written += n
 	return n, err
+}
+
+// Written returns the total number of bytes written to the response.
+func (mw *MeterResponseWriter) Written() int {
+	return mw.written
 }
