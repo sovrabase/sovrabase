@@ -1302,6 +1302,19 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if path == "" {
 		path = header.Filename
 	}
+	// Generate unique filename for clipboard pastes (no meaningful filename).
+	if path == "" || path == "blob" {
+		ext := ""
+		if ct := header.Header.Get("Content-Type"); ct != "" {
+			if parts := strings.SplitN(ct, "/", 2); len(parts) == 2 && parts[0] == "image" {
+				ext = "." + parts[1]
+				if ext == ".jpeg" {
+					ext = ".jpg"
+				}
+			}
+		}
+		path = uuid.New().String() + ext
+	}
 
 	contentType := header.Header.Get("Content-Type")
 	if contentType == "" {
@@ -1312,6 +1325,16 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Fallback: if the storage driver didn't provide a public URL, construct one
+	// pointing to the download endpoint.
+	if info.URL == "" {
+		scheme := "http"
+		if r.TLS != nil {
+			scheme = "https"
+		}
+		info.URL = fmt.Sprintf("%s://%s/api/v1/storage/%s/%s", scheme, r.Host, bucket, path)
 	}
 
 	// Track bandwidth and storage in metering
