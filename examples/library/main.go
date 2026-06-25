@@ -18,6 +18,7 @@ func main() {
 		DataDir:   "./example-data",
 		JWTSecret: "dev-secret-do-not-use-in-production",
 	})
+	app.Plugins().RegisterPlugin("my-custom-app")
 
 	// ── Record hooks ────────────────────────────────────────────────
 	app.Plugins().OnRecordCreate("*").Do(func(e *plugin.RecordEvent) error {
