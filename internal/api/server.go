@@ -442,6 +442,10 @@ func (s *Server) ListenAndServe() error {
 
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
+	// Run terminate hooks before shutting down.
+	if s.hooks != nil {
+		s.hooks.RunTerminateHooks()
+	}
 	if s.httpServer != nil {
 		s.logger.Info("Stopping API server gracefully...")
 		return s.httpServer.Shutdown(ctx)

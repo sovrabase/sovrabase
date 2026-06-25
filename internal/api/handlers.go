@@ -174,6 +174,16 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Run refresh hooks.
+	if s.hooks != nil {
+		authEvent := &plugin.AuthEvent{Action: "refresh"}
+		s.hooks.RunAuthHooks("refresh", authEvent)
+		if authEvent.Abort {
+			writeError(w, http.StatusForbidden, authEvent.AbortMessage)
+			return
+		}
+	}
+
 	writeJSON(w, http.StatusOK, tokens)
 }
 
@@ -273,6 +283,17 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
+	}
+
+	// Run OAuth hooks.
+	if s.hooks != nil {
+		authEvent := &plugin.AuthEvent{
+			Action:   "oauth",
+			Provider: provider,
+			UserID:   user.ID,
+			Email:    user.Email,
+		}
+		s.hooks.RunAuthHooks("oauth", authEvent)
 	}
 
 	// Redirect to the app's post-login URL encoded in the state (defaults to /).
@@ -730,6 +751,21 @@ func (s *Server) filterDocs(r *http.Request, collection string, docs []map[strin
 func (s *Server) publishRealtime(eventType realtime.EventType, projectID, collection, docID string, data map[string]interface{}) {
 	if s.realtimeHub == nil {
 		return
+	}
+	// Run realtime hooks — plugins can modify data or suppress broadcast.
+	if s.hooks != nil {
+		hookEvent := &plugin.RealtimeEvent{
+			Type:       string(eventType),
+			Collection: collection,
+			DocID:      docID,
+			Data:       data,
+			ProjectID:  projectID,
+			Timestamp:  time.Now().UTC(),
+		}
+		if !s.hooks.RunRealtimeHooks(collection, hookEvent) {
+			return // suppressed by hook
+		}
+		data = hookEvent.Data // use potentially modified data
 	}
 	s.realtimeHub.Publish(&realtime.Event{
 		Type:       eventType,
@@ -1311,6 +1347,19 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer reader.Close()
+
+	// Run download hook (read-only, cannot abort).
+	if s.hooks != nil {
+		s.hooks.RunStorageHooks("download", &plugin.StorageEvent{
+			Bucket:      bucket,
+			Path:        path,
+			ContentType: info.ContentType,
+			Size:        info.Size,
+			Action:      "download",
+			ProjectID:   getProjectID(r),
+			UserID:      getUserID(r),
+		})
+	}
 
 	// Parse image transformation options from query params.
 	q := r.URL.Query()
