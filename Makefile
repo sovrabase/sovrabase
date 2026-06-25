@@ -25,7 +25,12 @@ test-short:
 	go test -short ./...
 
 clean:
+ifeq ($(OS),Windows_NT)
+	@if exist $(BUILD_DIR) rmdir /s /q $(BUILD_DIR)
+	@if exist data rmdir /s /q data
+else
 	rm -rf $(BUILD_DIR) data/
+endif
 
 fmt:
 	go fmt ./...
