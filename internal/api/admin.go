@@ -32,6 +32,7 @@ type AdminServer struct {
 	adminEmail    string
 	adminPassword string
 	meterStore    *metering.MeterStore
+	teamStore     *tenant.TeamStore
 	// BackupsHandler handles backup operations.
 	BackupsHandler http.Handler
 	// OnRestart is called when the dashboard requests a server restart.
@@ -66,6 +67,11 @@ func (a *AdminServer) SetReplicationStatus(status *ReplicationStatus) {
 // SetMeterStore attaches a metering store for per-project usage tracking.
 func (a *AdminServer) SetMeterStore(ms *metering.MeterStore) {
 	a.meterStore = ms
+}
+
+// SetTeamStore attaches a team store for project team management.
+func (a *AdminServer) SetTeamStore(ts *tenant.TeamStore) {
+	a.teamStore = ts
 }
 
 // authMiddleware protects routes with admin JWT checks.
@@ -196,6 +202,14 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/backups", a.authMiddleware(http.HandlerFunc(a.handleCreateBackup)))
 	mux.Handle("DELETE /admin/backups/{name}", a.authMiddleware(http.HandlerFunc(a.handleDeleteBackup)))
 	mux.Handle("GET /admin/backups/{name}/download", a.authMiddleware(http.HandlerFunc(a.handleDownloadBackup)))
+
+	// Team management endpoints
+	mux.Handle("GET /admin/projects/{id}/members", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleListMembers))))
+	mux.Handle("POST /admin/projects/{id}/invite", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleCreateInvitation))))
+	mux.Handle("DELETE /admin/projects/{id}/members/{userId}", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleRemoveMember))))
+	mux.Handle("PUT /admin/projects/{id}/members/{userId}/role", a.authMiddleware(a.projectLogger(http.HandlerFunc(a.handleUpdateMemberRole))))
+	mux.Handle("GET /admin/invitations/{token}", a.authMiddleware(http.HandlerFunc(a.handleGetInvitation)))
+	mux.Handle("POST /admin/invitations/{token}/accept", a.authMiddleware(http.HandlerFunc(a.handleAcceptInvitation)))
 }
 
 func (a *AdminServer) handleCreateProject(w http.ResponseWriter, r *http.Request) {
@@ -1530,5 +1544,182 @@ func (a *AdminServer) handleSetOAuthProviders(w http.ResponseWriter, r *http.Req
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"providers": len(proj.OAuthProviders),
+	})
+}
+
+// ─── Team Management Handlers ───────────────────────────────────────────────
+
+func (a *AdminServer) handleListMembers(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+	members, err := a.teamStore.ListMembers(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"members": members,
+		"count":   len(members),
+	})
+}
+
+func (a *AdminServer) handleCreateInvitation(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+	var req struct {
+		Email string      `json:"email"`
+		Role  tenant.Role `json:"role"`
+		TTL   string      `json:"ttl"` // optional duration string e.g. "72h"
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+	if req.Role == "" {
+		req.Role = tenant.RoleDeveloper
+	}
+
+	ttl := 7 * 24 * time.Hour // default 7 days
+	if req.TTL != "" {
+		if d, err := time.ParseDuration(req.TTL); err == nil && d > 0 {
+			ttl = d
+		}
+	}
+
+	// Get the admin user info from JWT claims for created_by
+	createdBy := "admin"
+	if claims, ok := r.Context().Value("claims").(*auth.Claims); ok {
+		createdBy = claims.UserID
+	}
+
+	inv, err := a.teamStore.CreateInvitation(id, req.Email, createdBy, req.Role, ttl)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	baseURL := r.Host
+	if r.TLS != nil {
+		baseURL = "https://" + baseURL
+	} else {
+		baseURL = "http://" + baseURL
+	}
+	inviteLink := baseURL + "/admin/invitations/" + inv.Token
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"invitation":  inv,
+		"invite_link": inviteLink,
+	})
+}
+
+func (a *AdminServer) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	userID := r.PathValue("userId")
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+	if err := a.teamStore.RemoveMember(id, userID); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
+}
+
+func (a *AdminServer) handleUpdateMemberRole(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	userID := r.PathValue("userId")
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+	var req struct {
+		Role tenant.Role `json:"role"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Role == "" {
+		writeError(w, http.StatusBadRequest, "role is required")
+		return
+	}
+	if err := a.teamStore.UpdateMemberRole(id, userID, req.Role); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+func (a *AdminServer) handleGetInvitation(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+	inv, err := a.teamStore.GetInvitation(token)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	// Get project name for display
+	projectName := inv.ProjectID
+	if proj, err := a.projects.GetProject(inv.ProjectID); err == nil {
+		projectName = proj.Name
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"invitation":   inv,
+		"project_name": projectName,
+	})
+}
+
+func (a *AdminServer) handleAcceptInvitation(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+
+	// Extract user info from JWT claims
+	tokenString := ""
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+			tokenString = parts[1]
+		}
+	} else {
+		tokenString = r.URL.Query().Get("token")
+	}
+
+	if tokenString == "" {
+		writeError(w, http.StatusUnauthorized, "missing authorization")
+		return
+	}
+
+	claims, err := auth.ValidateToken(tokenString, a.jwtSecret)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	member, err := a.teamStore.AcceptInvitation(token, claims.UserID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"member": member,
+		"status": "accepted",
 	})
 }

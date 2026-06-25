@@ -1208,3 +1208,26 @@ textarea:focus { outline: none; border-color: var(--border-focus); }
   background: linear-gradient(90deg, #22c55e, #5b5bff);
 }
 
+/* ====== TEAM MANAGEMENT ====== */
+.role-select {
+  padding: 3px 6px;
+  font-size: 11px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color var(--transition);
+  font-family: var(--font);
+}
+.role-select:hover {
+  border-color: var(--border-light);
+}
+.role-select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+#invite-result-link {
+  animation: fadeSlideIn 0.25s ease;
+}
+

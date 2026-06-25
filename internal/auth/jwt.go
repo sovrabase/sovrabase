@@ -18,9 +18,10 @@ const (
 // Claims extends the standard JWT claims with Sovrabase-specific fields.
 type Claims struct {
 	jwt.RegisteredClaims
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
+	UserID      string `json:"user_id"`
+	Email       string `json:"email"`
+	Role        string `json:"role"`
+	ProjectRole string `json:"project_role,omitempty"` // team role within a specific project
 }
 
 // GenerateAccessToken creates a JWT for API authentication with the given TTL.

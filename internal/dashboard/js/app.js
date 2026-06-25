@@ -413,9 +413,130 @@ async function switchProjectDetailTab(name) {
   if (panel) panel.classList.add('active');
 
   if (name === 'database') await loadCollections();
+  if (name === 'team') await loadTeam();
   if (name === 'auth') { await loadUsers(); await loadOAuthProviders(); }
   if (name === 'storage') await loadBuckets();
   if (name === 'logs') await loadProjectLogs();
+}
+
+// ===== TEAM MANAGEMENT =====
+async function loadTeam() {
+  const tbody = document.getElementById('team-members-tbody');
+  if (!tbody) return;
+  try {
+    const data = await api(`/admin/projects/${detailProjectId}/members`);
+    const members = data.members || [];
+    if (members.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-muted" style="text-align:center;">No team members yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = members.map(m => {
+      const joined = formatDate(m.joined_at);
+      const userId = m.user_id || '';
+      const role = m.role || 'developer';
+      const shortId = userId.substring(0, 8) + '...';
+      const roleBadgeClass = role === 'owner' ? 'badge-suspended' : role === 'admin' ? 'badge-active' : 'badge-active';
+      return `<tr>
+        <td class="td-id" title="${escapeHtml(userId)}">${escapeHtml(shortId)}</td>
+        <td>
+          <select class="role-select" data-user-id="${escapeHtml(userId)}" onchange="changeMemberRole('${escapeHtml(userId)}', this.value)" style="padding:3px 6px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);">
+            <option value="owner" ${role === 'owner' ? 'selected' : ''}>Owner</option>
+            <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
+            <option value="developer" ${role === 'developer' ? 'selected' : ''}>Developer</option>
+            <option value="viewer" ${role === 'viewer' ? 'selected' : ''}>Viewer</option>
+          </select>
+        </td>
+        <td class="td-date">${joined}</td>
+        <td class="td-actions">
+          <button class="btn btn-xs btn-danger" onclick="removeMember('${escapeHtml(userId)}')">Remove</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-danger" style="text-align:center;">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+    showToast('Failed to load team members: ' + err.message, 'error');
+  }
+}
+
+async function inviteMember() {
+  const email = document.getElementById('invite-email').value.trim();
+  const role = document.getElementById('invite-role').value;
+  if (!email) { showToast('Please enter an email address', 'error'); return; }
+  const btn = document.getElementById('btn-invite-submit');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  try {
+    const data = await api(`/admin/projects/${detailProjectId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role })
+    });
+    // Show invite link
+    const linkContainer = document.getElementById('invite-result-link');
+    const linkValue = document.getElementById('invite-link-value');
+    linkContainer.style.display = 'block';
+    linkValue.textContent = data.invite_link || 'Link generated';
+    showToast('Invitation sent to ' + email, 'success');
+    await loadTeam();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send Invitation';
+  }
+}
+
+async function removeMember(userId) {
+  if (!await showConfirm('Remove Member', 'Are you sure you want to remove this team member?', 'Remove', true)) return;
+  try {
+    await api(`/admin/projects/${detailProjectId}/members/${userId}`, {
+      method: 'DELETE'
+    });
+    showToast('Member removed');
+    await loadTeam();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function changeMemberRole(userId, newRole) {
+  try {
+    await api(`/admin/projects/${detailProjectId}/members/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role: newRole })
+    });
+    showToast('Role updated to ' + newRole);
+  } catch (err) {
+    showToast(err.message, 'error');
+    // Reload to reset the select
+    await loadTeam();
+  }
+}
+
+function openInviteMemberModal() {
+  document.getElementById('invite-email').value = '';
+  document.getElementById('invite-role').value = 'developer';
+  document.getElementById('invite-result-link').style.display = 'none';
+  document.getElementById('modal-invite-member').style.display = 'flex';
+}
+
+function closeInviteMemberModal() {
+  const overlay = document.getElementById('modal-invite-member');
+  const inner = document.getElementById('modal-invite-member-inner');
+  inner.classList.add('closing');
+  setTimeout(() => {
+    overlay.style.display = 'none';
+    inner.classList.remove('closing');
+  }, 180);
+}
+
+function copyInviteLink() {
+  const el = document.getElementById('invite-link-value');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    showToast('Invite link copied');
+  }).catch(() => {
+    showToast('Failed to copy', 'error');
+  });
 }
 
 async function loadProjectLogs() {
@@ -730,6 +851,7 @@ document.addEventListener('click', function(e) {
     if (e.target.id === 'modal-create-user') closeSubModal('modal-create-user');
     if (e.target.id === 'modal-create-bucket') closeSubModal('modal-create-bucket');
     if (e.target.id === 'modal-preview-file') closeSubModal('modal-preview-file');
+    if (e.target.id === 'modal-invite-member') closeInviteMemberModal();
   }
 });
 
@@ -744,6 +866,7 @@ document.addEventListener('keydown', function(e) {
     if (document.getElementById('modal-create-user').style.display === 'flex') closeSubModal('modal-create-user');
     if (document.getElementById('modal-create-bucket').style.display === 'flex') closeSubModal('modal-create-bucket');
     if (document.getElementById('modal-preview-file').style.display === 'flex') closeSubModal('modal-preview-file');
+    if (document.getElementById('modal-invite-member').style.display === 'flex') closeInviteMemberModal();
   }
   // Enter in create modal
   if (e.key === 'Enter' && document.getElementById('modal-create').style.display === 'flex') {

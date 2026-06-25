@@ -131,6 +131,9 @@ func main() {
 	server.SetMeterStore(meterStore)
 	adminServer.SetMeterStore(meterStore)
 
+	// Wire team store into admin server
+	adminServer.SetTeamStore(projectMgr.GetTeamStore())
+
 	adminServer.RegisterRoutes(adminMux)
 	server.RegisterAdmin(adminMux)
 	logger.Info("Admin API registered")

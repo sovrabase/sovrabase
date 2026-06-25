@@ -26,6 +26,10 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 )
 
+// teamStoreCache holds the lazily-created TeamStore for the master DB.
+var teamStoreOnce sync.Once
+var masterTeamStore *TeamStore
+
 // Project represents an isolated Sovrabase project (tenant).
 type Project struct {
 	ID           string    `json:"id"`
@@ -51,12 +55,13 @@ type ProjectEnv struct {
 
 // ProjectManager manages all projects in the system.
 type ProjectManager struct {
-	mu       sync.RWMutex
-	db       *pebble.DB
-	baseDir  string
-	cfg      *config.Config
-	projects map[string]*Project // in-memory cache
-	envs     map[string]*ProjectEnv // project ID -> active environment cache
+	mu        sync.RWMutex
+	db        *pebble.DB
+	baseDir   string
+	cfg       *config.Config
+	projects  map[string]*Project // in-memory cache
+	envs      map[string]*ProjectEnv // project ID -> active environment cache
+	teamStore *TeamStore // lazily initialized
 }
 
 // NewProjectManager creates a new project manager backed by the master database
@@ -100,6 +105,17 @@ func (pm *ProjectManager) Close() error {
 	return pm.db.Close()
 }
 
+// GetTeamStore returns (and lazily initializes) the TeamStore backed by the
+// master Pebble database.
+func (pm *ProjectManager) GetTeamStore() *TeamStore {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	if pm.teamStore == nil {
+		pm.teamStore = NewTeamStore(pm.db)
+	}
+	return pm.teamStore
+}
+
 // CreateProject creates a new isolated project.
 func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) {
 	pm.mu.Lock()
@@ -140,6 +156,12 @@ func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) 
 	// Persist to master DB
 	if err := pm.saveProject(proj); err != nil {
 		return nil, err
+	}
+
+	// Auto-add the project owner as a team member with RoleOwner
+	ts := NewTeamStore(pm.db)
+	if err := ts.AddMember(id, ownerID, RoleOwner); err != nil {
+		return nil, fmt.Errorf("tenant: add owner to team: %w", err)
 	}
 
 	pm.projects[id] = proj
