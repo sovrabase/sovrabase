@@ -39,6 +39,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
+	"github.com/ketsuna-org/sovrabase/plugins"
 )
 
 func main() {
@@ -112,12 +113,13 @@ func main() {
 
 	// Initialize plugin system.
 	hookManager := plugin.NewHookManager()
+	app := plugin.NewApp(hookManager)
 
-	// Register plugins here. Example:
-	//   import "github.com/ketsuna-org/sovrabase/plugins"
-	//   statusPlugin := &plugins.StatusPlugin{}
-	//   app := &plugin.App{}
-	//   statusPlugin.Register(app)
+	// Register plugins.
+	statusPlugin := &statusplugin.StatusPlugin{}
+	if err := statusPlugin.Register(app); err != nil {
+		logger.Error("Failed to register status-plugin", "error", err)
+	}
 
 	// Create API server
 	server := api.NewServer(

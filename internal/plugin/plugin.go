@@ -21,6 +21,27 @@ type App struct {
 	storage StorageAccessor
 }
 
+// NewApp creates a new App with the given hook manager.
+// Use SetRouter, SetDB, SetStorage to configure additional accessors.
+func NewApp(manager *HookManager) *App {
+	return &App{manager: manager}
+}
+
+// SetRouter sets the chi router (available after server creation).
+func (a *App) SetRouter(router chi.Router) {
+	a.router = router
+}
+
+// SetDB sets the database accessor for plugins that need read access.
+func (a *App) SetDB(db DatabaseAccessor) {
+	a.db = db
+}
+
+// SetStorage sets the storage accessor for plugins that need read access.
+func (a *App) SetStorage(s StorageAccessor) {
+	a.storage = s
+}
+
 // Router returns the chi router so plugins can register custom routes
 // and middleware.
 func (a *App) Router() chi.Router {
