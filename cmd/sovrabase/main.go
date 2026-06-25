@@ -15,10 +15,6 @@ package main
 // @in              header
 // @name            Authorization
 // @description     JWT access token: "Bearer <token>"
-// @securityDefinitions.apikey ProjectKey
-// @in              header
-// @name            X-Project-Key
-// @description     Project API key for multi-tenant isolation. Required for all /auth/v1 and /api/v1 endpoints.
 
 import (
 	"context"

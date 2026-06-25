@@ -62,6 +62,7 @@ func (a *AdminServer) handleAdminAnalyticsSummary(w http.ResponseWriter, r *http
 // @Success      200   {object}  map[string]string
 // @Failure      400   {object}  map[string]string
 // @Failure      500   {object}  map[string]string
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/events [post]
 func (s *Server) handleIngestEvents(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)

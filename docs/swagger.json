@@ -5,7 +5,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Sovereign European BaaS \u2014 lightweight open-source Supabase alternative. Provides JSON document database (PebbleDB), JWT/OAuth authentication, file storage (local + S3), realtime WebSocket, queues, and config maps \u2014 all in a single ~40 MB binary.",
+        "description": "Sovereign European BaaS — lightweight open-source Supabase alternative. Provides JSON document database (PebbleDB), JWT/OAuth authentication, file storage (local + S3), realtime WebSocket, queues, and config maps — all in a single ~40 MB binary.",
         "title": "Sovrabase API",
         "contact": {
             "name": "Sovrabase",
@@ -25,7 +25,9 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -65,6 +67,13 @@
                         "description": "Number of documents to skip (paginated response)",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -89,7 +98,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -121,6 +132,13 @@
                             "type": "object",
                             "additionalProperties": true
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -165,7 +183,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -196,6 +216,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.batchRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -222,7 +249,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -253,6 +282,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.queryRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -288,7 +324,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -319,6 +357,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.searchRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -354,7 +399,9 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -382,6 +429,13 @@
                         "description": "Document ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -416,7 +470,9 @@
             "put": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -455,6 +511,13 @@
                             "type": "object",
                             "additionalProperties": true
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -497,7 +560,9 @@
             "delete": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -525,6 +590,13 @@
                         "description": "Document ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -563,7 +635,9 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -575,6 +649,15 @@
                     "config"
                 ],
                 "summary": "List config entries",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -597,7 +680,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -621,6 +706,20 @@
                         "schema": {
                             "$ref": "#/definitions/api.configSetRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -664,7 +763,7 @@
                         "ProjectKey": []
                     }
                 ],
-                "description": "Returns all public config entries as a simple key\u2192value map. No authentication required.",
+                "description": "Returns all public config entries as a simple key→value map. No authentication required.",
                 "produces": [
                     "application/json"
                 ],
@@ -672,6 +771,15 @@
                     "config"
                 ],
                 "summary": "List public config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -696,7 +804,9 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -714,6 +824,13 @@
                         "description": "Config key",
                         "name": "key",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -747,7 +864,9 @@
             "put": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -777,6 +896,20 @@
                         "schema": {
                             "$ref": "#/definitions/api.configSetRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -815,7 +948,9 @@
             "delete": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -833,6 +968,13 @@
                         "description": "Config key",
                         "name": "key",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -871,7 +1013,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -903,6 +1047,13 @@
                                 }
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -940,7 +1091,9 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -955,6 +1108,15 @@
                     "auth"
                 ],
                 "summary": "Get current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "User profile",
@@ -987,7 +1149,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1019,6 +1183,13 @@
                                 }
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1065,7 +1236,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1097,6 +1270,13 @@
                                 }
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1132,7 +1312,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1165,6 +1347,13 @@
                                 }
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1202,7 +1391,9 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1230,6 +1421,13 @@
                         "description": "Path prefix to filter by",
                         "name": "prefix",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1258,7 +1456,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1293,6 +1493,13 @@
                         "description": "Custom file path (defaults to filename)",
                         "name": "path",
                         "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1336,7 +1543,9 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1395,6 +1604,13 @@
                         "description": "Image quality (1-100)",
                         "name": "quality",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1418,7 +1634,9 @@
             "delete": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1446,6 +1664,13 @@
                         "description": "File path",
                         "name": "path",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -1493,6 +1718,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.forgotPasswordRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1539,6 +1771,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.magicLinkRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1567,7 +1806,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1595,6 +1836,13 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1630,7 +1878,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1658,6 +1908,13 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1695,7 +1952,9 @@
             "post": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1711,6 +1970,15 @@
                     "mfa"
                 ],
                 "summary": "Setup MFA",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "MFA setup data",
@@ -1746,7 +2014,9 @@
             "get": {
                 "security": [
                     {
-                        "BearerAuth": [],
+                        "BearerAuth": []
+                    },
+                    {
                         "ProjectKey": []
                     }
                 ],
@@ -1762,6 +2032,15 @@
                     "mfa"
                 ],
                 "summary": "Get MFA status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "MFA status",
@@ -1831,6 +2110,13 @@
                         "description": "Project key for frontend embedding",
                         "name": "project_key",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1941,6 +2227,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.refreshRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1993,6 +2286,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.resetPasswordRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2039,6 +2339,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.signInRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2105,6 +2412,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.signUpRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2167,6 +2481,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.verifyEmailRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2213,6 +2534,13 @@
                         "schema": {
                             "$ref": "#/definitions/api.verifyMagicLinkRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2564,15 +2892,9 @@
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "JWT access token: \"Bearer <token>\"",
+            "description": "JWT access token: \"Bearer \u003ctoken\u003e\"",
             "type": "apiKey",
             "name": "Authorization",
-            "in": "header"
-        },
-        "ProjectKey": {
-            "description": "Project API key for multi-tenant isolation. Required for all /auth/v1 and /api/v1 endpoints.",
-            "type": "apiKey",
-            "name": "X-Project-Key",
             "in": "header"
         }
     }

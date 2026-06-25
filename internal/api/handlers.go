@@ -40,6 +40,7 @@ type signUpRequest struct {
 // @Failure 409 {object} map[string]string "User already exists"
 // @Failure 403 {object} map[string]string "Captcha verification failed"
 // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/signup [post]
 func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 	var req signUpRequest
@@ -96,6 +97,7 @@ type signInRequest struct {
 // @Failure 401 {object} map[string]string "Invalid credentials"
 // @Failure 403 {object} map[string]string "Captcha verification failed"
 // // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/signin [post]
 func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	var req signInRequest
@@ -145,6 +147,7 @@ type refreshRequest struct {
 // @Failure 400 {object} map[string]string "Invalid request"
 // @Failure 401 {object} map[string]string "Invalid refresh token"
 // // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/refresh [post]
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
@@ -175,6 +178,7 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 // @Success 302 "Browser redirect to OAuth provider"
 // @Failure 400 {object} map[string]string "Invalid provider"
 // // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/oauth/{provider} [get]
 func (s *Server) handleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
@@ -286,6 +290,7 @@ type verifyEmailRequest struct {
 // @Success 200 {object} map[string]string "Verification successful"
 // @Failure 400 {object} map[string]string "Invalid or expired token"
 // // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/verify-email [post]
 func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	var req verifyEmailRequest
@@ -320,6 +325,7 @@ type forgotPasswordRequest struct {
 // @Success 200 {object} map[string]string "Password reset email sent"
 // @Failure 400 {object} map[string]string "Invalid request"
 // // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/forgot-password [post]
 func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req forgotPasswordRequest
@@ -358,6 +364,7 @@ type resetPasswordRequest struct {
 // @Success 200 {object} map[string]string "Password reset successfully"
 // @Failure 400 {object} map[string]string "Invalid token or password"
 // // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/reset-password [post]
 func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	var req resetPasswordRequest
@@ -394,6 +401,7 @@ type magicLinkRequest struct {
 // @Success 200 {object} map[string]string "Magic link generated"
 // @Failure 400 {object} map[string]string "Invalid request"
 // // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/magic-link [post]
 func (s *Server) handleCreateMagicLink(w http.ResponseWriter, r *http.Request) {
 	var req magicLinkRequest
@@ -436,6 +444,7 @@ type verifyMagicLinkRequest struct {
 // @Failure 400 {object} map[string]string "Invalid request"
 // @Failure 401 {object} map[string]string "Invalid or expired token"
 // // @Security ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/verify-magic-link [post]
 func (s *Server) handleVerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 	var req verifyMagicLinkRequest
@@ -469,6 +478,7 @@ func (s *Server) handleVerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]string "MFA setup data"
 // @Failure 400 {object} map[string]string "Setup failed"
 // @Failure 401 {object} map[string]string "Authentication required"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/mfa/setup [post]
 func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
@@ -500,6 +510,7 @@ func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]interface{} "MFA enabled with backup codes"
 // @Failure 400 {object} map[string]string "Invalid code"
 // @Failure 401 {object} map[string]string "Authentication required"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/mfa/confirm [post]
 func (s *Server) handleMFAConfirm(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
@@ -543,6 +554,7 @@ func (s *Server) handleMFAConfirm(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]string "MFA disabled"
 // @Failure 400 {object} map[string]string "Invalid code"
 // @Failure 401 {object} map[string]string "Authentication required"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/mfa/disable [post]
 func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
@@ -577,6 +589,7 @@ func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]bool "MFA status"
 // @Failure 401 {object} map[string]string "Authentication required"
 // @Failure 404 {object} map[string]string "User not found"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /auth/v1/mfa/status [get]
 func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
@@ -604,6 +617,7 @@ func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} UserInfo "User profile"
 // @Failure 401 {object} map[string]string "Not authenticated"
 // @Failure 404 {object} map[string]string "User not found"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/me [get]
 func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
@@ -739,6 +753,7 @@ func (s *Server) publishRealtime(eventType realtime.EventType, projectID, collec
 // @Failure 400 {object} map[string]string "Invalid document"
 // @Failure 403 {object} map[string]string "RLS policy restricts insertion"
 // @Failure 500 {object} map[string]string "Internal error"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/collections/{collection} [post]
 func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
@@ -799,6 +814,7 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]interface{} "Retrieved document"
 // @Failure 403 {object} map[string]string "RLS policy restricts access"
 // @Failure 404 {object} map[string]string "Document not found"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/collections/{collection}/{id} [get]
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
@@ -842,6 +858,7 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} map[string]string "Invalid document"
 // @Failure 403 {object} map[string]string "RLS policy restricts update"
 // @Failure 404 {object} map[string]string "Document not found"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/collections/{collection}/{id} [put]
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
@@ -900,6 +917,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]string "Document deleted"
 // @Failure 403 {object} map[string]string "RLS policy restricts deletion"
 // @Failure 404 {object} map[string]string "Document not found"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/collections/{collection}/{id} [delete]
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
@@ -954,6 +972,7 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 // @Param offset query int false "Number of documents to skip (paginated response)"
 // @Success 200 {object} map[string]interface{} "List of documents or paginated response"
 // @Failure 500 {object} map[string]string "Internal error"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/collections/{collection} [get]
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
@@ -1061,6 +1080,7 @@ type queryRequest struct {
 // @Success 200 {object} map[string]interface{} "Query results or paginated response"
 // @Failure 400 {object} map[string]string "Invalid query"
 // @Failure 500 {object} map[string]string "Internal error"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/collections/{collection}/query [post]
 func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
@@ -1158,6 +1178,7 @@ func parseIntParam(s string, defaultVal int) int {
 // @Failure 400 {object} map[string]string "Invalid form data"
 // @Failure 403 {object} map[string]string "Storage quota exceeded"
 // @Failure 500 {object} map[string]string "Upload failed"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/storage/{bucket}/upload [post]
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
@@ -1233,6 +1254,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 // @Param quality query int false "Image quality (1-100)"
 // @Success 200 {file} binary "File content"
 // @Failure 404 {object} map[string]string "File not found"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/storage/{bucket}/{path} [get]
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
@@ -1292,6 +1314,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 // @Param path path string true "File path"
 // @Success 200 {object} map[string]string "File deleted"
 // @Failure 404 {object} map[string]string "File not found"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/storage/{bucket}/{path} [delete]
 func (s *Server) handleStorageDelete(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
@@ -1316,6 +1339,7 @@ func (s *Server) handleStorageDelete(w http.ResponseWriter, r *http.Request) {
 // @Param prefix query string false "Path prefix to filter by"
 // @Success 200 {array} FileInfo "List of files"
 // @Failure 500 {object} map[string]string "Internal error"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/storage/{bucket}/list [get]
 func (s *Server) handleStorageList(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
@@ -1365,6 +1389,7 @@ type batchResult struct {
 // @Param request body batchRequest true "Batch operations"
 // @Success 200 {object} map[string]interface{} "Batch results"
 // @Failure 400 {object} map[string]string "Invalid request"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/collections/{collection}/batch [post]
 func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
@@ -1538,6 +1563,7 @@ type searchRequest struct {
 // @Success 200 {object} map[string]interface{} "Search results"
 // @Failure 400 {object} map[string]string "Invalid request or query required"
 // @Failure 500 {object} map[string]string "Internal error"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/collections/{collection}/search [post]
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")

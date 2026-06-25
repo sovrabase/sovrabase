@@ -51,6 +51,7 @@ func (s *Server) RegisterConfigMapsRoutes() {
 // @Success      200  {object}  map[string]interface{}
 // @Failure      500  {object}  map[string]string
 // @Security     ProjectKey
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/config/public [get]
 func (s *Server) handleConfigPublic(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
@@ -82,6 +83,7 @@ func (s *Server) handleConfigPublic(w http.ResponseWriter, r *http.Request) {
 // @Security     ProjectKey
 // @Success      200  {object}  map[string]interface{}
 // @Failure      500  {object}  map[string]string
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/config [get]
 func (s *Server) handleConfigList(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
@@ -114,6 +116,7 @@ func (s *Server) handleConfigList(w http.ResponseWriter, r *http.Request) {
 // @Success      200  {object}  configmaps.Entry
 // @Failure      404  {object}  map[string]string
 // @Failure      500  {object}  map[string]string
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/config/{key} [get]
 func (s *Server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
@@ -152,7 +155,9 @@ type configSetRequest struct {
 // @Success      201    {object}  configmaps.Entry
 // @Failure      400    {object}  map[string]string
 // @Failure      500    {object}  map[string]string
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/config [post]
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/config/{key} [put]
 func (s *Server) handleConfigSet(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
@@ -212,6 +217,7 @@ func (s *Server) handleConfigSet(w http.ResponseWriter, r *http.Request) {
 // @Success      200  {object}  map[string]string
 // @Failure      404  {object}  map[string]string
 // @Failure      500  {object}  map[string]string
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/config/{key} [delete]
 func (s *Server) handleConfigDelete(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)

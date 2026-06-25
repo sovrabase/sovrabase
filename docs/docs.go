@@ -69,6 +69,13 @@ const docTemplate = `{
                         "description": "Number of documents to skip (paginated response)",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -127,6 +134,13 @@ const docTemplate = `{
                             "type": "object",
                             "additionalProperties": true
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -204,6 +218,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.batchRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -263,6 +284,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.queryRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -331,6 +359,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.searchRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -396,6 +431,13 @@ const docTemplate = `{
                         "description": "Document ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -471,6 +513,13 @@ const docTemplate = `{
                             "type": "object",
                             "additionalProperties": true
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -544,6 +593,13 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -595,6 +651,15 @@ const docTemplate = `{
                     "config"
                 ],
                 "summary": "List config entries",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -643,6 +708,20 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.configSetRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -694,6 +773,15 @@ const docTemplate = `{
                     "config"
                 ],
                 "summary": "List public config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -738,6 +826,13 @@ const docTemplate = `{
                         "description": "Config key",
                         "name": "key",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -803,6 +898,20 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.configSetRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -861,6 +970,13 @@ const docTemplate = `{
                         "description": "Config key",
                         "name": "key",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -933,6 +1049,13 @@ const docTemplate = `{
                                 }
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -987,6 +1110,15 @@ const docTemplate = `{
                     "auth"
                 ],
                 "summary": "Get current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "User profile",
@@ -1053,6 +1185,13 @@ const docTemplate = `{
                                 }
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1133,6 +1272,13 @@ const docTemplate = `{
                                 }
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1203,6 +1349,13 @@ const docTemplate = `{
                                 }
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1270,6 +1423,13 @@ const docTemplate = `{
                         "description": "Path prefix to filter by",
                         "name": "prefix",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1335,6 +1495,13 @@ const docTemplate = `{
                         "description": "Custom file path (defaults to filename)",
                         "name": "path",
                         "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1439,6 +1606,13 @@ const docTemplate = `{
                         "description": "Image quality (1-100)",
                         "name": "quality",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1493,6 +1667,13 @@ const docTemplate = `{
                         "name": "path",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1539,6 +1720,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.forgotPasswordRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1585,6 +1773,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.magicLinkRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1643,6 +1838,13 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1708,6 +1910,13 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1763,6 +1972,15 @@ const docTemplate = `{
                     "mfa"
                 ],
                 "summary": "Setup MFA",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "MFA setup data",
@@ -1816,6 +2034,15 @@ const docTemplate = `{
                     "mfa"
                 ],
                 "summary": "Get MFA status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "MFA status",
@@ -1885,6 +2112,13 @@ const docTemplate = `{
                         "description": "Project key for frontend embedding",
                         "name": "project_key",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1995,6 +2229,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.refreshRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2047,6 +2288,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.resetPasswordRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2093,6 +2341,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.signInRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2159,6 +2414,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.signUpRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2221,6 +2483,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.verifyEmailRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2267,6 +2536,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.verifyMagicLinkRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2621,12 +2897,6 @@ const docTemplate = `{
             "description": "JWT access token: \"Bearer \u003ctoken\u003e\"",
             "type": "apiKey",
             "name": "Authorization",
-            "in": "header"
-        },
-        "ProjectKey": {
-            "description": "Project API key for multi-tenant isolation. Required for all /auth/v1 and /api/v1 endpoints.",
-            "type": "apiKey",
-            "name": "X-Project-Key",
             "in": "header"
         }
     }

@@ -43,4 +43,3 @@ dev: build
 
 swagger:
 	swag init -g cmd/sovrabase/main.go -o docs/
-	python3 scripts/fix-swagger-security.py docs/swagger.json

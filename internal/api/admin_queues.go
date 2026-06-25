@@ -51,6 +51,7 @@ func getQueueStore(projectID string, projects *tenant.ProjectManager) (*queue.St
 // @Success      201   {object}  map[string]string
 // @Failure      400   {object}  map[string]string
 // @Failure      500   {object}  map[string]string
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/queues/send [post]
 func (s *Server) handleQueueSend(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)
@@ -93,6 +94,7 @@ func (s *Server) handleQueueSend(w http.ResponseWriter, r *http.Request) {
 // @Success      200   {object}  map[string]interface{}
 // @Failure      400   {object}  map[string]string
 // @Failure      500   {object}  map[string]string
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/queues/receive [post]
 func (s *Server) handleQueueReceive(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)
@@ -142,6 +144,7 @@ func (s *Server) handleQueueReceive(w http.ResponseWriter, r *http.Request) {
 // @Failure      400   {object}  map[string]string
 // @Failure      404   {object}  map[string]string
 // @Failure      500   {object}  map[string]string
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router       /api/v1/queues/delete [post]
 func (s *Server) handleQueueDelete(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)

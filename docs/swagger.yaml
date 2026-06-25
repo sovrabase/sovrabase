@@ -249,6 +249,11 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -287,6 +292,11 @@ paths:
         schema:
           additionalProperties: true
           type: object
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -335,6 +345,11 @@ paths:
         name: id
         required: true
         type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -375,6 +390,11 @@ paths:
       - description: Document ID
         in: path
         name: id
+        required: true
+        type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
         required: true
         type: string
       produces:
@@ -426,6 +446,11 @@ paths:
         schema:
           additionalProperties: true
           type: object
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -476,6 +501,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.batchRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -514,6 +544,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.queryRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -557,6 +592,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.searchRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -586,6 +626,12 @@ paths:
   /api/v1/config:
     get:
       description: Returns all config entries for the project.
+      parameters:
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -618,6 +664,16 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.configSetRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -656,6 +712,11 @@ paths:
         name: key
         required: true
         type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -689,6 +750,11 @@ paths:
       - description: Config key
         in: path
         name: key
+        required: true
+        type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
         required: true
         type: string
       produces:
@@ -732,6 +798,16 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.configSetRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -765,6 +841,12 @@ paths:
     get:
       description: Returns all public config entries as a simple key→value map. No
         authentication required.
+      parameters:
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -802,6 +884,11 @@ paths:
                 $ref: '#/definitions/analytics.Event'
               type: array
           type: object
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -834,6 +921,12 @@ paths:
       consumes:
       - application/json
       description: Get the profile of the currently authenticated user.
+      parameters:
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -877,6 +970,11 @@ paths:
             queue:
               type: string
           type: object
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -928,6 +1026,11 @@ paths:
             queue:
               type: string
           type: object
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -973,6 +1076,11 @@ paths:
             queue:
               type: string
           type: object
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1014,6 +1122,11 @@ paths:
       - description: File path
         in: path
         name: path
+        required: true
+        type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
         required: true
         type: string
       produces:
@@ -1073,6 +1186,11 @@ paths:
         in: query
         name: quality
         type: integer
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/octet-stream
       responses:
@@ -1106,6 +1224,11 @@ paths:
       - description: Path prefix to filter by
         in: query
         name: prefix
+        type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
         type: string
       produces:
       - application/json
@@ -1148,6 +1271,11 @@ paths:
       - description: Custom file path (defaults to filename)
         in: formData
         name: path
+        type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
         type: string
       produces:
       - application/json
@@ -1193,6 +1321,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.forgotPasswordRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1224,6 +1357,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.magicLinkRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1257,6 +1395,11 @@ paths:
           additionalProperties:
             type: string
           type: object
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1299,6 +1442,11 @@ paths:
           additionalProperties:
             type: string
           type: object
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1332,6 +1480,12 @@ paths:
       consumes:
       - application/json
       description: Generate an MFA secret and URI for TOTP setup. Requires authentication.
+      parameters:
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1365,6 +1519,12 @@ paths:
       consumes:
       - application/json
       description: Check whether MFA is enabled for the authenticated user.
+      parameters:
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1416,6 +1576,11 @@ paths:
       - description: Project key for frontend embedding
         in: query
         name: project_key
+        type: string
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
         type: string
       produces:
       - application/json
@@ -1492,6 +1657,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.refreshRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1526,6 +1696,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.resetPasswordRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1557,6 +1732,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.signInRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1598,6 +1778,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.signUpRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1641,6 +1826,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.verifyEmailRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1671,6 +1861,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.verifyMagicLinkRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -1701,11 +1896,5 @@ securityDefinitions:
     description: 'JWT access token: "Bearer <token>"'
     in: header
     name: Authorization
-    type: apiKey
-  ProjectKey:
-    description: Project API key for multi-tenant isolation. Required for all /auth/v1
-      and /api/v1 endpoints.
-    in: header
-    name: X-Project-Key
     type: apiKey
 swagger: "2.0"
