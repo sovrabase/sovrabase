@@ -57,6 +57,7 @@ func (a *AdminServer) handleAdminAnalyticsSummary(w http.ResponseWriter, r *http
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Security     ProjectKey
 // @Param        body  body  object{events=[]analytics.Event}  true  "Analytics events"
 // @Success      200   {object}  map[string]string
 // @Failure      400   {object}  map[string]string

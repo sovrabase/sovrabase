@@ -28,6 +28,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "List documents in a collection with optional filtering, field selection, and pagination. Query parameters are treated as filter fields.",
@@ -91,6 +94,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Insert a new document into the specified collection. An _id is auto-generated if not provided.",
@@ -166,6 +172,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Execute multiple insert, update, and delete operations in a single atomic batch.",
@@ -222,6 +231,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Query documents in a collection with a structured filter, field projection, and pagination.",
@@ -287,6 +299,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Perform a full-text search on documents in a collection.",
@@ -352,6 +367,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Retrieve a single document by its ID from the specified collection.",
@@ -413,6 +431,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Partially update an existing document by ID. Supports both PUT and PATCH methods.",
@@ -493,6 +514,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Delete a document by ID from the specified collection.",
@@ -558,6 +582,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Returns all config entries for the project.",
@@ -591,6 +618,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Creates a new config entry (POST) or updates an existing one (PUT). On successful create returns 201, on update returns 200.",
@@ -651,6 +681,11 @@ const docTemplate = `{
         },
         "/api/v1/config/public": {
             "get": {
+                "security": [
+                    {
+                        "ProjectKey": []
+                    }
+                ],
                 "description": "Returns all public config entries as a simple key→value map. No authentication required.",
                 "produces": [
                     "application/json"
@@ -684,6 +719,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Returns a single config entry by its key.",
@@ -734,6 +772,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Creates a new config entry (POST) or updates an existing one (PUT). On successful create returns 201, on update returns 200.",
@@ -801,6 +842,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Deletes a config entry by its key.",
@@ -856,6 +900,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Accepts a batch of analytics events for processing. Returns 202 with count of accepted events.",
@@ -924,6 +971,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Get the profile of the currently authenticated user.",
@@ -970,6 +1020,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Deletes a message by its ID from the specified queue (acknowledges receipt).",
@@ -1047,6 +1100,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Receives up to ` + "`" + `limit` + "`" + ` messages from the specified queue. Messages are made invisible until deleted or timeout.",
@@ -1113,6 +1169,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Sends a JSON message to the specified queue. Returns the message ID and queue name.",
@@ -1182,6 +1241,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "List files in a storage bucket, optionally filtered by prefix.",
@@ -1237,6 +1299,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Upload a file to the specified storage bucket. Supports multipart form data with optional path.",
@@ -1314,6 +1379,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Download a file from the specified storage bucket. Supports optional image transformation parameters.",
@@ -1395,6 +1463,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Delete a file from the specified storage bucket.",
@@ -1543,6 +1614,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Confirm MFA setup by providing a valid TOTP code. Returns backup codes. Requires authentication.",
@@ -1605,6 +1679,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Disable MFA for the authenticated user. Requires a valid TOTP code. Requires authentication.",
@@ -1669,6 +1746,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Generate an MFA secret and URI for TOTP setup. Requires authentication.",
@@ -1719,6 +1799,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
+                    },
+                    {
+                        "ProjectKey": []
                     }
                 ],
                 "description": "Check whether MFA is enabled for the authenticated user.",
@@ -2051,6 +2134,11 @@ const docTemplate = `{
         },
         "/auth/v1/signup": {
             "post": {
+                "security": [
+                    {
+                        "ProjectKey": []
+                    }
+                ],
                 "description": "Create a new user account with email and password. Returns the created user and authentication tokens.",
                 "consumes": [
                     "application/json"
@@ -2533,6 +2621,12 @@ const docTemplate = `{
             "description": "JWT access token: \"Bearer \u003ctoken\u003e\"",
             "type": "apiKey",
             "name": "Authorization",
+            "in": "header"
+        },
+        "ProjectKey": {
+            "description": "Project API key for multi-tenant isolation. Required for all /auth/v1 and /api/v1 endpoints.",
+            "type": "apiKey",
+            "name": "X-Project-Key",
             "in": "header"
         }
     }

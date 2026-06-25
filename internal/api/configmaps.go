@@ -50,6 +50,7 @@ func (s *Server) RegisterConfigMapsRoutes() {
 // @Produce      json
 // @Success      200  {object}  map[string]interface{}
 // @Failure      500  {object}  map[string]string
+// @Security     ProjectKey
 // @Router       /api/v1/config/public [get]
 func (s *Server) handleConfigPublic(w http.ResponseWriter, r *http.Request) {
 	store := s.configmapsStore(r)
@@ -78,6 +79,7 @@ func (s *Server) handleConfigPublic(w http.ResponseWriter, r *http.Request) {
 // @Tags         config
 // @Produce      json
 // @Security     BearerAuth
+// @Security     ProjectKey
 // @Success      200  {object}  map[string]interface{}
 // @Failure      500  {object}  map[string]string
 // @Router       /api/v1/config [get]
@@ -107,6 +109,7 @@ func (s *Server) handleConfigList(w http.ResponseWriter, r *http.Request) {
 // @Tags         config
 // @Produce      json
 // @Security     BearerAuth
+// @Security     ProjectKey
 // @Param        key  path  string  true  "Config key"
 // @Success      200  {object}  configmaps.Entry
 // @Failure      404  {object}  map[string]string
@@ -142,6 +145,7 @@ type configSetRequest struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Security     ProjectKey
 // @Param        key    path      string            false  "Config key (for PUT)"
 // @Param        body   body      configSetRequest  true   "Config entry"
 // @Success      200    {object}  configmaps.Entry
@@ -203,6 +207,7 @@ func (s *Server) handleConfigSet(w http.ResponseWriter, r *http.Request) {
 // @Tags         config
 // @Produce      json
 // @Security     BearerAuth
+// @Security     ProjectKey
 // @Param        key  path  string  true  "Config key"
 // @Success      200  {object}  map[string]string
 // @Failure      404  {object}  map[string]string
