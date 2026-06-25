@@ -122,6 +122,20 @@ func (c *Client) GetMe() (*User, error) {
 	return &user, nil
 }
 
+// OAuthURL returns the authorization URL for an OAuth provider.
+// Set redirect=true to have the server redirect the browser directly.
+// Set finalRedirect to specify where to redirect after OAuth completes.
+func (c *Client) OAuthURL(provider string) (string, error) {
+	path := fmt.Sprintf("/auth/v1/oauth/%s", provider)
+	var resp struct {
+		URL string `json:"url"`
+	}
+	if err := c.doJSON("GET", path, nil, &resp); err != nil {
+		return "", err
+	}
+	return resp.URL, nil
+}
+
 // ─── Magic Links ──────────────────────────────────────────────────────────────
 
 // CreateMagicLink sends a magic link to the given email for passwordless login.
