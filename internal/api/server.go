@@ -340,6 +340,10 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 
 	// API routes (rate limited + auth)
 	r.Route("/api/v1", func(r chi.Router) {
+		// Storage download — public access with project key only (no auth required).
+		// Images embedded via <img> tags cannot send Authorization headers.
+		r.With(s.rateLimitMiddleware, s.projectMiddleware).Get("/storage/{bucket}/{path:.*}", s.handleDownload)
+
 		r.Use(s.rateLimitMiddleware)
 		r.Use(s.projectMiddleware)
 		r.Use(s.clientRequestLoggerMiddleware)
@@ -365,11 +369,10 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 			r.Delete("/{id}", s.handleDelete)
 		})
 
-		// Storage
+		// Storage (upload, list, delete need auth)
 			r.Route("/storage/{bucket}", func(r chi.Router) {
 				r.Post("/upload", s.handleUpload)
 				r.Get("/list", s.handleStorageList)
-				r.Get("/{path:.*}", s.handleDownload)
 				r.Delete("/{path:.*}", s.handleStorageDelete)
 			})
 
