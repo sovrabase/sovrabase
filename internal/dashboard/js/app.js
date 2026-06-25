@@ -301,42 +301,64 @@ async function openProjectDetailView(id) {
 
     // Populate overview
     document.getElementById('pdtab-overview-content').innerHTML = `
-      <div class="detail-row"><span class="detail-label">Name</span><span class="detail-value">${escapeHtml(p.name)}</span></div>
-      <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value mono">${escapeHtml(p.id)}</span></div>
-      <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value"><span class="badge badge-${p.status || 'active'}"><span class="badge-dot"></span>${escapeHtml(p.status || 'active')}</span></span></div>
-      <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${formatDate(p.created_at)}</span></div>
-      <div class="detail-row"><span class="detail-label">Storage Quota</span><span class="detail-value">${escapeHtml(formatBytes(data.storage_quota || 0))}</span></div>
-      <div class="detail-row"><span class="detail-label">Allow Origins</span><span class="detail-value mono">${escapeHtml(data.allow_origins || '*')}</span></div>
-      <div class="detail-row"><span class="detail-label">API URL</span><span class="detail-value mono">${escapeHtml(data.api_url || p.api_url || '')}</span></div>
-      <div class="detail-row">
-        <span class="detail-label">API Key</span>
-        <span class="detail-value">
-          <span class="mask-toggle" id="pdtab-apikey-mask" onclick="toggleApiKeyReveal()">•••••••••••• (click to reveal)</span>
-          <span id="pdtab-apikey-full" style="display:none;font-family:var(--font-mono);font-size:12px;word-break:break-all;"></span>
-        </span>
-      </div>
-      <div class="detail-row" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px;">
-        <span class="detail-label">Edit Settings</span>
-        <span class="detail-value"></span>
-      </div>
-      <div class="form-group" style="margin-top: 8px;">
-        <label for="pd-allow-origins" style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted);">Allowed Origins (comma-separated)</label>
-        <input type="text" id="pd-allow-origins" value="${escapeHtml(data.allow_origins || '*')}" style="width:100%; font-family: var(--font-mono); font-size: 12px;">
-      </div>
-      <div class="form-group" style="margin-top: 8px;">
-        <label for="pd-storage-quota" style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted);">Storage Quota</label>
-        <div style="display:flex;gap:8px;align-items:stretch;">
-          <input type="number" id="pd-storage-quota" value="${humanizeBytes(data.storage_quota || 104857600).val}" min="0" style="flex:1; font-family: var(--font-mono); font-size: 12px;">
-          <select id="pd-storage-quota-unit" style="width:80px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:12px; padding:9px 8px;">
-            <option value="MB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'MB' ? 'selected' : ''}>MB</option>
-            <option value="GB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'GB' ? 'selected' : ''}>GB</option>
-            <option value="TB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'TB' ? 'selected' : ''}>TB</option>
-          </select>
+      <!-- Left Card: Project Info & Credentials -->
+      <div class="overview-card" style="background: var(--bg-card-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+        <h3 style="font-size: 13px; font-weight: 700; color: var(--accent); margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">📋 Project Information</h3>
+        <div class="detail-row"><span class="detail-label">Name</span><span class="detail-value">${escapeHtml(p.name)}</span></div>
+        <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value mono" style="font-size:11px;">${escapeHtml(p.id)}</span></div>
+        <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value"><span class="badge badge-${p.status || 'active'}"><span class="badge-dot"></span>${escapeHtml(p.status || 'active')}</span></span></div>
+        <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${formatDate(p.created_at)}</span></div>
+        
+        <h3 style="font-size: 13px; font-weight: 700; color: var(--accent); margin: 16px 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">🔑 API Credentials</h3>
+        <div class="detail-row"><span class="detail-label">API URL</span><span class="detail-value mono" style="font-size:11px;">${escapeHtml(data.api_url || p.api_url || '')}</span></div>
+        <div class="detail-row">
+          <span class="detail-label">API Key</span>
+          <span class="detail-value">
+            <span class="mask-toggle" id="pdtab-apikey-mask" onclick="toggleApiKeyReveal()">•••••••••••• (click to reveal)</span>
+            <span id="pdtab-apikey-full" style="display:none;font-family:var(--font-mono);font-size:12px;word-break:break-all;"></span>
+          </span>
         </div>
       </div>
-      <div style="margin-top: 12px;">
-        <button class="btn btn-primary btn-sm" id="btn-save-project-settings" onclick="saveProjectSettings()">💾 Save Settings</button>
-        <span id="pd-save-status" style="font-size: 12px; margin-left: 10px; color: var(--text-secondary);"></span>
+
+      <!-- Right Card: Project Settings -->
+      <div class="overview-card" style="background: var(--bg-card-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;">
+        <div>
+          <h3 style="font-size: 13px; font-weight: 700; color: var(--accent); margin: 0 0 16px 0; text-transform: uppercase; letter-spacing: 0.5px;">⚙️ Project Settings</h3>
+          <div class="form-group" style="margin: 0 0 16px 0;">
+            <label for="pd-allow-origins" style="font-size: 10px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 6px;">Allowed Origins (CORS)</label>
+            <input type="text" id="pd-allow-origins" value="${escapeHtml(data.allow_origins || '*')}" style="width:100%; font-family: var(--font-mono); font-size: 12px; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-primary);">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="pd-storage-quota" style="font-size: 10px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 6px;">Storage Quota Limit</label>
+            <div style="display:flex;gap:8px;align-items:stretch;">
+              <input type="number" id="pd-storage-quota" value="${humanizeBytes(data.storage_quota || 104857600).val}" min="0" style="flex:1; font-family: var(--font-mono); font-size: 12px; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-primary);">
+              <select id="pd-storage-quota-unit" style="width:80px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:12px; padding:8px;">
+                <option value="MB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'MB' ? 'selected' : ''}>MB</option>
+                <option value="GB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'GB' ? 'selected' : ''}>GB</option>
+                <option value="TB" ${humanizeBytes(data.storage_quota || 104857600).unit === 'TB' ? 'selected' : ''}>TB</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: auto;">
+          <button class="btn btn-primary" id="btn-save-project-settings" onclick="saveProjectSettings()" style="padding: 10px 20px;">💾 Save Settings</button>
+          <span id="pd-save-status" style="font-size: 12px; color: var(--text-secondary);"></span>
+        </div>
+      </div>
+
+      <!-- Bottom Card: Database Storage Analysis -->
+      <div class="overview-card" style="background: var(--bg-card-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; grid-column: span 2; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 13px; font-weight: 700; color: var(--accent); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">🗄️ Database Storage Analysis</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">
+              Calculate real disk usage details for this project's database, including metadata, secondary index overhead, and per-collection breakdowns.
+            </p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="runDeepDbAnalysis()">🔍 Run Deep Analysis</button>
+        </div>
+        <div id="db-analysis-result" style="display:none; margin-top:8px; padding:16px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: var(--radius);">
+        </div>
       </div>`;
 
     // Update API code snippets
@@ -425,6 +447,11 @@ async function switchProjectDetailTab(name) {
   if (name === 'team') await loadTeam();
   if (name === 'auth') { await loadUsers(); await loadOAuthProviders(); }
   if (name === 'storage') await loadBuckets();
+  if (name === 'config') await loadRemoteConfig();
+  if (name === 'cron') await loadCronJobs();
+  if (name === 'webhooks') await loadWebhooks();
+  if (name === 'analytics') await loadAnalytics();
+  if (name === 'queues') await loadQueues();
   if (name === 'logs') await loadProjectLogs();
 }
 
@@ -552,6 +579,34 @@ async function loadProjectLogs() {
   const tbody = document.getElementById('logs-tbody');
   if (!tbody) return;
 
+  // 1. Fetch usage metrics first (to always display even if requests.log is empty)
+  let usage = { db_reads_total: 0, db_writes_total: 0, database_bytes: 0, file_storage_bytes: 0, total_storage_bytes: 0, realtime_connections: 0 };
+  try {
+    usage = await api(`/admin/projects/${detailProjectId}/usage`);
+  } catch (e) {
+    console.warn("Failed to load project usage", e);
+  }
+
+  // Populate usage elements
+  const rtConnEl = document.getElementById('metrics-realtime-connections');
+  if (rtConnEl) rtConnEl.textContent = usage.realtime_connections !== undefined ? usage.realtime_connections : '0';
+  
+  const dbReadsEl = document.getElementById('metrics-db-reads');
+  if (dbReadsEl) dbReadsEl.textContent = usage.db_reads_total !== undefined ? usage.db_reads_total.toLocaleString() : '0';
+  
+  const dbWritesEl = document.getElementById('metrics-db-writes');
+  if (dbWritesEl) dbWritesEl.textContent = usage.db_writes_total !== undefined ? usage.db_writes_total.toLocaleString() : '0';
+  
+  const dbSizeEl = document.getElementById('metrics-database-size');
+  if (dbSizeEl) dbSizeEl.textContent = formatBytes(usage.database_bytes || 0);
+  
+  const fileStorageEl = document.getElementById('metrics-file-storage-size');
+  if (fileStorageEl) fileStorageEl.textContent = formatBytes(usage.file_storage_bytes || 0);
+  
+  const totalStorageEl = document.getElementById('metrics-total-storage');
+  if (totalStorageEl) totalStorageEl.textContent = formatBytes(usage.total_storage_bytes || 0);
+
+  // 2. Fetch and render logs
   try {
     const logs = await api(`/admin/projects/${detailProjectId}/logs`);
     
@@ -698,6 +753,7 @@ async function loadSettings() {
     document.getElementById('cfg-admin-password').value = '';
     document.getElementById('cfg-admin-password-confirm').value = '';
     document.getElementById('cfg-session-duration').value = cfg.session_duration || '24h';
+    document.getElementById('cfg-backup-interval').value = cfg.backup_interval || '1h';
 
     // S3 fields
     const s3Enabled = cfg.s3_enabled === true;
@@ -782,6 +838,7 @@ async function saveConfig() {
         cert_file:         document.getElementById('cfg-cert-file').value,
         key_file:          document.getElementById('cfg-key-file').value,
         session_duration:   document.getElementById('cfg-session-duration').value || '24h',
+        backup_interval:    document.getElementById('cfg-backup-interval').value || '1h',
         s3_enabled:         document.getElementById('cfg-s3-enabled').checked,
         s3_endpoint:        document.getElementById('cfg-s3-endpoint').value,
         s3_access_key:      document.getElementById('cfg-s3-access-key').value,
@@ -1153,3 +1210,547 @@ function checkAuth() {
   }
 }
 checkAuth();
+
+async function clearAuditLogs() {
+  if (!confirm("Are you sure you want to clear all audit logs? This action cannot be undone.")) {
+    return;
+  }
+  try {
+    await api('/admin/audit-logs', { method: 'DELETE' });
+    showToast('Audit logs cleared successfully');
+    auditPage = 0;
+    loadAuditLogs();
+  } catch (e) {
+    showToast('Failed to clear audit logs: ' + e.message, 'error');
+  }
+}
+
+async function runDeepDbAnalysis() {
+  const resultDiv = document.getElementById('db-analysis-result');
+  if (!resultDiv) return;
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-secondary);">Analyzing storage...</div>';
+
+  try {
+    const analysis = await api(`/admin/projects/${detailProjectId}/db-analysis`);
+    
+    let collectionsHtml = '';
+    const colls = analysis.collections || {};
+    const collNames = Object.keys(colls);
+    
+    if (collNames.length === 0) {
+      collectionsHtml = '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px 0;">No collections found</div>';
+    } else {
+      collectionsHtml = `
+        <table style="width:100%;font-size:12px;margin-top:8px;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);color:var(--text-muted);">
+              <th style="text-align:left;padding:6px 0;">Collection</th>
+              <th style="text-align:right;padding:6px 0;">Docs Count</th>
+              <th style="text-align:right;padding:6px 0;">Docs Size</th>
+              <th style="text-align:right;padding:6px 0;">Index Size</th>
+              <th style="text-align:right;padding:6px 0;">Total Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${collNames.map(name => {
+              const c = colls[name];
+              const docSize = c.document_size || 0;
+              const idxSize = c.index_size || 0;
+              const total = docSize + idxSize;
+              return `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                  <td style="padding:6px 0;font-family:var(--font-mono);">${escapeHtml(name)}</td>
+                  <td style="text-align:right;padding:6px 0;">${c.document_count || 0}</td>
+                  <td style="text-align:right;padding:6px 0;">${formatBytes(docSize)}</td>
+                  <td style="text-align:right;padding:6px 0;">${formatBytes(idxSize)}</td>
+                  <td style="text-align:right;padding:6px 0;font-weight:bold;">${formatBytes(total)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    resultDiv.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px;">
+        <span style="font-weight:bold;font-size:13px;text-transform:uppercase;color:var(--accent);">Storage Breakdown</span>
+        <button class="btn btn-xs btn-secondary" onclick="runDeepDbAnalysis()">Re-run</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:12px;margin-bottom:16px;">
+        <div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:4px;border:1px solid rgba(255,255,255,0.05);">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Total Size</div>
+          <div style="font-size:16px;font-weight:bold;margin-top:4px;color:var(--text-primary);">${formatBytes(analysis.total_size || 0)}</div>
+        </div>
+        <div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:4px;border:1px solid rgba(255,255,255,0.05);">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Metadata Size</div>
+          <div style="font-size:16px;font-weight:bold;margin-top:4px;color:var(--text-primary);">${formatBytes(analysis.metadata_size || 0)}</div>
+        </div>
+        <div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:4px;border:1px solid rgba(255,255,255,0.05);">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Index Size</div>
+          <div style="font-size:16px;font-weight:bold;margin-top:4px;color:var(--text-primary);">${formatBytes(analysis.index_size || 0)}</div>
+        </div>
+      </div>
+      <div>
+        <span style="font-weight:bold;font-size:12px;color:var(--text-secondary);">Collections Storage</span>
+        ${collectionsHtml}
+      </div>
+    `;
+  } catch (e) {
+    resultDiv.innerHTML = `<div style="color:var(--danger);text-align:center;padding:12px;">Analysis failed: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ===== REMOTE CONFIG =====
+
+async function loadRemoteConfig() {
+  const tbody = document.getElementById('config-entries-tbody');
+  if (!tbody) return;
+  try {
+    const data = await api(`/admin/projects/${detailProjectId}/config`);
+    const entries = data.data || [];
+    if (entries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;">No config entries yet. Click "Add Config" to create one.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = entries.map(e => {
+      const valStr = typeof e.value === 'object' ? JSON.stringify(e.value) : String(e.value);
+      const visBadge = e.public
+        ? '<span style="color:var(--success);font-size:11px;">🌐 Public</span>'
+        : '<span style="color:var(--text-muted);font-size:11px;">🔒 Private</span>';
+      return `
+        <tr>
+          <td style="font-family:var(--font-mono,monospace);font-size:12px;font-weight:600;">${escapeHtml(e.key)}</td>
+          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(valStr)}">${escapeHtml(valStr)}</td>
+          <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px;">${escapeHtml(e.type || 'string')}</span></td>
+          <td>${visBadge}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" onclick="deleteConfigEntry('${escapeHtml(e.key)}')" title="Delete">🗑</button>
+          </td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align:center;">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function showAddConfigModal() {
+  document.getElementById('modal-add-config').style.display = 'flex';
+  // Reset fields
+  document.getElementById('cfg-config-key').value = '';
+  document.getElementById('cfg-config-value').value = '';
+  document.getElementById('cfg-config-type').value = '';
+  document.getElementById('cfg-config-public').value = 'false';
+  document.getElementById('cfg-config-desc').value = '';
+  document.getElementById('config-modal-title').textContent = 'Add Config Entry';
+  setTimeout(() => document.getElementById('cfg-config-key').focus(), 100);
+}
+
+function closeAddConfigModal() {
+  const overlay = document.getElementById('modal-add-config');
+  const inner = overlay.querySelector('.modal');
+  if (inner) {
+    inner.classList.add('closing');
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      inner.classList.remove('closing');
+    }, 180);
+  } else {
+    overlay.style.display = 'none';
+  }
+}
+
+async function saveConfigEntry() {
+  const key = document.getElementById('cfg-config-key').value.trim();
+  const valueStr = document.getElementById('cfg-config-value').value.trim();
+  const type = document.getElementById('cfg-config-type').value;
+  const isPublic = document.getElementById('cfg-config-public').value === 'true';
+  const desc = document.getElementById('cfg-config-desc').value.trim();
+
+  if (!key) { showToast('Key is required', 'error'); return; }
+  if (!valueStr) { showToast('Value is required', 'error'); return; }
+
+  // Parse value based on type.
+  let value;
+  const effectiveType = type || 'auto';
+  try {
+    if (effectiveType === 'boolean' || (effectiveType === 'auto' && (valueStr === 'true' || valueStr === 'false'))) {
+      value = valueStr === 'true';
+    } else if (effectiveType === 'number' || (effectiveType === 'auto' && /^-?\d+(\.\d+)?$/.test(valueStr))) {
+      value = parseFloat(valueStr);
+    } else if (effectiveType === 'json') {
+      value = JSON.parse(valueStr);
+    } else {
+      value = valueStr;
+    }
+  } catch (e) {
+    showToast('Invalid JSON value: ' + e.message, 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-config');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    await api(`/admin/projects/${detailProjectId}/config`, {
+      method: 'POST',
+      body: JSON.stringify({ key, value, type, description: desc, public: isPublic })
+    });
+    showToast('Config entry saved');
+    closeAddConfigModal();
+    await loadRemoteConfig();
+  } catch (err) {
+    showToast('Failed to save: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save';
+  }
+}
+
+async function deleteConfigEntry(key) {
+  if (!confirmCustom) {
+    // Fallback to native confirm if custom confirm not available.
+    if (!confirm(`Delete config entry "${key}"?`)) return;
+    try {
+      await api(`/admin/projects/${detailProjectId}/config/${encodeURIComponent(key)}`, { method: 'DELETE' });
+      showToast('Config entry deleted');
+      await loadRemoteConfig();
+    } catch (err) {
+      showToast('Failed to delete: ' + err.message, 'error');
+    }
+    return;
+  }
+  confirmCustom(`Delete config entry "${key}"?`, async () => {
+    try {
+      await api(`/admin/projects/${detailProjectId}/config/${encodeURIComponent(key)}`, { method: 'DELETE' });
+      showToast('Config entry deleted');
+      await loadRemoteConfig();
+    } catch (err) {
+      showToast('Failed to delete: ' + err.message, 'error');
+    }
+  });
+}
+
+// ===== CRON JOBS =====
+
+async function loadCronJobs() {
+  const tbody = document.getElementById('cron-jobs-tbody');
+  if (!tbody) return;
+  try {
+    const data = await api(`/admin/projects/${detailProjectId}/cron`);
+    const jobs = data.data || [];
+    if (jobs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;">No scheduled jobs yet. Click "Add Job" to create one.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = jobs.map(j => {
+      const statusBadge = j.enabled
+        ? '<span style="color:var(--success);font-size:11px;">● Active</span>'
+        : '<span style="color:var(--text-muted);font-size:11px;">○ Paused</span>';
+      const shortUrl = (j.url || '').length > 40 ? j.url.substring(0, 37) + '...' : (j.url || '');
+      return `
+        <tr>
+          <td style="font-size:12px;font-weight:600;">${escapeHtml(j.name)}</td>
+          <td style="font-family:var(--font-mono,monospace);font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:3px;">${escapeHtml(j.schedule)}</td>
+          <td style="font-size:12px;max-width:250px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(j.url)}">${escapeHtml(shortUrl)}</td>
+          <td>${statusBadge}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" onclick="deleteCronJob('${escapeHtml(j.id)}','${escapeHtml(j.name)}')" title="Delete">🗑</button>
+          </td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align:center;">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function showAddCronModal() {
+  document.getElementById('modal-add-cron').style.display = 'flex';
+  document.getElementById('cron-name').value = '';
+  document.getElementById('cron-schedule').value = '*/5 * * * *';
+  document.getElementById('cron-method').value = 'POST';
+  document.getElementById('cron-enabled').value = 'true';
+  document.getElementById('cron-url').value = '';
+  document.getElementById('cron-body').value = '';
+  setTimeout(() => document.getElementById('cron-name').focus(), 100);
+}
+
+function closeAddCronModal() {
+  const overlay = document.getElementById('modal-add-cron');
+  const inner = overlay.querySelector('.modal');
+  if (inner) {
+    inner.classList.add('closing');
+    setTimeout(() => { overlay.style.display = 'none'; inner.classList.remove('closing'); }, 180);
+  } else {
+    overlay.style.display = 'none';
+  }
+}
+
+async function saveCronJob() {
+  const name = document.getElementById('cron-name').value.trim();
+  const schedule = document.getElementById('cron-schedule').value.trim();
+  const method = document.getElementById('cron-method').value;
+  const enabled = document.getElementById('cron-enabled').value === 'true';
+  const url = document.getElementById('cron-url').value.trim();
+  const body = document.getElementById('cron-body').value.trim();
+
+  if (!name) { showToast('Job name is required', 'error'); return; }
+  if (!schedule) { showToast('Schedule is required', 'error'); return; }
+  if (!url) { showToast('Callback URL is required', 'error'); return; }
+
+  const payload = { name, schedule, method, enabled, url };
+  if (body) {
+    try { JSON.parse(body); payload.body = body; }
+    catch (e) { showToast('Invalid JSON in body', 'error'); return; }
+  }
+
+  const btn = document.getElementById('btn-save-cron');
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+
+  try {
+    await api(`/admin/projects/${detailProjectId}/cron`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    showToast('Cron job created');
+    closeAddCronModal();
+    await loadCronJobs();
+  } catch (err) {
+    showToast('Failed to create: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Job';
+  }
+}
+
+async function deleteCronJob(jobId, jobName) {
+  if (!confirm(`Delete cron job "${jobName}"?`)) return;
+  try {
+    await api(`/admin/projects/${detailProjectId}/cron/${jobId}`, { method: 'DELETE' });
+    showToast('Cron job deleted');
+    await loadCronJobs();
+  } catch (err) {
+    showToast('Failed to delete: ' + err.message, 'error');
+  }
+}
+
+// ===== WEBHOOKS =====
+
+async function loadWebhooks() {
+  const tbody = document.getElementById('webhooks-tbody');
+  if (!tbody) return;
+  try {
+    const data = await api(`/admin/projects/${detailProjectId}/webhooks`);
+    const hooks = data.data || [];
+    if (hooks.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-muted" style="text-align:center;">No webhooks configured. Add one to receive HTTP callbacks on data events.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = hooks.map(h => {
+      const events = h.events || 'all';
+      const statusBadge = h.enabled
+        ? '<span style="color:var(--success);font-size:11px;">● Active</span>'
+        : '<span style="color:var(--text-muted);font-size:11px;">○ Paused</span>';
+      const shortUrl = (h.url || '').length > 50 ? h.url.substring(0, 47) + '...' : (h.url || '');
+      return `
+        <tr>
+          <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(h.url)}">${escapeHtml(shortUrl)}</td>
+          <td style="font-size:11px;">${escapeHtml(events)}</td>
+          <td>${statusBadge}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" onclick="deleteWebhook('${escapeHtml(h.id)}')" title="Delete">🗑</button>
+          </td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function showAddWebhookModal() {
+  document.getElementById('modal-add-webhook').style.display = 'flex';
+  document.getElementById('wh-url').value = '';
+  document.getElementById('wh-events').value = '';
+  document.getElementById('wh-enabled').value = 'true';
+  setTimeout(() => document.getElementById('wh-url').focus(), 100);
+}
+
+function closeAddWebhookModal() {
+  const overlay = document.getElementById('modal-add-webhook');
+  const inner = overlay.querySelector('.modal');
+  if (inner) {
+    inner.classList.add('closing');
+    setTimeout(() => { overlay.style.display = 'none'; inner.classList.remove('closing'); }, 180);
+  } else {
+    overlay.style.display = 'none';
+  }
+}
+
+async function saveWebhook() {
+  const url = document.getElementById('wh-url').value.trim();
+  const events = document.getElementById('wh-events').value.trim();
+  const enabled = document.getElementById('wh-enabled').value === 'true';
+
+  if (!url) { showToast('URL is required', 'error'); return; }
+
+  const btn = document.getElementById('btn-save-webhook');
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+
+  try {
+    await api(`/admin/projects/${detailProjectId}/webhooks`, {
+      method: 'POST',
+      body: JSON.stringify({ url, events, enabled })
+    });
+    showToast('Webhook created');
+    closeAddWebhookModal();
+    await loadWebhooks();
+  } catch (err) {
+    showToast('Failed to create: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Webhook';
+  }
+}
+
+async function deleteWebhook(webhookId) {
+  if (!confirm('Delete this webhook?')) return;
+  try {
+    await api(`/admin/projects/${detailProjectId}/webhooks/${webhookId}`, { method: 'DELETE' });
+    showToast('Webhook deleted');
+    await loadWebhooks();
+  } catch (err) {
+    showToast('Failed to delete: ' + err.message, 'error');
+  }
+}
+
+// ===== ANALYTICS =====
+
+async function loadAnalytics() {
+  try {
+    const data = await api(`/admin/projects/${detailProjectId}/analytics`);
+
+    // Summary cards.
+    document.getElementById('analytics-total').textContent = (data.total_events || 0).toLocaleString();
+
+    const topEvents = data.top_events || [];
+    document.getElementById('analytics-top').textContent = topEvents.length > 0 ? topEvents[0].name : '—';
+
+    const hourlyCounts = data.hourly_counts || [];
+    document.getElementById('analytics-hours').textContent = hourlyCounts.length;
+
+    // Top events table.
+    const topTbody = document.getElementById('analytics-top-tbody');
+    if (topEvents.length === 0) {
+      topTbody.innerHTML = '<tr><td colspan="2" class="text-muted" style="text-align:center;">No events yet. Start sending events via POST /api/v1/events</td></tr>';
+    } else {
+      topTbody.innerHTML = topEvents.map(e => `
+        <tr>
+          <td style="font-size:12px;font-weight:600;">${escapeHtml(e.name)}</td>
+          <td>${e.count.toLocaleString()}</td>
+        </tr>`).join('');
+    }
+
+    // Hourly bar chart.
+    const chart = document.getElementById('analytics-chart');
+    if (!chart) return;
+
+    if (hourlyCounts.length === 0) {
+      chart.innerHTML = '<span style="color:var(--text-muted);font-size:12px;align-self:center;width:100%;text-align:center;">No data yet</span>';
+      return;
+    }
+
+    const maxCount = Math.max(...hourlyCounts.map(h => h.count), 1);
+    chart.innerHTML = hourlyCounts.map(h => {
+      const pct = Math.round((h.count / maxCount) * 100);
+      const hour = new Date(h.hour).getHours();
+      const hourLabel = String(hour).padStart(2, '0') + ':00';
+      return `
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:20px;" title="${hourLabel}: ${h.count} events">
+          <span style="font-size:9px;color:var(--text-muted);">${h.count}</span>
+          <div style="width:100%;height:${Math.max(pct, 2)}%;background:linear-gradient(180deg, #5b5bff 0%, #8b5cf6 100%);border-radius:3px 3px 0 0;min-height:2px;"></div>
+          <span style="font-size:9px;color:var(--text-muted);">${hourLabel}</span>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('analytics-total').textContent = '—';
+    document.getElementById('analytics-top').textContent = '—';
+    document.getElementById('analytics-hours').textContent = '—';
+    const topTbody = document.getElementById('analytics-top-tbody');
+    if (topTbody) topTbody.innerHTML = `<tr><td colspan="2" class="text-muted" style="text-align:center;">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+    const chart = document.getElementById('analytics-chart');
+    if (chart) chart.innerHTML = '<span style="color:var(--danger);font-size:12px;align-self:center;width:100%;text-align:center;">Load failed</span>';
+  }
+}
+
+// ===== QUEUES =====
+
+let queuesData = [];
+
+async function loadQueues() {
+  const tbody = document.getElementById('queues-tbody');
+  if (!tbody) return;
+  try {
+    const data = await api(`/admin/projects/${detailProjectId}/queues`);
+    queuesData = data.data || [];
+    if (queuesData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;">No queues yet. Send a message via POST /api/v1/queues/send to create one.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = queuesData.map(q => `
+      <tr>
+        <td style="font-size:13px;font-weight:600;font-family:var(--font-mono,monospace);">${escapeHtml(q.name)}</td>
+        <td><span style="color:var(--success);">${q.visible || 0}</span></td>
+        <td><span style="color:var(--warning);">${q.in_flight || 0}</span></td>
+        <td>${(q.total || 0).toLocaleString()}</td>
+        <td>
+          <button class="btn btn-sm btn-warning" onclick="unstickQueue('${escapeHtml(q.name)}')" title="Make in-flight messages visible again">🔓</button>
+          <button class="btn btn-sm btn-danger" onclick="purgeQueueConfirm('${escapeHtml(q.name)}')" title="Delete all messages">🗑</button>
+        </td>
+      </tr>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align:center;">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function unstickQueue(queueName) {
+  if (!confirm(`Make ALL in-flight messages in "${queueName}" visible again?`)) return;
+  try {
+    await api(`/admin/projects/${detailProjectId}/queues/${encodeURIComponent(queueName)}/make-visible`, { method: 'POST', body: '{}' });
+    showToast(`Queue "${queueName}" unstuck`);
+    await loadQueues();
+  } catch (err) {
+    showToast('Failed: ' + err.message, 'error');
+  }
+}
+
+async function makeAllVisible() {
+  if (queuesData.length === 0) { showToast('No queues to unstick', 'error'); return; }
+  const name = prompt('Queue name to unstick:');
+  if (!name) return;
+  await unstickQueue(name);
+}
+
+async function purgeQueueConfirm(queueName) {
+  if (!confirm(`PERMANENTLY DELETE all messages from "${queueName}"?`)) return;
+  try {
+    await api(`/admin/projects/${detailProjectId}/queues/purge`, {
+      method: 'POST',
+      body: JSON.stringify({ queue: queueName })
+    });
+    showToast(`Queue "${queueName}" purged`);
+    await loadQueues();
+  } catch (err) {
+    showToast('Failed: ' + err.message, 'error');
+  }
+}
+
+async function purgeQueue() {
+  if (queuesData.length === 0) { showToast('No queues to purge', 'error'); return; }
+  const name = prompt('Queue name to purge (this DELETES all messages):');
+  if (!name) return;
+  await purgeQueueConfirm(name);
+}

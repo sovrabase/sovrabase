@@ -55,13 +55,14 @@ type ProjectEnv struct {
 
 // ProjectManager manages all projects in the system.
 type ProjectManager struct {
-	mu        sync.RWMutex
-	db        *pebble.DB
-	baseDir   string
-	cfg       *config.Config
-	projects  map[string]*Project // in-memory cache
-	envs      map[string]*ProjectEnv // project ID -> active environment cache
-	teamStore *TeamStore // lazily initialized
+	mu          sync.RWMutex
+	db          *pebble.DB
+	baseDir     string
+	cfg         *config.Config
+	projects    map[string]*Project     // in-memory cache
+	envs        map[string]*ProjectEnv // project ID -> active environment cache
+	teamStore   *TeamStore             // lazily initialized
+	secretIndex map[string]*Project    // JWT secret -> project (O(1) lookup)
 }
 
 // NewProjectManager creates a new project manager backed by the master database
@@ -78,11 +79,12 @@ func NewProjectManager(baseDir string, cfg *config.Config) (*ProjectManager, err
 	}
 
 	pm := &ProjectManager{
-		db:       db,
-		baseDir:  baseDir,
-		cfg:      cfg,
-		projects: make(map[string]*Project),
-		envs:     make(map[string]*ProjectEnv),
+		db:          db,
+		baseDir:     baseDir,
+		cfg:         cfg,
+		projects:    make(map[string]*Project),
+		envs:        make(map[string]*ProjectEnv),
+		secretIndex: make(map[string]*Project),
 	}
 
 	// Load existing projects into cache
@@ -165,6 +167,7 @@ func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) 
 	}
 
 	pm.projects[id] = proj
+	pm.secretIndex[jwtSecret] = proj
 	return proj, nil
 }
 
@@ -181,16 +184,16 @@ func (pm *ProjectManager) GetProject(id string) (*Project, error) {
 }
 
 // GetProjectBySecret retrieves a project by its JWT secret (API key).
+// Uses an in-memory secret index for O(1) lookup.
 func (pm *ProjectManager) GetProjectBySecret(secret string) (*Project, error) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 
-	for _, p := range pm.projects {
-		if p.JWTSecret == secret {
-			return p, nil
-		}
+	proj, ok := pm.secretIndex[secret]
+	if !ok {
+		return nil, fmt.Errorf("tenant: invalid project secret")
 	}
-	return nil, fmt.Errorf("tenant: invalid project secret")
+	return proj, nil
 }
 
 // ListProjects returns all active projects.
@@ -263,7 +266,7 @@ func (pm *ProjectManager) DeleteProject(id string) error {
 	os.RemoveAll(projectDir)
 
 	delete(pm.projects, id)
-
+	delete(pm.secretIndex, proj.JWTSecret)
 	// Remove from master DB
 	key := projectDBKey(id)
 	return pm.db.Delete(key, pebble.Sync)
@@ -359,6 +362,10 @@ func (pm *ProjectManager) loadAll() error {
 			}
 		}
 		pm.projects[proj.ID] = &proj
+		// Build secret index for O(1) lookups.
+		if proj.JWTSecret != "" {
+			pm.secretIndex[proj.JWTSecret] = &proj
+		}
 	}
 	return iter.Error()
 }
@@ -388,14 +395,25 @@ func (pm *ProjectManager) GetProjectEnv(id string) (*ProjectEnv, error) {
 	// 4. Initialize auth service
 	userStore := auth.NewDBUserStore(engine)
 	authSvc := auth.NewService(proj.JWTSecret, userStore)
-	authSvc.EmailVerificationEnabled = os.Getenv("SOVRABASE_EMAIL_VERIFICATION") == "true"
-	authSvc.SMTPHost = os.Getenv("SOVRABASE_SMTP_HOST")
-	if portVal, err := strconv.Atoi(os.Getenv("SOVRABASE_SMTP_PORT")); err == nil {
-		authSvc.SMTPPort = portVal
+	// Use central config if available, otherwise fall back to env vars.
+	if pm.cfg != nil {
+		authSvc.EmailVerificationEnabled = pm.cfg.EmailVerification
+		authSvc.SMTPHost = pm.cfg.SMTPHost
+		authSvc.SMTPPort = pm.cfg.SMTPPort
+		authSvc.SMTPUser = pm.cfg.SMTPUser
+		authSvc.SMTPPassword = pm.cfg.SMTPPassword
+		authSvc.SMTPSender = pm.cfg.SMTPSender
+	} else {
+		// Legacy fallback for tests passing nil config.
+		authSvc.EmailVerificationEnabled = os.Getenv("SOVRABASE_EMAIL_VERIFICATION") == "true"
+		authSvc.SMTPHost = os.Getenv("SOVRABASE_SMTP_HOST")
+		if portVal, err := strconv.Atoi(os.Getenv("SOVRABASE_SMTP_PORT")); err == nil {
+			authSvc.SMTPPort = portVal
+		}
+		authSvc.SMTPUser = os.Getenv("SOVRABASE_SMTP_USER")
+		authSvc.SMTPPassword = os.Getenv("SOVRABASE_SMTP_PASSWORD")
+		authSvc.SMTPSender = os.Getenv("SOVRABASE_SMTP_SENDER")
 	}
-	authSvc.SMTPUser = os.Getenv("SOVRABASE_SMTP_USER")
-	authSvc.SMTPPassword = os.Getenv("SOVRABASE_SMTP_PASSWORD")
-	authSvc.SMTPSender = os.Getenv("SOVRABASE_SMTP_SENDER")
 
 	// Register per-project OAuth providers
 	for _, pCfg := range proj.OAuthProviders {
@@ -409,7 +427,13 @@ func (pm *ProjectManager) GetProjectEnv(id string) (*ProjectEnv, error) {
 
 	// 5. Initialize storage driver
 	var storageDriver storage.Driver
-	if os.Getenv("S3_ACCESS_KEY") != "" {
+	s3Enabled := false
+	if pm.cfg != nil {
+		s3Enabled = pm.cfg.S3Enabled && pm.cfg.S3AccessKey != ""
+	} else {
+		s3Enabled = os.Getenv("S3_ACCESS_KEY") != ""
+	}
+	if s3Enabled {
 		s3Svc, err := storage.NewS3DriverFromEnv()
 		if err != nil {
 			engine.Close()

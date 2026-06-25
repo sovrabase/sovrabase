@@ -21,6 +21,7 @@ type Config struct {
 	AdminEmail      string        `yaml:"admin_email"    json:"admin_email"`
 	AdminPassword   string        `yaml:"admin_password" json:"admin_password"`
 	SessionDuration time.Duration `yaml:"session_duration" json:"session_duration"`
+	BackupInterval  time.Duration `yaml:"backup_interval"  json:"backup_interval"`
 
 	// Security / HTTPS
 	CertFile        string        `yaml:"cert_file"        json:"cert_file"`
@@ -34,6 +35,12 @@ type Config struct {
 	SMTPPassword      string        `yaml:"smtp_password"      json:"smtp_password"`
 	SMTPSender        string        `yaml:"smtp_sender"        json:"smtp_sender"`
 	EmailVerification bool          `yaml:"email_verification" json:"email_verification"`
+
+	// Captcha protection
+	CaptchaEnabled  bool   `yaml:"captcha_enabled"   json:"captcha_enabled"`
+	CaptchaProvider string `yaml:"captcha_provider"  json:"captcha_provider"` // "hcaptcha" or "turnstile"
+	CaptchaSiteKey  string `yaml:"captcha_site_key"  json:"captcha_site_key"`
+	CaptchaSecret   string `yaml:"captcha_secret"    json:"captcha_secret"`
 
 	// Rate Limiting
 	RateLimitPerMinute int `yaml:"rate_limit_per_minute" json:"rate_limit_per_minute"`
@@ -68,6 +75,7 @@ func defaults() *Config {
 		AdminEmail:         "admin@sovrabase.eu",
 		AdminPassword:      "admin1234",
 		SessionDuration:    24 * time.Hour,
+		BackupInterval:     1 * time.Hour,
 		RateLimitPerMinute: 100,
 		RateLimitBurst:     20,
 		S3UseSSL:           true,
@@ -176,6 +184,11 @@ func applyEnvOverrides(cfg *Config) {
 	}
 
 	setStr("SOVRABASE_DATA_DIR", &cfg.DataDir)
+	if v := os.Getenv("SOVRABASE_BACKUP_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.BackupInterval = d
+		}
+	}
 	setStr("SOVRABASE_LISTEN_ADDR", &cfg.ListenAddr)
 	setStr("SOVRABASE_JWT_SECRET", &cfg.JWTSecret)
 	setStr("SOVRABASE_STORAGE_DIR", &cfg.StorageDir)
@@ -213,6 +226,10 @@ func applyEnvOverrides(cfg *Config) {
 	setStr("SOVRABASE_SMTP_PASSWORD", &cfg.SMTPPassword)
 	setStr("SOVRABASE_SMTP_SENDER", &cfg.SMTPSender)
 	setBool("SOVRABASE_EMAIL_VERIFICATION", &cfg.EmailVerification)
+	setBool("SOVRABASE_CAPTCHA_ENABLED", &cfg.CaptchaEnabled)
+	setStr("SOVRABASE_CAPTCHA_PROVIDER", &cfg.CaptchaProvider)
+	setStr("SOVRABASE_CAPTCHA_SITE_KEY", &cfg.CaptchaSiteKey)
+	setStr("SOVRABASE_CAPTCHA_SECRET", &cfg.CaptchaSecret)
 	setStr("ENV", &cfg.Env)
 	setStr("APP_ENV", &cfg.Env)
 }

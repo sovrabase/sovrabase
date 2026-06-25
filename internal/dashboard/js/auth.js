@@ -21,6 +21,7 @@ function renderUsersTable() {
   tbody.innerHTML = activeProjectEnv.users.map(u => {
     const id = u.id || '';
     const email = u.email || '';
+    const username = u.username || '—';
     const role = u.role || 'user';
     const name = u.name || '';
     const avatar = u.avatar_url || '';
@@ -39,10 +40,12 @@ function renderUsersTable() {
     
     return `<tr>
       <td class="td-id" title="${escapeHtml(id)}">${escapeHtml(shortId)}</td>
+      <td style="font-size:12px;">${escapeHtml(username)}</td>
       <td class="td-name">${avatarHtml}${escapeHtml(displayName)}${providerTags}</td>
       <td><span class="badge ${role === 'admin' ? 'badge-suspended' : 'badge-active'}"><span class="badge-dot"></span>${escapeHtml(role)}</span></td>
       <td class="td-date">${created}</td>
-      <td class="td-actions">
+      <td class="td-actions" style="display:flex;gap:4px;">
+        <button class="btn btn-xs btn-secondary" onclick="openEditUserModal('${escapeHtml(id)}')">Edit</button>
         <button class="btn btn-xs btn-danger" onclick="deleteUser('${escapeHtml(id)}')">Delete</button>
       </td>
     </tr>`;
@@ -50,6 +53,7 @@ function renderUsersTable() {
 }
 
 function openCreateUserModal() {
+  document.getElementById('new-user-username').value = '';
   document.getElementById('new-user-email').value = '';
   document.getElementById('new-user-password').value = '';
   document.getElementById('new-user-role').value = 'user';
@@ -57,6 +61,7 @@ function openCreateUserModal() {
 }
 
 async function submitCreateUser() {
+  const username = document.getElementById('new-user-username').value.trim();
   const email = document.getElementById('new-user-email').value.trim();
   const password = document.getElementById('new-user-password').value;
   const role = document.getElementById('new-user-role').value;
@@ -73,7 +78,7 @@ async function submitCreateUser() {
   try {
     await api(`/admin/projects/${detailProjectId}/users`, {
       method: 'POST',
-      body: JSON.stringify({ email, password, role })
+      body: JSON.stringify({ email, password, role, username })
     });
     showToast('User created successfully');
     closeSubModal('modal-create-user');
@@ -90,6 +95,46 @@ async function deleteUser(id) {
       method: 'DELETE'
     });
     showToast('User deleted');
+    await loadUsers();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function openEditUserModal(id) {
+  const user = activeProjectEnv.users.find(u => u.id === id);
+  if (!user) return;
+
+  document.getElementById('edit-user-id').value = user.id;
+  document.getElementById('edit-user-username').value = user.username || '';
+  document.getElementById('edit-user-email').value = user.email || '';
+  document.getElementById('edit-user-name').value = user.name || '';
+  document.getElementById('edit-user-avatar').value = user.avatar_url || '';
+  document.getElementById('edit-user-role').value = user.role || 'user';
+
+  openSubModal('modal-edit-user');
+}
+
+async function submitEditUser() {
+  const id = document.getElementById('edit-user-id').value;
+  const username = document.getElementById('edit-user-username').value.trim();
+  const email = document.getElementById('edit-user-email').value.trim();
+  const name = document.getElementById('edit-user-name').value.trim();
+  const avatar_url = document.getElementById('edit-user-avatar').value.trim();
+  const role = document.getElementById('edit-user-role').value;
+
+  if (!email) {
+    showToast('Email is required', 'error');
+    return;
+  }
+
+  try {
+    await api(`/admin/projects/${detailProjectId}/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ email, username, name, avatar_url, role })
+    });
+    showToast('User updated successfully');
+    closeSubModal('modal-edit-user');
     await loadUsers();
   } catch (err) {
     showToast(err.message, 'error');
@@ -182,6 +227,29 @@ async function loadOAuthProviders() {
     renderOAuthProviders();
   } catch (err) {
     showToast('Failed to load OAuth providers: ' + err.message, 'error');
+  }
+  // Load auth features status (email verification, etc.)
+  loadAuthFeaturesStatus();
+}
+
+async function loadAuthFeaturesStatus() {
+  // Check email verification status from server config.
+  try {
+    const cfg = await api('/admin/config');
+    const el = document.getElementById('auth-email-ver-status');
+    if (!el) return;
+    if (cfg.email_verification) {
+      el.textContent = '✓ Enabled';
+      el.style.color = 'var(--success)';
+      el.style.background = 'rgba(34,197,94,0.1)';
+    } else {
+      el.textContent = '✗ Disabled';
+      el.style.color = 'var(--text-muted)';
+      el.style.background = 'rgba(255,255,255,0.06)';
+    }
+  } catch (e) {
+    const el = document.getElementById('auth-email-ver-status');
+    if (el) { el.textContent = '—'; el.style.color = 'var(--text-muted)'; }
   }
 }
 

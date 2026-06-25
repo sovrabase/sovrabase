@@ -121,3 +121,85 @@ func (c *Client) GetMe() (*User, error) {
 	}
 	return &user, nil
 }
+
+// ─── Magic Links ──────────────────────────────────────────────────────────────
+
+// CreateMagicLink sends a magic link to the given email for passwordless login.
+// Returns the token (in dev mode) or an empty string.
+func (c *Client) CreateMagicLink(email string) (string, error) {
+	body := map[string]interface{}{"email": email}
+	var resp struct {
+		Message string `json:"message"`
+		Token   string `json:"token"`
+	}
+	if err := c.doJSON("POST", "/auth/v1/magic-link", body, &resp); err != nil {
+		return "", err
+	}
+	return resp.Token, nil
+}
+
+// VerifyMagicLink completes a magic link login flow.
+// Returns the authentication tokens on success.
+func (c *Client) VerifyMagicLink(email, token string) error {
+	body := map[string]interface{}{
+		"email": email,
+		"token": token,
+	}
+	var resp AuthResponse
+	if err := c.doJSON("POST", "/auth/v1/verify-magic-link", body, &resp); err != nil {
+		return err
+	}
+	c.SetAuth(resp.AccessToken, resp.RefreshToken)
+	return nil
+}
+
+// ─── MFA (TOTP) ───────────────────────────────────────────────────────────────
+
+// MFASetupResponse contains the TOTP secret and otpauth URI from SetupMFA.
+type MFASetupResponse struct {
+	Secret string `json:"secret"`
+	URI    string `json:"uri"`
+}
+
+// MFAConfirmResponse contains the backup codes returned after enabling MFA.
+type MFAConfirmResponse struct {
+	Message      string   `json:"message"`
+	BackupCodes  []string `json:"backup_codes"`
+}
+
+// SetupMFA generates a new TOTP secret. The secret must be confirmed with
+// ConfirmMFA before MFA is fully enabled.
+func (c *Client) SetupMFA() (*MFASetupResponse, error) {
+	var resp MFASetupResponse
+	if err := c.doJSON("POST", "/auth/v1/mfa/setup", nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// ConfirmMFA verifies a TOTP code and enables MFA. Returns backup codes.
+func (c *Client) ConfirmMFA(code string) ([]string, error) {
+	body := map[string]interface{}{"code": code}
+	var resp MFAConfirmResponse
+	if err := c.doJSON("POST", "/auth/v1/mfa/confirm", body, &resp); err != nil {
+		return nil, err
+	}
+	return resp.BackupCodes, nil
+}
+
+// DisableMFA turns off MFA after verifying a TOTP or backup code.
+func (c *Client) DisableMFA(code string) error {
+	body := map[string]interface{}{"code": code}
+	return c.doJSON("POST", "/auth/v1/mfa/disable", body, nil)
+}
+
+// GetMFAStatus returns whether MFA is enabled for the current user.
+func (c *Client) GetMFAStatus() (bool, error) {
+	var resp struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.doJSON("GET", "/auth/v1/mfa/status", nil, &resp); err != nil {
+		return false, err
+	}
+	return resp.Enabled, nil
+}

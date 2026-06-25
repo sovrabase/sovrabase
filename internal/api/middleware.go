@@ -82,9 +82,8 @@ func getClaims(r *http.Request) *UserClaims {
 	return claims
 }
 
-// auditLoggerMiddleware logs mutation requests to the project's requests.log file.
-// It wraps mutation methods (POST/PUT/PATCH/DELETE) on /api/v1/collections/.
-func (s *Server) auditLoggerMiddleware(next http.Handler) http.Handler {
+// clientRequestLoggerMiddleware logs all requests (API and Auth) to the project's requests.log file.
+func (s *Server) clientRequestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w}
@@ -113,25 +112,29 @@ func (s *Server) auditLoggerMiddleware(next http.Handler) http.Handler {
 		defer f.Close()
 
 		logEntry := map[string]interface{}{
-			"timestamp":  time.Now().Format(time.RFC3339Nano),
-			"method":     r.Method,
-			"path":       r.URL.Path,
-			"email":      email,
-			"status":     sw.status,
-			"duration":   time.Since(start).String(),
-			"collection": strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/api/v1/collections/"), "/"),
+			"timestamp": time.Now().Format(time.RFC3339Nano),
+			"method":    r.Method,
+			"path":      r.URL.Path,
+			"email":     email,
+			"status":    sw.status,
+			"duration":  time.Since(start).String(),
+			"ip":        r.RemoteAddr,
 		}
 
-		// Extract doc_id from path if present (e.g., /api/v1/collections/{collection}/{id})
-		pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/v1/collections/"), "/")
-		if len(pathParts) >= 2 {
-			logEntry["doc_id"] = pathParts[1]
+		if strings.HasPrefix(r.URL.Path, "/api/v1/collections/") {
+			rest := strings.TrimPrefix(r.URL.Path, "/api/v1/collections/")
+			parts := strings.Split(rest, "/")
+			if len(parts) > 0 && parts[0] != "" {
+				logEntry["collection"] = parts[0]
+			}
+			if len(parts) >= 2 && parts[1] != "" {
+				logEntry["doc_id"] = parts[1]
+			}
 		}
 
 		bytes, err := json.Marshal(logEntry)
-		if err != nil {
-			return
+		if err == nil {
+			_, _ = f.Write(append(bytes, '\n'))
 		}
-		_, _ = f.Write(append(bytes, '\n'))
 	})
 }

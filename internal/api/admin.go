@@ -58,6 +58,7 @@ var adminPermissionMap = []struct {
 	{"/admin/admins", []string{"GET"}, auth.AdminRoleSupport},
 	// Audit logs — all authenticated admins
 	{"/admin/audit-logs", []string{"GET"}, auth.AdminRoleSupport},
+	{"/admin/audit-logs", []string{"DELETE"}, auth.AdminRoleAdmin},
 	// Admin info (self)
 	{"/admin/admins/me", []string{"GET"}, auth.AdminRoleSupport},
 	// Config — admins and above
@@ -307,6 +308,7 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 
 	// Audit log endpoint
 	mux.Handle("GET /admin/audit-logs", a.adminAuthMiddleware(http.HandlerFunc(a.handleListAuditLogs)))
+	mux.Handle("DELETE /admin/audit-logs", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleClearAuditLogs))))
 
 	// Project management
 	mux.Handle("GET /admin/projects", a.adminAuthMiddleware(http.HandlerFunc(a.handleListProjects)))
@@ -325,6 +327,7 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 
 	// Database management endpoints
 	mux.Handle("GET /admin/projects/{id}/collections", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleListCollections))))
+	mux.Handle("GET /admin/projects/{id}/db-analysis", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleProjectDbAnalysis))))
 	mux.Handle("POST /admin/projects/{id}/collections", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateCollection))))
 	mux.Handle("DELETE /admin/projects/{id}/collections/{name}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDropCollection))))
 	mux.Handle("GET /admin/projects/{id}/collections/{name}/documents", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleListDocuments))))
@@ -344,6 +347,7 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /admin/projects/{id}/users", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleListUsers))))
 	mux.Handle("POST /admin/projects/{id}/users", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateUser))))
 	mux.Handle("DELETE /admin/projects/{id}/users/{userId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteUser))))
+	mux.Handle("PATCH /admin/projects/{id}/users/{userId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUpdateUser))))
 
 	// OAuth provider management endpoints
 	mux.Handle("GET /admin/projects/{id}/auth/providers", a.adminAuthMiddleware(http.HandlerFunc(a.handleListOAuthProviders)))
@@ -375,6 +379,42 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /admin/projects/{id}/members/{userId}/role", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUpdateMemberRole))))
 	mux.Handle("GET /admin/invitations/{token}", a.adminAuthMiddleware(http.HandlerFunc(a.handleGetInvitation)))
 	mux.Handle("POST /admin/invitations/{token}/accept", a.adminAuthMiddleware(http.HandlerFunc(a.handleAcceptInvitation)))
+
+	// Remote config management endpoints
+	mux.Handle("GET /admin/projects/{id}/config", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListConfig))))
+	mux.Handle("POST /admin/projects/{id}/config", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminSetConfig))))
+	mux.Handle("DELETE /admin/projects/{id}/config/{key}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminDeleteConfig))))
+
+	// Cron job management endpoints
+	mux.Handle("GET /admin/projects/{id}/cron", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListCronJobs))))
+	mux.Handle("POST /admin/projects/{id}/cron", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminCreateCronJob))))
+	mux.Handle("PUT /admin/projects/{id}/cron/{jobId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminUpdateCronJob))))
+	mux.Handle("DELETE /admin/projects/{id}/cron/{jobId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminDeleteCronJob))))
+	mux.Handle("GET /admin/projects/{id}/cron/{jobId}/executions", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminGetCronExecutions))))
+
+	// Webhook management endpoints
+	mux.Handle("GET /admin/projects/{id}/webhooks", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListWebhooks))))
+	mux.Handle("POST /admin/projects/{id}/webhooks", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminCreateWebhook))))
+	mux.Handle("PUT /admin/projects/{id}/webhooks/{webhookId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminUpdateWebhook))))
+	mux.Handle("DELETE /admin/projects/{id}/webhooks/{webhookId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminDeleteWebhook))))
+
+	// Email template management endpoints
+	mux.Handle("GET /admin/projects/{id}/email-templates", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListEmailTemplates))))
+	mux.Handle("POST /admin/projects/{id}/email-templates", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminSetEmailTemplate))))
+	mux.Handle("POST /admin/projects/{id}/email-templates/{type}/reset", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminResetEmailTemplate))))
+
+	// Log drain management endpoints
+	mux.Handle("GET /admin/projects/{id}/log-drains", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListLogDrains))))
+	mux.Handle("POST /admin/projects/{id}/log-drains", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminCreateLogDrain))))
+	mux.Handle("DELETE /admin/projects/{id}/log-drains/{drainId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminDeleteLogDrain))))
+
+	// Analytics endpoints
+	mux.Handle("GET /admin/projects/{id}/analytics", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminAnalyticsSummary))))
+
+	// Queue management endpoints
+	mux.Handle("GET /admin/projects/{id}/queues", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListQueues))))
+	mux.Handle("POST /admin/projects/{id}/queues/purge", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminPurgeQueue))))
+	mux.Handle("POST /admin/projects/{id}/queues/{queueName}/make-visible", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminMakeVisible))))
 }
 
 // ─── Admin CRUD Handlers ─────────────────────────────────────────────────────
@@ -588,6 +628,19 @@ func (a *AdminServer) handleUpdateAdminRole(w http.ResponseWriter, r *http.Reque
 }
 
 // ─── Audit Log Handler ────────────────────────────────────────────────────────
+
+func (a *AdminServer) handleClearAuditLogs(w http.ResponseWriter, r *http.Request) {
+	if a.auditStore == nil {
+		writeError(w, http.StatusInternalServerError, "audit store not available")
+		return
+	}
+	if err := a.auditStore.Clear(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	a.auditAdminAction(r, "clear_audit_logs", "audit_logs", "all", nil)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
+}
 
 // handleListAuditLogs returns paginated audit log entries.
 func (a *AdminServer) handleListAuditLogs(w http.ResponseWriter, r *http.Request) {
@@ -932,20 +985,38 @@ func (a *AdminServer) handleUsageStats(w http.ResponseWriter, r *http.Request) {
 	projectUsage := make([]map[string]interface{}, 0, len(records))
 	for _, rec := range records {
 		projName := rec.ProjectID
-		if proj, err := a.projects.GetProject(rec.ProjectID); err == nil {
+		proj, err := a.projects.GetProject(rec.ProjectID)
+		if err == nil {
 			projName = proj.Name
 		}
 		totalRequests += rec.APIRequestsTotal
 		totalBWUp += rec.BandwidthUploadBytes
 		totalBWDown += rec.BandwidthDownloadBytes
+
+		var dbBytes, fileStorageBytes, totalStorageBytes int64
+		if err == nil && proj != nil {
+			dbBytes = dirSize(proj.DataDir)
+			if _, statErr := os.Stat(proj.StorageDir); statErr == nil {
+				fileStorageBytes = dirSize(proj.StorageDir)
+			} else {
+				fileStorageBytes = rec.StorageBytes
+			}
+			totalStorageBytes = dbBytes + fileStorageBytes
+		} else {
+			fileStorageBytes = rec.StorageBytes
+			totalStorageBytes = rec.StorageBytes
+		}
+
 		projectUsage = append(projectUsage, map[string]interface{}{
-			"project_id":     rec.ProjectID,
-			"project_name":   projName,
-			"api_requests":   rec.APIRequestsTotal,
-			"bandwidth_up":   rec.BandwidthUploadBytes,
-			"bandwidth_down": rec.BandwidthDownloadBytes,
-			"storage_bytes":  rec.StorageBytes,
-			"last_updated":   rec.LastUpdated,
+			"project_id":          rec.ProjectID,
+			"project_name":        projName,
+			"api_requests":        rec.APIRequestsTotal,
+			"bandwidth_up":        rec.BandwidthUploadBytes,
+			"bandwidth_down":      rec.BandwidthDownloadBytes,
+			"storage_bytes":       fileStorageBytes,
+			"database_bytes":      dbBytes,
+			"total_storage_bytes": totalStorageBytes,
+			"last_updated":        rec.LastUpdated,
 		})
 	}
 
@@ -982,16 +1053,32 @@ func (a *AdminServer) handleProjectUsage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Compute disk storage usage
+	dbBytes := dirSize(proj.DataDir)
+	var fileStorageBytes int64
+	if _, err := os.Stat(proj.StorageDir); err == nil {
+		fileStorageBytes = dirSize(proj.StorageDir)
+	} else {
+		fileStorageBytes = rec.StorageBytes
+	}
+	totalStorageBytes := dbBytes + fileStorageBytes
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"enabled":            true,
-		"project_id":         rec.ProjectID,
-		"project_name":       proj.Name,
-		"api_requests":       rec.APIRequestsTotal,
-		"bandwidth_up":       rec.BandwidthUploadBytes,
-		"bandwidth_down":     rec.BandwidthDownloadBytes,
-		"storage_bytes":      rec.StorageBytes,
-		"last_updated":       rec.LastUpdated,
-		"requests_by_method": rec.APIRequestsByMethod,
+		"enabled":               true,
+		"project_id":            rec.ProjectID,
+		"project_name":          proj.Name,
+		"api_requests":          rec.APIRequestsTotal,
+		"bandwidth_up":          rec.BandwidthUploadBytes,
+		"bandwidth_down":        rec.BandwidthDownloadBytes,
+		"storage_bytes":         rec.StorageBytes,
+		"database_bytes":        dbBytes,
+		"file_storage_bytes":    fileStorageBytes,
+		"total_storage_bytes":   totalStorageBytes,
+		"db_reads_total":        rec.DBReadsTotal,
+		"db_writes_total":       rec.DBWritesTotal,
+		"realtime_connections":  rec.RealtimeConnections,
+		"last_updated":          rec.LastUpdated,
+		"requests_by_method":    rec.APIRequestsByMethod,
 	})
 }
 
@@ -1017,6 +1104,21 @@ func dirSize(path string) int64 {
 }
 
 // === Database/Collections Handlers ===
+
+func (a *AdminServer) handleProjectDbAnalysis(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	analysis, err := env.Engine.AnalyzeStorage()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, analysis)
+}
 
 func (a *AdminServer) handleListCollections(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -1271,6 +1373,7 @@ func (a *AdminServer) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 		Role     string `json:"role"`
+		Username string `json:"username"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -1285,14 +1388,69 @@ func (a *AdminServer) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
+	updated := false
 	if req.Role != "" && req.Role != string(auth.RoleUser) {
 		user.Role = auth.Role(req.Role)
+		updated = true
+	}
+	if req.Username != "" {
+		user.Username = req.Username
+		updated = true
+	}
+	if updated {
 		if err := env.Auth.UpdateUser(user); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
 	writeJSON(w, http.StatusCreated, user)
+}
+
+func (a *AdminServer) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	userId := r.PathValue("userId")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	var req struct {
+		Email     *string `json:"email"`
+		Role      *string `json:"role"`
+		Name      *string `json:"name"`
+		AvatarURL *string `json:"avatar_url"`
+		Username  *string `json:"username"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	user, err := env.Auth.GetUser(userId)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	if req.Email != nil {
+		user.Email = *req.Email
+	}
+	if req.Role != nil {
+		user.Role = auth.Role(*req.Role)
+	}
+	if req.Name != nil {
+		user.Name = *req.Name
+	}
+	if req.AvatarURL != nil {
+		user.AvatarURL = *req.AvatarURL
+	}
+	if req.Username != nil {
+		user.Username = *req.Username
+	}
+	user.UpdatedAt = time.Now().UTC()
+	if err := env.Auth.UpdateUser(user); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, user)
 }
 
 func (a *AdminServer) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -1590,6 +1748,7 @@ func (a *AdminServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		"admin_password":   masked(a.cfg.AdminPassword),
 		"jwt_secret":       masked(a.cfg.JWTSecret),
 		"session_duration": a.cfg.SessionDuration.String(),
+		"backup_interval":  a.cfg.BackupInterval.String(),
 		"env":              a.cfg.Env,
 		"cert_file":        a.cfg.CertFile,
 		"key_file":         a.cfg.KeyFile,
@@ -1626,6 +1785,7 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		AdminEmail      *string `json:"admin_email"`
 		AdminPassword   *string `json:"admin_password"`   // ignored if == secretMask or empty
 		SessionDuration *string `json:"session_duration"` // e.g. "24h", "168h"
+		BackupInterval  *string `json:"backup_interval"`  // e.g. "1h", "12h"
 		// Security / HTTPS
 		JWTSecret *string `json:"jwt_secret"` // ignored if == secretMask
 		CertFile  *string `json:"cert_file"`
@@ -1668,6 +1828,11 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	if req.SessionDuration != nil && *req.SessionDuration != "" {
 		if d, err := time.ParseDuration(*req.SessionDuration); err == nil && d > 0 {
 			a.cfg.SessionDuration = d
+		}
+	}
+	if req.BackupInterval != nil && *req.BackupInterval != "" {
+		if d, err := time.ParseDuration(*req.BackupInterval); err == nil {
+			a.cfg.BackupInterval = d
 		}
 	}
 	// Security / HTTPS

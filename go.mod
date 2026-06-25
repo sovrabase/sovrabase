@@ -12,6 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.15.0
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.51.0
+	golang.org/x/image v0.43.0
 	golang.org/x/oauth2 v0.5.0
 	golang.org/x/sys v0.44.0
 	nhooyr.io/websocket v1.8.17
@@ -51,7 +52,7 @@ require (
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
 	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/ini.v1 v1.67.2 // indirect

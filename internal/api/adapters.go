@@ -103,6 +103,38 @@ func (a *authAdapter) ResetPassword(token, newPassword string) error {
 	return a.svc.ResetPassword(token, newPassword)
 }
 
+func (a *authAdapter) CreateMagicLink(email string) (string, error) {
+	return a.svc.CreateMagicLink(email)
+}
+
+func (a *authAdapter) VerifyMagicLink(email, token string) (*TokenPair, error) {
+	tokens, err := a.svc.VerifyMagicLink(email, token)
+	if err != nil {
+		return nil, err
+	}
+	return authTokensToAPI(tokens), nil
+}
+
+func (a *authAdapter) SetupMFA(userID string) (string, string, error) {
+	return a.svc.SetupMFA(userID)
+}
+
+func (a *authAdapter) ConfirmMFA(userID, code string) ([]string, error) {
+	return a.svc.ConfirmMFA(userID, code)
+}
+
+func (a *authAdapter) DisableMFA(userID, code string) error {
+	return a.svc.DisableMFA(userID, code)
+}
+
+func (a *authAdapter) VerifyMFA(userID, code string) error {
+	return a.svc.VerifyMFA(userID, code)
+}
+
+func (a *authAdapter) GetMFAStatus(userID string) (bool, error) {
+	return a.svc.GetMFAStatus(userID)
+}
+
 func authUserToAPI(u *auth.User) *UserInfo {
 	if u == nil {
 		return nil

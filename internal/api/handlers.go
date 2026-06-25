@@ -7,16 +7,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/imgtransform"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
 )
@@ -24,8 +24,9 @@ import (
 // ─── Auth Handlers ───────────────────────────────────────────────────────────
 
 type signUpRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	CaptchaToken string `json:"captcha_token"`
 }
 
 func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +40,22 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify captcha if enabled.
+	if s.captchaVerifier != nil && s.captchaVerifier.IsEnabled() {
+		ok, err := s.captchaVerifier.Verify(r.Context(), req.CaptchaToken)
+		if err != nil || !ok {
+			writeError(w, http.StatusForbidden, "captcha verification failed: "+err.Error())
+			return
+		}
+	}
+
 	user, tokens, err := s.getAuth(r).SignUp(req.Email, req.Password)
+	if s.meterStore != nil {
+		if projectID := getProjectID(r); projectID != "" {
+			_ = s.meterStore.Inc(projectID, metering.MetricDBWrites, 1)
+			_ = s.meterStore.Inc(projectID, metering.MetricDBReads, 1)
+		}
+	}
 	if err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
@@ -52,8 +68,9 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 }
 
 type signInRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	CaptchaToken string `json:"captcha_token"`
 }
 
 func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
@@ -67,7 +84,21 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify captcha if enabled.
+	if s.captchaVerifier != nil && s.captchaVerifier.IsEnabled() {
+		ok, err := s.captchaVerifier.Verify(r.Context(), req.CaptchaToken)
+		if err != nil || !ok {
+			writeError(w, http.StatusForbidden, "captcha verification failed: "+err.Error())
+			return
+		}
+	}
+
 	tokens, err := s.getAuth(r).SignIn(req.Email, req.Password)
+	if s.meterStore != nil {
+		if projectID := getProjectID(r); projectID != "" {
+			_ = s.meterStore.Inc(projectID, metering.MetricDBReads, 1)
+		}
+	}
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
@@ -257,6 +288,154 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password reset successfully"})
 }
 
+// ─── Magic Link Handlers ─────────────────────────────────────────────────────
+
+type magicLinkRequest struct {
+	Email string `json:"email"`
+}
+
+func (s *Server) handleCreateMagicLink(w http.ResponseWriter, r *http.Request) {
+	var req magicLinkRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	token, err := s.getAuth(r).CreateMagicLink(req.Email)
+	if err != nil {
+		// Don't leak whether email exists for security.
+		writeJSON(w, http.StatusOK, map[string]string{
+			"message": "if the email exists, a magic link has been sent",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "magic link generated",
+		"token":   token,
+	})
+}
+
+type verifyMagicLinkRequest struct {
+	Email string `json:"email"`
+	Token string `json:"token"`
+}
+
+func (s *Server) handleVerifyMagicLink(w http.ResponseWriter, r *http.Request) {
+	var req verifyMagicLinkRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Email == "" || req.Token == "" {
+		writeError(w, http.StatusBadRequest, "email and token are required")
+		return
+	}
+
+	tokens, err := s.getAuth(r).VerifyMagicLink(req.Email, req.Token)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tokens)
+}
+
+// ─── MFA Handlers ────────────────────────────────────────────────────────────
+
+func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	secret, uri, err := s.getAuth(r).SetupMFA(claims.UserID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"secret": secret,
+		"uri":    uri,
+	})
+}
+
+func (s *Server) handleMFAConfirm(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Code == "" {
+		writeError(w, http.StatusBadRequest, "code is required")
+		return
+	}
+
+	backupCodes, err := s.getAuth(r).ConfirmMFA(claims.UserID, req.Code)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":      "MFA enabled successfully",
+		"backup_codes": backupCodes,
+	})
+}
+
+func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.getAuth(r).DisableMFA(claims.UserID, req.Code); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "MFA disabled"})
+}
+
+func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	enabled, err := s.getAuth(r).GetMFAStatus(claims.UserID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"enabled": enabled})
+}
+
 func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	if claims == nil {
@@ -378,17 +557,6 @@ func (s *Server) publishRealtime(eventType realtime.EventType, projectID, collec
 	})
 }
 
-// getProjectIDFromRequest extracts the project ID from the request context.
-func (s *Server) getProjectIDFromRequest(r *http.Request) string {
-	if env := getProjectEnv(r); env != nil {
-		// Walk through the projects to find the matching env.
-		// For now, use a simple empty string — the realtime filter will use
-		// the project key from the environment.
-		return ""
-	}
-	return ""
-}
-
 func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 
@@ -411,18 +579,27 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	projectID := getProjectID(r)
 	if err := s.getDB(r).Insert(collection, id, doc); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if s.meterStore != nil && projectID != "" {
+		_ = s.meterStore.Inc(projectID, metering.MetricDBWrites, 1)
+	}
 
 	created, _ := s.getDB(r).Get(collection, id)
+	if s.meterStore != nil && projectID != "" {
+		_ = s.meterStore.Inc(projectID, metering.MetricDBReads, 1)
+	}
 
 	// Publish realtime event.
 	if s.realtimeHub != nil {
-		projectID := getProjectID(r)
 		s.publishRealtime(realtime.EventInsert, projectID, collection, id, created)
 	}
+
+	// Webhook trigger
+	s.fireWebhooks(r, collection, "insert", id, created)
 
 	writeJSON(w, http.StatusCreated, created)
 }
@@ -442,6 +619,11 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doc, err := s.getDB(r).Get(collection, id)
+	if s.meterStore != nil {
+		if projectID := getProjectID(r); projectID != "" {
+			_ = s.meterStore.Inc(projectID, metering.MetricDBReads, 1)
+		}
+	}
 	if err != nil || doc == nil {
 		writeError(w, http.StatusNotFound, "document not found")
 		return
@@ -470,18 +652,27 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	projectID := getProjectID(r)
 	if err := s.getDB(r).Update(collection, id, doc); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if s.meterStore != nil && projectID != "" {
+		_ = s.meterStore.Inc(projectID, metering.MetricDBWrites, 1)
+	}
 
 	updated, _ := s.getDB(r).Get(collection, id)
+	if s.meterStore != nil && projectID != "" {
+		_ = s.meterStore.Inc(projectID, metering.MetricDBReads, 1)
+	}
 
 	// Publish realtime event.
 	if s.realtimeHub != nil {
-		projectID := getProjectID(r)
 		s.publishRealtime(realtime.EventUpdate, projectID, collection, id, updated)
 	}
+
+	// Webhook trigger
+	s.fireWebhooks(r, collection, "update", id, updated)
 
 	writeJSON(w, http.StatusOK, updated)
 }
@@ -490,8 +681,12 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	collection := chi.URLParam(r, "collection")
 	id := chi.URLParam(r, "id")
 
+	projectID := getProjectID(r)
 	// Fetch existing doc before delete (for RLS + realtime event).
 	existing, _ := s.getDB(r).Get(collection, id)
+	if s.meterStore != nil && projectID != "" {
+		_ = s.meterStore.Inc(projectID, metering.MetricDBReads, 1)
+	}
 
 	allowed, err := s.checkRLS(r, collection, "delete", id, nil)
 	if err != nil {
@@ -507,12 +702,17 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "document not found")
 		return
 	}
+	if s.meterStore != nil && projectID != "" {
+		_ = s.meterStore.Inc(projectID, metering.MetricDBWrites, 1)
+	}
 
 	// Publish realtime event.
 	if s.realtimeHub != nil && existing != nil {
-		projectID := getProjectID(r)
 		s.publishRealtime(realtime.EventDelete, projectID, collection, id, existing)
 	}
+
+	// Webhook trigger
+	s.fireWebhooks(r, collection, "delete", id, existing)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
@@ -560,6 +760,16 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 			docs, err = s.getDB(r).Query(collection, filter, projection)
 		} else {
 			docs, err = s.getDB(r).List(collection)
+		}
+	}
+
+	if s.meterStore != nil {
+		if projectID := getProjectID(r); projectID != "" {
+			count := int64(1)
+			if hasPagination {
+				count = 2
+			}
+			_ = s.meterStore.Inc(projectID, metering.MetricDBReads, count)
 		}
 	}
 
@@ -626,6 +836,16 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		docs, err = s.getDB(r).Query(collection, req.Filter, proj)
 	}
 
+	if s.meterStore != nil {
+		if projectID := getProjectID(r); projectID != "" {
+			count := int64(1)
+			if hasPagination {
+				count = 2
+			}
+			_ = s.meterStore.Inc(projectID, metering.MetricDBReads, count)
+		}
+	}
+
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -689,22 +909,15 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Enforce project storage quota
+	// Enforce project storage quota using the meterStore counter (O(1) instead
+	// of walking the filesystem on every upload).
 	projectID := getProjectID(r)
 	if projectID != "" {
 		proj, err := s.projects.GetProject(projectID)
 		if err == nil && proj != nil && proj.StorageQuota > 0 {
 			var currentUsage int64
-			if _, statErr := os.Stat(proj.StorageDir); statErr == nil {
-				_ = filepath.Walk(proj.StorageDir, func(path string, info os.FileInfo, walkErr error) error {
-					if walkErr != nil {
-						return nil
-					}
-					if !info.IsDir() {
-						currentUsage += info.Size()
-					}
-					return nil
-				})
+			if s.meterStore != nil {
+				currentUsage, _ = s.meterStore.GetStorageUsage(projectID)
 			}
 			if currentUsage+header.Size > proj.StorageQuota {
 				writeError(w, http.StatusForbidden, fmt.Sprintf("storage quota exceeded (used %d/%d bytes, attempting to upload %d bytes)", currentUsage, proj.StorageQuota, header.Size))
@@ -749,6 +962,37 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer reader.Close()
 
+	// Parse image transformation options from query params.
+	q := r.URL.Query()
+	imgOpts := imgransform.Options{}
+	if wStr := q.Get("w"); wStr != "" {
+		imgOpts.Width, _ = strconv.Atoi(wStr)
+	}
+	if hStr := q.Get("h"); hStr != "" {
+		imgOpts.Height, _ = strconv.Atoi(hStr)
+	}
+	imgOpts.Format = q.Get("format")
+	imgOpts.Fit = q.Get("fit")
+	if qStr := q.Get("quality"); qStr != "" {
+		imgOpts.Quality, _ = strconv.Atoi(qStr)
+	}
+
+	if imgransform.IsTransformRequested(imgOpts) {
+		// Determine output MIME type.
+		outCT := info.ContentType
+		if imgOpts.Format != "" {
+			outCT = "image/" + imgOpts.Format
+		}
+		w.Header().Set("Content-Type", outCT)
+		w.Header().Set("Content-Disposition", "inline; filename=\""+info.Path+"\"")
+		w.Header().Set("X-Image-Transformed", "sovrabase")
+		if err := imgransform.Transform(reader, w, info.ContentType, imgOpts); err != nil {
+			writeError(w, http.StatusInternalServerError, "image transformation failed: "+err.Error())
+		}
+		return
+	}
+
+	// Pass-through without transformation.
 	w.Header().Set("Content-Type", info.ContentType)
 	w.Header().Set("Content-Disposition", "inline; filename=\""+info.Path+"\"")
 	io.Copy(w, reader)
@@ -816,6 +1060,8 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 	projectID := getProjectID(r)
 	results := make([]batchResult, 0, len(req.Operations))
 
+	var dbReads, dbWrites int64
+
 	for i, op := range req.Operations {
 		result := batchResult{
 			Index:   i,
@@ -845,8 +1091,10 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 				results = append(results, result)
 				continue
 			}
+			dbWrites++
 
 			created, _ := engine.Get(collection, id)
+			dbReads++
 			result.Success = true
 			result.Data = created
 
@@ -877,8 +1125,10 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 				results = append(results, result)
 				continue
 			}
+			dbWrites++
 
 			updated, _ := engine.Get(collection, op.ID)
+			dbReads++
 			result.Success = true
 			result.Data = updated
 
@@ -898,6 +1148,7 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 			}
 
 			existing, _ := engine.Get(collection, op.ID)
+			dbReads++
 
 			allowed, err := s.checkRLS(r, collection, "delete", op.ID, nil)
 			if err != nil || !allowed {
@@ -911,6 +1162,7 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 				results = append(results, result)
 				continue
 			}
+			dbWrites++
 
 			result.Success = true
 			result.Data = map[string]string{"status": "deleted"}
@@ -930,6 +1182,15 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		results = append(results, result)
+	}
+
+	if s.meterStore != nil && projectID != "" {
+		if dbReads > 0 {
+			_ = s.meterStore.Inc(projectID, metering.MetricDBReads, dbReads)
+		}
+		if dbWrites > 0 {
+			_ = s.meterStore.Inc(projectID, metering.MetricDBWrites, dbWrites)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -965,6 +1226,12 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	docs, err := s.getDB(r).Search(collection, req.Query, req.Fields, req.Limit)
+	if s.meterStore != nil {
+		if projectID := getProjectID(r); projectID != "" {
+			_ = s.meterStore.Inc(projectID, metering.MetricDBReads, 1)
+		}
+	}
+
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -989,11 +1256,67 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 // ─── Webhook Triggers ─────────────────────────────────────────────────────────
 
+// webhookCacheTTL is how long the webhook list is cached per project.
+const webhookCacheTTL = 30 * time.Second
+// webhookCacheEntry holds a cached webhook list with expiry.
+type webhookCacheEntry struct {
+	webhooks []map[string]interface{}
+	expiry   time.Time
+}
+
+// Global webhook cache shared between Server and AdminServer.
+var (
+	webhookGlobalCacheMu sync.RWMutex
+	webhookGlobalCache   = make(map[string]webhookCacheEntry)
+)
+
+// invalidateWebhookCacheProject clears all cached webhooks for a project.
+func invalidateWebhookCacheProject(projectID string) {
+	webhookGlobalCacheMu.Lock()
+	for k := range webhookGlobalCache {
+		if len(k) > len(projectID) && k[:len(projectID)] == projectID {
+			delete(webhookGlobalCache, k)
+		}
+	}
+	webhookGlobalCacheMu.Unlock()
+}
+
 func (s *Server) fireWebhooks(r *http.Request, collection, eventType, docID string, data map[string]interface{}) {
 	go func() {
 		engine := s.getDB(r)
-		webhookDocs, err := engine.List("_webhooks")
-		if err != nil || len(webhookDocs) == 0 {
+
+		// Check the global cache first.
+		projectID := getProjectID(r)
+		cacheKey := projectID + ":" + collection
+
+		webhookGlobalCacheMu.RLock()
+		entry, ok := webhookGlobalCache[cacheKey]
+		webhookGlobalCacheMu.RUnlock()
+
+		if !ok || time.Now().After(entry.expiry) {
+			// Cache miss or expired — reload from DB.
+			webhookDocs, err := engine.List("_webhooks")
+			if err != nil || len(webhookDocs) == 0 {
+				// Cache the empty result too, to avoid repeated lookups.
+				webhookGlobalCacheMu.Lock()
+				webhookGlobalCache[cacheKey] = webhookCacheEntry{
+					webhooks: nil,
+					expiry:   time.Now().Add(webhookCacheTTL),
+				}
+				webhookGlobalCacheMu.Unlock()
+				return
+			}
+
+			webhookGlobalCacheMu.Lock()
+			webhookGlobalCache[cacheKey] = webhookCacheEntry{
+				webhooks: webhookDocs,
+				expiry:   time.Now().Add(webhookCacheTTL),
+			}
+			webhookGlobalCacheMu.Unlock()
+			entry.webhooks = webhookDocs
+		}
+
+		if len(entry.webhooks) == 0 {
 			return
 		}
 
@@ -1005,7 +1328,7 @@ func (s *Server) fireWebhooks(r *http.Request, collection, eventType, docID stri
 			"timestamp":  time.Now().UTC().Format(time.RFC3339Nano),
 		})
 
-		for _, wh := range webhookDocs {
+		for _, wh := range entry.webhooks {
 			url, ok := wh["url"].(string)
 			if !ok || url == "" {
 				continue

@@ -285,15 +285,7 @@ func (s *AuthService) HandleOAuthCallback(provider, code, state string) (*User, 
 	// Try to find an existing user by email
 	user, err := s.store.GetByEmail(oauthInfo.Email)
 	if err != nil {
-		// User doesn't exist; create one with a random password (OAuth users
-		// authenticate via provider, not password).
-		randomPass, _ := generateRandomString(32)
-		hash, hashErr := HashPassword(randomPass)
-		if hashErr != nil {
-			return nil, nil, fmt.Errorf("creating oauth user: %w", hashErr)
-		}
-
-		user = NewUser(oauthInfo.Email, hash)
+		user = NewUser(oauthInfo.Email, "")
 		user.IsVerified = true // OAuth users are verified!
 		user.Name = oauthInfo.Name
 		user.AvatarURL = oauthInfo.AvatarURL
@@ -484,4 +476,206 @@ func (s *AuthService) ResetPassword(token, newPassword string) error {
 	user.IsVerified = true
 
 	return s.store.Update(user)
+}
+
+// CreateMagicLink generates a single-use magic link token for passwordless
+// login. The token is stored on the user record and returned for delivery
+// (typically via email). The token expires after 15 minutes.
+func (s *AuthService) CreateMagicLink(email string) (string, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return "", fmt.Errorf("email is required")
+	}
+
+	user, err := s.store.GetByEmail(email)
+	if err != nil {
+		// Don't leak whether the email exists — return a generic error.
+		return "", fmt.Errorf("user not found")
+	}
+
+	tokenBytes := make([]byte, 24)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("generating magic link token: %w", err)
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	user.MagicLinkToken = token
+	user.MagicLinkExpires = time.Now().Add(15 * time.Minute)
+
+	if err := s.store.Update(user); err != nil {
+		return "", fmt.Errorf("saving magic link token: %w", err)
+	}
+
+	return token, nil
+}
+
+// VerifyMagicLink validates a magic link token and returns a token pair for
+// passwordless authentication. The token is single-use and is cleared after.
+func (s *AuthService) VerifyMagicLink(email, token string) (*TokenPair, error) {
+	email = strings.TrimSpace(email)
+	token = strings.TrimSpace(token)
+	if email == "" || token == "" {
+		return nil, fmt.Errorf("email and token are required")
+	}
+
+	user, err := s.store.GetByEmail(email)
+	if err != nil {
+		return nil, fmt.Errorf("invalid or expired magic link")
+	}
+
+	if user.MagicLinkToken == "" || user.MagicLinkToken != token {
+		return nil, fmt.Errorf("invalid or expired magic link")
+	}
+
+	if time.Now().After(user.MagicLinkExpires) {
+		return nil, fmt.Errorf("magic link has expired")
+	}
+
+	// Clear the token (single-use).
+	user.MagicLinkToken = ""
+	user.MagicLinkExpires = time.Time{}
+	user.IsVerified = true
+
+	if err := s.store.Update(user); err != nil {
+		return nil, fmt.Errorf("updating user: %w", err)
+	}
+
+	return s.generateTokenPair(user)
+}
+
+// ─── MFA (TOTP) Methods ──────────────────────────────────────────────────────
+
+// SetupMFA generates a new TOTP secret for the user and returns the secret
+// along with an otpauth:// URI for QR code generation. The secret is NOT
+// stored until ConfirmMFA is called with a valid TOTP code.
+func (s *AuthService) SetupMFA(userID string) (secret, uri string, err error) {
+	user, err := s.store.GetByID(userID)
+	if err != nil {
+		return "", "", fmt.Errorf("user not found")
+	}
+
+	secret, err = GenerateMFASecret()
+	if err != nil {
+		return "", "", err
+	}
+
+	// Store the secret temporarily (not yet enabled).
+	user.MFASecret = secret
+	if err := s.store.Update(user); err != nil {
+		return "", "", fmt.Errorf("saving MFA secret: %w", err)
+	}
+
+	uri = GenerateOTPUri(secret, user.Email, "Sovrabase")
+	return secret, uri, nil
+}
+
+// ConfirmMFA verifies a TOTP code and enables MFA for the user.
+// Returns backup codes that the user should save for recovery.
+func (s *AuthService) ConfirmMFA(userID, code string) ([]string, error) {
+	user, err := s.store.GetByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	if user.MFASecret == "" {
+		return nil, fmt.Errorf("MFA not set up — call SetupMFA first")
+	}
+	if user.MFAEnabled {
+		return nil, fmt.Errorf("MFA is already enabled")
+	}
+
+	if !ValidateTOTP(user.MFASecret, code) {
+		return nil, fmt.Errorf("invalid TOTP code")
+	}
+
+	// Generate backup codes.
+	backupCodes, err := GenerateBackupCodes()
+	if err != nil {
+		return nil, err
+	}
+
+	user.MFAEnabled = true
+	user.MFABackupCodes = backupCodes
+
+	if err := s.store.Update(user); err != nil {
+		return nil, fmt.Errorf("enabling MFA: %w", err)
+	}
+
+	return backupCodes, nil
+}
+
+// DisableMFA turns off MFA for the user after verifying either a TOTP code
+// or a backup code.
+func (s *AuthService) DisableMFA(userID, code string) error {
+	user, err := s.store.GetByID(userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	if !user.MFAEnabled {
+		return fmt.Errorf("MFA is not enabled")
+	}
+
+	// Check TOTP code first.
+	codeValid := ValidateTOTP(user.MFASecret, code)
+
+	// Check backup codes.
+	if !codeValid && len(user.MFABackupCodes) > 0 {
+		for i, bc := range user.MFABackupCodes {
+			if bc == code {
+				// Remove used backup code.
+				user.MFABackupCodes = append(user.MFABackupCodes[:i], user.MFABackupCodes[i+1:]...)
+				codeValid = true
+				break
+			}
+		}
+	}
+
+	if !codeValid {
+		return fmt.Errorf("invalid TOTP code or backup code")
+	}
+
+	user.MFAEnabled = false
+	user.MFASecret = ""
+	user.MFABackupCodes = nil
+
+	return s.store.Update(user)
+}
+
+// VerifyMFA checks a TOTP code (or backup code) for a user. Used during login.
+func (s *AuthService) VerifyMFA(userID, code string) error {
+	user, err := s.store.GetByID(userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	if !user.MFAEnabled {
+		return nil // No MFA required
+	}
+
+	// Check TOTP.
+	if ValidateTOTP(user.MFASecret, code) {
+		return nil
+	}
+
+	// Check backup codes.
+	for i, bc := range user.MFABackupCodes {
+		if bc == code {
+			// Consume the backup code.
+			user.MFABackupCodes = append(user.MFABackupCodes[:i], user.MFABackupCodes[i+1:]...)
+			_ = s.store.Update(user)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid MFA code")
+}
+
+// GetMFAStatus returns whether MFA is enabled for a user.
+func (s *AuthService) GetMFAStatus(userID string) (enabled bool, err error) {
+	user, err := s.store.GetByID(userID)
+	if err != nil {
+		return false, err
+	}
+	return user.MFAEnabled, nil
 }

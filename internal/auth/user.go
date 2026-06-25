@@ -29,10 +29,12 @@ type OAuthProviderMetadata struct {
 type User struct {
 	ID                  string                   `json:"id"`
 	Email               string                   `json:"email"`
+	Username            string                   `json:"username,omitempty"`
 	PasswordHash        string                   `json:"-"`
 	Role                Role                     `json:"role"`
 	Name                string                   `json:"name,omitempty"`
 	AvatarURL           string                   `json:"avatar_url,omitempty"`
+
 	OAuthProviders      []OAuthProviderMetadata  `json:"_metadata,omitempty"`
 	CreatedAt           time.Time                `json:"created_at"`
 	UpdatedAt           time.Time                `json:"updated_at"`
@@ -41,6 +43,11 @@ type User struct {
 	VerificationExpires time.Time                `json:"verification_expires,omitempty"`
 	ResetToken          string                   `json:"reset_token,omitempty"`
 	ResetExpires        time.Time                `json:"reset_expires,omitempty"`
+	MagicLinkToken      string                   `json:"magic_link_token,omitempty"`
+	MagicLinkExpires    time.Time                `json:"magic_link_expires,omitempty"`
+	MFAEnabled          bool                     `json:"mfa_enabled"`
+	MFASecret           string                   `json:"-"`
+	MFABackupCodes      []string                 `json:"-"`
 }
 
 // TokenPair contains the access and refresh tokens returned on login/signup.

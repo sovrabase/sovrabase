@@ -2,6 +2,7 @@ package db
 
 import (
 	"testing"
+	"time"
 )
 
 func TestEngine_Pagination(t *testing.T) {
@@ -174,6 +175,7 @@ func TestEngine_AutoTimestamps(t *testing.T) {
 	}
 
 	// Update: _updatedAt should change, _createdAt preserved.
+	time.Sleep(10 * time.Millisecond)
 	got["name"] = "updated"
 	if err := e.Update("ts", doc["_id"].(string), got); err != nil {
 		t.Fatal(err)

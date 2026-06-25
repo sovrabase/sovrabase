@@ -13,6 +13,7 @@ import (
 
 	"github.com/ketsuna-org/sovrabase/internal/api"
 	"github.com/ketsuna-org/sovrabase/internal/auth"
+	"github.com/ketsuna-org/sovrabase/internal/captcha"
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/dashboard"
 	"github.com/ketsuna-org/sovrabase/internal/db"
@@ -139,6 +140,18 @@ func main() {
 	server.SetMeterStore(meterStore)
 	adminServer.SetMeterStore(meterStore)
 
+	// Wire captcha verifier if enabled.
+	if cfg.CaptchaEnabled && cfg.CaptchaSecret != "" {
+		verifier := captcha.NewVerifier(captcha.Config{
+			Provider:  captcha.Provider(cfg.CaptchaProvider),
+			SiteKey:   cfg.CaptchaSiteKey,
+			SecretKey: cfg.CaptchaSecret,
+			Enabled:   true,
+		})
+		server.SetCaptchaVerifier(verifier)
+		logger.Info("Captcha protection enabled", "provider", cfg.CaptchaProvider)
+	}
+
 	// Wire team store into admin server
 	adminServer.SetTeamStore(projectMgr.GetTeamStore())
 
@@ -152,6 +165,10 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Start cron schedulers for all existing projects.
+	api.StartProjectSchedulers(ctx, projectMgr)
+	logger.Info("Cron schedulers started", "projects", projectMgr.ProjectCount())
 
 	// Start replication node if configured
 	if cfg.IsReplicationEnabled() {
@@ -174,43 +191,39 @@ func main() {
 		logger.Info("ReplicatedDB set on API server")
 	}
 
-	// Start backup scheduler (every 1 hour)
-	backupTicker := time.NewTicker(1 * time.Hour)
-	defer backupTicker.Stop()
-	go func() {
-		for {
-			select {
-			case <-backupTicker.C:
-				logger.Info("Running scheduled backup...")
-				backupDir := filepath.Join(cfg.DataDir, "backups")
-				if err := os.MkdirAll(backupDir, 0755); err != nil {
-					logger.Error("Failed to create backup directory", "error", err)
-					continue
-				}
-				timestamp := time.Now().UTC().Format("20060102T150405Z")
-				backupName := "backup-" + timestamp
-				backupPath := filepath.Join(backupDir, backupName)
-				if err := os.MkdirAll(backupPath, 0755); err != nil {
-					logger.Error("Failed to create backup", "error", err)
-					continue
-				}
-				// Copy projects data
-				projectsDir := filepath.Join(cfg.DataDir, "projects")
-				entries, _ := os.ReadDir(projectsDir)
-				for _, e := range entries {
-					if e.IsDir() {
-						src := filepath.Join(projectsDir, e.Name())
-						dst := filepath.Join(backupPath, e.Name())
-						copyDir(src, dst)
+	// Start backup scheduler if enabled
+	if cfg.BackupInterval > 0 {
+		backupTicker := time.NewTicker(cfg.BackupInterval)
+		defer backupTicker.Stop()
+		go func() {
+			for {
+				select {
+				case <-backupTicker.C:
+					logger.Info("Running scheduled backup...")
+					backupDir := filepath.Join(cfg.DataDir, "backups")
+					if err := os.MkdirAll(backupDir, 0755); err != nil {
+						logger.Error("Failed to create backup directory", "error", err)
+						continue
 					}
+					timestamp := time.Now().UTC().Format("20060102T150405Z")
+					backupName := "backup-" + timestamp
+					backupPath := filepath.Join(backupDir, backupName)
+					// Use ProjectManager.Backup which uses Pebble checkpoints
+					// (consistent snapshots) instead of naively copying live SST files.
+					if err := projectMgr.Backup(backupPath); err != nil {
+						logger.Error("Failed to create backup", "error", err)
+						continue
+					}
+					logger.Info("Scheduled backup completed", "name", backupName, "path", backupPath)
+				case <-ctx.Done():
+					return
 				}
-				logger.Info("Scheduled backup completed", "name", backupName, "path", backupPath)
-			case <-ctx.Done():
-				return
 			}
-		}
-	}()
-	logger.Info("Backup scheduler started (interval: 1h)")
+		}()
+		logger.Info("Backup scheduler started", "interval", cfg.BackupInterval)
+	} else {
+		logger.Info("Backup scheduler disabled (interval <= 0)")
+	}
 
 	// Graceful shutdown / restart handler
 	go func() {
@@ -266,33 +279,4 @@ func main() {
 	}
 
 	logger.Info("Sovrabase stopped")
-}
-
-// copyDir recursively copies a directory.
-func copyDir(src, dst string) error {
-	if err := os.MkdirAll(dst, 0755); err != nil {
-		return err
-	}
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return err
-	}
-	for _, e := range entries {
-		srcPath := filepath.Join(src, e.Name())
-		dstPath := filepath.Join(dst, e.Name())
-		if e.IsDir() {
-			if err := copyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			data, err := os.ReadFile(srcPath)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(dstPath, data, 0644); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/ketsuna-org/sovrabase/internal/auth"
+	"github.com/ketsuna-org/sovrabase/internal/captcha"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
@@ -37,6 +38,7 @@ type Server struct {
 	rateLimiters *tenantRateLimiter
 	logger       *slog.Logger
 	httpServer   *http.Server // reference for graceful shutdown
+	captchaVerifier *captcha.Verifier
 }
 
 // Config holds API-specific configuration.
@@ -84,6 +86,13 @@ type AuthService interface {
 	VerifyEmail(token string) error
 	ForgotPassword(email string) (string, error)
 	ResetPassword(token, newPassword string) error
+	CreateMagicLink(email string) (string, error)
+	VerifyMagicLink(email, token string) (*TokenPair, error)
+	SetupMFA(userID string) (secret, uri string, err error)
+	ConfirmMFA(userID, code string) ([]string, error)
+	DisableMFA(userID, code string) error
+	VerifyMFA(userID, code string) error
+	GetMFAStatus(userID string) (bool, error)
 }
 
 // StorageService is the interface expected from the storage package.
@@ -167,6 +176,11 @@ func (s *Server) SetMeterStore(ms *metering.MeterStore) {
 	s.meterStore = ms
 }
 
+// SetCaptchaVerifier attaches a captcha verifier for auth endpoint protection.
+func (s *Server) SetCaptchaVerifier(v *captcha.Verifier) {
+	s.captchaVerifier = v
+}
+
 // MeterStore returns the current meter store, or nil if not set.
 func (s *Server) MeterStore() *metering.MeterStore {
 	return s.meterStore
@@ -183,7 +197,7 @@ func (s *Server) meteringMiddleware(next http.Handler) http.Handler {
 // SetRealtimeHub attaches a realtime hub and mounts the WebSocket endpoint.
 func (s *Server) SetRealtimeHub(hub *realtime.Hub, jwtSecret string) {
 	s.realtimeHub = hub
-	s.router.Get("/realtime/v1/ws", realtime.NewWSHandler(hub, jwtSecret).ServeHTTP)
+	s.router.Get("/realtime/v1/ws", realtime.NewWSHandler(hub, jwtSecret, s.meterStore, s.projects).ServeHTTP)
 }
 
 // SetRealtimeHubForHandler sets the hub reference (for handlers to publish events).
@@ -291,6 +305,8 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	// Auth routes (public, no rate limit)
 	r.Route("/auth/v1", func(r chi.Router) {
 		r.Use(s.projectMiddleware)
+		r.Use(s.clientRequestLoggerMiddleware)
+		r.Use(s.meteringMiddleware)
 		r.Post("/signup", s.handleSignUp)
 		r.Post("/signin", s.handleSignIn)
 		r.Post("/refresh", s.handleRefresh)
@@ -298,7 +314,13 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		r.Post("/verify-email", s.handleVerifyEmail)
 		r.Post("/forgot-password", s.handleForgotPassword)
 		r.Post("/reset-password", s.handleResetPassword)
-	})
+		r.Post("/magic-link", s.handleCreateMagicLink)
+		r.Post("/verify-magic-link", s.handleVerifyMagicLink)
+		r.Post("/mfa/setup", s.handleMFASetup)
+		r.Post("/mfa/confirm", s.handleMFAConfirm)
+		r.Post("/mfa/disable", s.handleMFADisable)
+		r.Get("/mfa/status", s.handleMFAStatus)
+		})
 	// OAuth callback is outside projectMiddleware because it receives
 	// ?code and ?state from the OAuth provider (no X-Project-Key header).
 	// The project ID is decoded from the state token itself.
@@ -308,6 +330,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(s.rateLimitMiddleware)
 		r.Use(s.projectMiddleware)
+		r.Use(s.clientRequestLoggerMiddleware)
 		r.Use(s.authMiddleware)
 		r.Use(s.meteringMiddleware)
 		r.Get("/me", s.handleGetMe)
@@ -323,26 +346,36 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 			r.Post("/batch", s.handleBatch)
 			r.Post("/search", s.handleSearch)
 
-			// Mutation endpoints (with audit logging)
-			r.Group(func(r chi.Router) {
-				r.Use(s.auditLoggerMiddleware)
-				r.Post("/", s.handleInsert)
-				r.Put("/{id}", s.handleUpdate)
-				r.Patch("/{id}", s.handleUpdate)
-				r.Delete("/{id}", s.handleDelete)
-			})
+			// Mutation endpoints
+			r.Post("/", s.handleInsert)
+			r.Put("/{id}", s.handleUpdate)
+			r.Patch("/{id}", s.handleUpdate)
+			r.Delete("/{id}", s.handleDelete)
 		})
 
 		// Storage
-		r.Route("/storage/{bucket}", func(r chi.Router) {
-			r.Post("/upload", s.handleUpload)
-			r.Get("/list", s.handleStorageList)
-			r.Get("/{path:.*}", s.handleDownload)
-			r.Delete("/{path:.*}", s.handleStorageDelete)
-		})
-	})
+			r.Route("/storage/{bucket}", func(r chi.Router) {
+				r.Post("/upload", s.handleUpload)
+				r.Get("/list", s.handleStorageList)
+				r.Get("/{path:.*}", s.handleDownload)
+				r.Delete("/{path:.*}", s.handleStorageDelete)
+			})
 
+			// Analytics events ingestion
+			r.Post("/events", s.handleIngestEvents)
+
+			// Queues
+			r.Route("/queues", func(r chi.Router) {
+				r.Post("/send", s.handleQueueSend)
+				r.Post("/receive", s.handleQueueReceive)
+				r.Post("/delete", s.handleQueueDelete)
+			})
+			})
+
+	// Remote config routes — registered on the chi router.
 	s.router = r
+	s.RegisterConfigMapsRoutes()
+
 	return s
 }
 

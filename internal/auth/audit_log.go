@@ -358,6 +358,12 @@ func (a *AuditStore) PurgeBefore(t time.Time) error {
 	return b.Commit(pebble.Sync)
 }
 
+// Clear deletes all audit entries.
+func (a *AuditStore) Clear() error {
+	return a.PurgeBefore(time.Now().Add(24 * time.Hour))
+}
+
+
 // Count returns the total number of audit entries.
 func (a *AuditStore) Count() (int, error) {
 	prefix := auditPrefix()

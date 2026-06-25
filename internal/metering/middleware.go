@@ -23,6 +23,11 @@ func MeteringMiddleware(meterStore *MeterStore, projectManager *tenant.ProjectMa
 					// Track the API request by method
 					_ = meterStore.IncMethod(proj.ID, r.Method, 1)
 
+					// Track upload bandwidth (request body size)
+					if r.ContentLength > 0 {
+						_ = meterStore.Inc(proj.ID, MetricBandwidthUp, r.ContentLength)
+					}
+
 					// Wrap response writer to track download bandwidth
 					mw := &MeterResponseWriter{ResponseWriter: w}
 					next.ServeHTTP(mw, r)

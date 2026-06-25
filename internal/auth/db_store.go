@@ -138,6 +138,9 @@ func userToMap(u *User) map[string]interface{} {
 		"updated_at":   u.UpdatedAt.Format(time.RFC3339Nano),
 		"is_verified":  u.IsVerified,
 	}
+	if u.Username != "" {
+		m["username"] = u.Username
+	}
 	if u.Name != "" {
 		m["name"] = u.Name
 	}
@@ -178,6 +181,7 @@ func userToMap(u *User) map[string]interface{} {
 func mapToUser(m map[string]interface{}) (*User, error) {
 	id, _ := m["_id"].(string)
 	email, _ := m["email"].(string)
+	username, _ := m["username"].(string)
 	pwHash, _ := m["password_hash"].(string)
 	roleStr, _ := m["role"].(string)
 	isVerified, _ := m["is_verified"].(bool)
@@ -234,6 +238,7 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 	return &User{
 		ID:                   id,
 		Email:                email,
+		Username:             username,
 		PasswordHash:         pwHash,
 		Role:                 Role(roleStr),
 		Name:                 name,

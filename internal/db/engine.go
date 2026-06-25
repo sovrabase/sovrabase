@@ -822,3 +822,88 @@ func prefixUpperBound(prefix []byte) []byte {
 	// Prefix is all 0xff; append 0x00 to make it longer.
 	return append(prefix, 0x00)
 }
+
+// StorageAnalysis represents the detailed breakdown of Pebble database storage.
+type StorageAnalysis struct {
+	TotalSize    int64                         `json:"total_size"`
+	MetadataSize int64                         `json:"metadata_size"`
+	IndexSize    int64                         `json:"index_size"`
+	Collections  map[string]*CollectionStorage `json:"collections"`
+}
+
+// CollectionStorage holds storage statistics for a single collection.
+type CollectionStorage struct {
+	DocumentCount int64 `json:"document_count"`
+	DocumentSize  int64 `json:"document_size"`
+	IndexSize     int64 `json:"index_size"`
+}
+
+// AnalyzeStorage scans the Pebble database and returns a breakdown of storage usage.
+func (e *Engine) AnalyzeStorage() (*StorageAnalysis, error) {
+	iter, err := e.db.NewIter(&pebble.IterOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("db: analyze storage iter: %w", err)
+	}
+	defer iter.Close()
+
+	analysis := &StorageAnalysis{
+		Collections: make(map[string]*CollectionStorage),
+	}
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		val := iter.Value()
+		size := int64(len(key) + len(val))
+		analysis.TotalSize += size
+
+		keyStr := string(key)
+		if strings.HasPrefix(keyStr, metaPrefix) { // "__meta__:"
+			analysis.MetadataSize += size
+			collName := strings.TrimPrefix(keyStr, metaPrefix)
+			c := getOrCreateCollStorage(analysis.Collections, collName)
+			c.DocumentSize += size
+		} else if strings.HasPrefix(keyStr, idxMetaPrefix) { // "__idx_meta__:"
+			analysis.MetadataSize += size
+			collName := strings.TrimPrefix(keyStr, idxMetaPrefix)
+			c := getOrCreateCollStorage(analysis.Collections, collName)
+			c.IndexSize += size
+		} else if strings.HasPrefix(keyStr, idxEntryPrefx) { // "__idx__:"
+			analysis.IndexSize += size
+			rest := strings.TrimPrefix(keyStr, idxEntryPrefx)
+			parts := strings.SplitN(rest, ":", 2)
+			if len(parts) > 0 {
+				collName := parts[0]
+				c := getOrCreateCollStorage(analysis.Collections, collName)
+				c.IndexSize += size
+			}
+		} else {
+			// Normal document key: {collection}:{id}
+			parts := strings.SplitN(keyStr, ":", 2)
+			if len(parts) == 2 {
+				collName := parts[0]
+				c := getOrCreateCollStorage(analysis.Collections, collName)
+				c.DocumentCount++
+				c.DocumentSize += size
+			} else {
+				// Unknown key format, count as metadata
+				analysis.MetadataSize += size
+			}
+		}
+	}
+
+	if err := iter.Error(); err != nil {
+		return nil, fmt.Errorf("db: analyze storage iterate: %w", err)
+	}
+
+	return analysis, nil
+}
+
+func getOrCreateCollStorage(m map[string]*CollectionStorage, name string) *CollectionStorage {
+	c, ok := m[name]
+	if !ok {
+		c = &CollectionStorage{}
+		m[name] = c
+	}
+	return c
+}
+

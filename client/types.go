@@ -55,6 +55,7 @@ type AuthResponse struct {
 type User struct {
 	ID             string    `json:"id"`
 	Email          string    `json:"email"`
+	Username       string    `json:"username,omitempty"`
 	Role           string    `json:"role"`
 	CreatedAt      time.Time `json:"created_at"`
 	IsVerified     bool      `json:"is_verified"`

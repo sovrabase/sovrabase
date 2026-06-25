@@ -8,23 +8,29 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ketsuna-org/sovrabase/internal/auth"
+	"github.com/ketsuna-org/sovrabase/internal/metering"
+	"github.com/ketsuna-org/sovrabase/internal/tenant"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
 
 // WSHandler handles WebSocket upgrade and realtime subscription lifecycle.
 type WSHandler struct {
-	hub       *Hub
-	jwtSecret string
-	logger    *slog.Logger
+	hub            *Hub
+	jwtSecret      string
+	logger         *slog.Logger
+	meterStore     *metering.MeterStore
+	projectManager *tenant.ProjectManager
 }
 
 // NewWSHandler creates a new WebSocket handler for realtime subscriptions.
-func NewWSHandler(hub *Hub, jwtSecret string) *WSHandler {
+func NewWSHandler(hub *Hub, jwtSecret string, meterStore *metering.MeterStore, projectManager *tenant.ProjectManager) *WSHandler {
 	return &WSHandler{
-		hub:       hub,
-		jwtSecret: jwtSecret,
-		logger:    slog.Default().With("module", "realtime-ws"),
+		hub:            hub,
+		jwtSecret:      jwtSecret,
+		logger:         slog.Default().With("module", "realtime-ws"),
+		meterStore:     meterStore,
+		projectManager: projectManager,
 	}
 }
 
@@ -80,7 +86,13 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectID := am.ProjectKey
+	projectKey := am.ProjectKey
+	projectID := projectKey
+	if h.projectManager != nil && projectKey != "" {
+		if proj, err := h.projectManager.GetProjectBySecret(projectKey); err == nil && proj != nil {
+			projectID = proj.ID
+		}
+	}
 	if projectID == "" {
 		projectID = claims.UserID
 	}
@@ -88,7 +100,17 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	clientID := uuid.New().String()
 	client := newClient(clientID, projectID)
 	h.hub.Register(client)
-	defer h.hub.Unregister(clientID)
+
+	if h.meterStore != nil && projectID != "" {
+		_ = h.meterStore.Inc(projectID, metering.MetricRealtimeConnections, 1)
+	}
+
+	defer func() {
+		h.hub.Unregister(clientID)
+		if h.meterStore != nil && projectID != "" {
+			_ = h.meterStore.Inc(projectID, metering.MetricRealtimeConnections, -1)
+		}
+	}()
 
 	// Start writer goroutine.
 	writeDone := make(chan struct{})
