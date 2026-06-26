@@ -73,8 +73,8 @@ var adminPermissionMap = []struct {
 	// Backups
 	{"/admin/backups", []string{"POST", "DELETE"}, auth.AdminRoleAdmin},
 	{"/admin/backups", []string{"GET"}, auth.AdminRoleSupport},
-	// Invitations
-	{"/admin/invitations", []string{"GET", "POST"}, auth.AdminRoleSupport},
+	// Invitations — GET and POST /admin/invitations/{token}[/accept] are public;
+	// they are not behind adminAuthMiddleware so this entry is intentionally absent.
 }
 
 // checkAdminPermission verifies if the given admin role has permission for the route.
@@ -377,8 +377,8 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/projects/{id}/invite", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateInvitation))))
 	mux.Handle("DELETE /admin/projects/{id}/members/{userId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleRemoveMember))))
 	mux.Handle("PUT /admin/projects/{id}/members/{userId}/role", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUpdateMemberRole))))
-	mux.Handle("GET /admin/invitations/{token}", a.adminAuthMiddleware(http.HandlerFunc(a.handleGetInvitation)))
-	mux.Handle("POST /admin/invitations/{token}/accept", a.adminAuthMiddleware(http.HandlerFunc(a.handleAcceptInvitation)))
+	mux.Handle("GET /admin/invitations/{token}", http.HandlerFunc(a.handleGetInvitation))                   // public — no auth required
+	mux.Handle("POST /admin/invitations/{token}/accept", http.HandlerFunc(a.handleAcceptInvitation))         // auth validated inside handler
 
 	// Remote config management endpoints
 	mux.Handle("GET /admin/projects/{id}/config", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListConfig))))
@@ -551,7 +551,11 @@ func (a *AdminServer) handleDeleteAdmin(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Prevent self-deletion
-	claims := r.Context().Value(claimsKey).(*auth.Claims)
+	claims, ok := r.Context().Value(claimsKey).(*auth.Claims)
+	if !ok || claims == nil {
+		writeError(w, http.StatusInternalServerError, "missing auth context")
+		return
+	}
 	if claims.UserID == id {
 		writeError(w, http.StatusBadRequest, "cannot delete your own account")
 		return
@@ -2379,6 +2383,18 @@ func (a *AdminServer) handleGetInvitation(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	// Reject non-pending invitations so stale links don't leak project/email data.
+	switch inv.Status {
+	case tenant.InvitationExpired:
+		writeError(w, http.StatusGone, "invitation has expired")
+		return
+	case tenant.InvitationRevoked:
+		writeError(w, http.StatusGone, "invitation has been revoked")
+		return
+	case tenant.InvitationAccepted:
+		writeError(w, http.StatusGone, "invitation has already been accepted")
+		return
+	}
 	// Get project name for display
 	projectName := inv.ProjectID
 	if proj, err := a.projects.GetProject(inv.ProjectID); err == nil {
@@ -2391,13 +2407,15 @@ func (a *AdminServer) handleGetInvitation(w http.ResponseWriter, r *http.Request
 }
 
 func (a *AdminServer) handleAcceptInvitation(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
+	invitationToken := r.PathValue("token")
 	if a.teamStore == nil {
 		writeError(w, http.StatusInternalServerError, "team store not available")
 		return
 	}
 
-	// Extract user info from JWT claims
+	// Extract user JWT from Authorization header or the ?auth_token query param.
+	// Note: the path already owns the name "token" ({token} path value), so the
+	// query param is intentionally named "auth_token" to avoid confusion.
 	tokenString := ""
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
@@ -2406,21 +2424,21 @@ func (a *AdminServer) handleAcceptInvitation(w http.ResponseWriter, r *http.Requ
 			tokenString = parts[1]
 		}
 	} else {
-		tokenString = r.URL.Query().Get("token")
+		tokenString = r.URL.Query().Get("auth_token")
 	}
 
 	if tokenString == "" {
-		writeError(w, http.StatusUnauthorized, "missing authorization")
+		writeError(w, http.StatusUnauthorized, "missing authorization: provide a Bearer token or auth_token query parameter")
 		return
 	}
 
 	claims, err := auth.ValidateToken(tokenString, a.jwtSecret)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "invalid token")
+		writeError(w, http.StatusUnauthorized, "invalid or expired token")
 		return
 	}
 
-	member, err := a.teamStore.AcceptInvitation(token, claims.UserID)
+	member, err := a.teamStore.AcceptInvitation(invitationToken, claims.UserID)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
