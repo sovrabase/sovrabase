@@ -338,12 +338,14 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	// The project ID is decoded from the state token itself.
 	r.Get("/auth/v1/oauth/{provider}/callback", s.handleOAuthCallback)
 
+	// Storage download — no auth required. Images embedded via <img> tags
+	// cannot send Authorization headers. Only project key is needed.
+	// Must be outside the /api/v1 Route block because chi requires
+	// all middlewares to be defined before routes on a given mux.
+	r.With(s.rateLimitMiddleware, s.projectMiddleware).Get("/api/v1/storage/{bucket}/{path:.*}", s.handleDownload)
+
 	// API routes (rate limited + auth)
 	r.Route("/api/v1", func(r chi.Router) {
-		// Storage download — no auth required. Images embedded via <img> tags
-		// cannot send Authorization headers. Only project key is needed.
-		r.With(s.rateLimitMiddleware, s.projectMiddleware).Get("/storage/{bucket}/{path:.*}", s.handleDownload)
-
 		r.Use(s.rateLimitMiddleware)
 		r.Use(s.projectMiddleware)
 		r.Use(s.clientRequestLoggerMiddleware)
