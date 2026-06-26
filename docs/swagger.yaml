@@ -110,6 +110,13 @@ definitions:
       email:
         type: string
     type: object
+  api.mfaChallengeRequest:
+    properties:
+      challenge_token:
+        type: string
+      code:
+        type: string
+    type: object
   api.queryRequest:
     properties:
       filter:
@@ -188,6 +195,13 @@ definitions:
         description: ISO 8601
         type: string
       signed_url:
+        type: string
+    type: object
+  api.updateMeRequest:
+    properties:
+      avatar_url:
+        type: string
+      name:
         type: string
     type: object
   api.verifyEmailRequest:
@@ -956,6 +970,48 @@ paths:
       summary: Get current user
       tags:
       - auth
+    patch:
+      consumes:
+      - application/json
+      description: Update the authenticated user's profile. Only name and avatar_url
+        can be changed. All fields are optional — only the fields present in the request
+        body are updated.
+      parameters:
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.updateMeRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated user profile
+          schema:
+            $ref: '#/definitions/api.UserInfo'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update current user profile
+      tags:
+      - auth
   /api/v1/queues/delete:
     post:
       consumes:
@@ -1424,6 +1480,46 @@ paths:
               type: string
             type: object
       summary: Create magic link
+      tags:
+      - auth
+  /auth/v1/mfa/challenge:
+    post:
+      consumes:
+      - application/json
+      description: Complete an MFA challenge by providing the TOTP code. Returns authentication
+        tokens.
+      parameters:
+      - description: MFA challenge completion
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.mfaChallengeRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Authentication tokens
+          schema:
+            $ref: '#/definitions/api.TokenPair'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid challenge
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Complete MFA challenge
       tags:
       - auth
   /auth/v1/mfa/confirm:

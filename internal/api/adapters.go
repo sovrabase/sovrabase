@@ -135,6 +135,39 @@ func (a *authAdapter) GetMFAStatus(userID string) (bool, error) {
 	return a.svc.GetMFAStatus(userID)
 }
 
+func (a *authAdapter) UpdateUser(id string, name, avatarURL *string) (*UserInfo, error) {
+	user, err := a.svc.GetUser(id)
+	if err != nil {
+		return nil, err
+	}
+	if name != nil {
+		user.Name = *name
+	}
+	if avatarURL != nil {
+		user.AvatarURL = *avatarURL
+	}
+	if err := a.svc.UpdateUser(user); err != nil {
+		return nil, err
+	}
+	return authUserToAPI(a.svc.MustGetUser(id)), nil
+}
+
+func (a *authAdapter) SignInWithMFA(email, password string) (*SignInResult, error) {
+	result, err := a.svc.SignInWithMFA(email, password)
+	if err != nil {
+		return nil, err
+	}
+	return signInResultToAPI(result), nil
+}
+
+func (a *authAdapter) CompleteMFAChallenge(challengeToken, code string) (*TokenPair, error) {
+	tokens, err := a.svc.CompleteMFAChallenge(challengeToken, code)
+	if err != nil {
+		return nil, err
+	}
+	return authTokensToAPI(tokens), nil
+}
+
 func authUserToAPI(u *auth.User) *UserInfo {
 	if u == nil {
 		return nil
@@ -167,6 +200,18 @@ func authTokensToAPI(t *auth.TokenPair) *TokenPair {
 		AccessToken:  t.AccessToken,
 		RefreshToken: t.RefreshToken,
 		ExpiresIn:    int(t.ExpiresIn),
+	}
+}
+
+func signInResultToAPI(r *auth.SignInResult) *SignInResult {
+	if r == nil {
+		return nil
+	}
+	return &SignInResult{
+		Token:          authTokensToAPI(r.Token),
+		MFARequired:    r.MFARequired,
+		ChallengeToken: r.ChallengeToken,
+		ExpiresIn:      r.ExpiresIn,
 	}
 }
 

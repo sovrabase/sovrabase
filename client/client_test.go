@@ -256,14 +256,17 @@ func TestAuthFlows(t *testing.T) {
 	}
 
 	// Test sign-in.
-	resp, err = c.SignIn(email, password)
+	signInResult, err := c.SignIn(email, password)
 	if err != nil {
 		t.Fatalf("signin failed: %v", err)
 	}
-	if resp.AccessToken == "" {
+	if signInResult.Token == nil {
+		t.Fatal("expected non-nil token in sign-in result")
+	}
+	if signInResult.Token.AccessToken == "" {
 		t.Fatal("expected non-empty access token")
 	}
-	if resp.RefreshToken == "" {
+	if signInResult.Token.RefreshToken == "" {
 		t.Fatal("expected non-empty refresh token")
 	}
 
@@ -296,11 +299,11 @@ func TestStorageUploadAndDownload(t *testing.T) {
 	c := getTestClient(t)
 
 	// Ensure we have auth for storage operations (storage requires auth).
-	resp, err := c.SignIn("testuser@example.com", "securePassword123")
+	signInResult, err := c.SignIn("testuser@example.com", "securePassword123")
 	if err != nil {
 		t.Skipf("skipping storage test: auth failed: %v", err)
 	}
-	_ = resp
+	_ = signInResult
 
 	// Upload a test file.
 	content := []byte("Hello, Sovrabase Storage!")

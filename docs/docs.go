@@ -1095,6 +1095,68 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the authenticated user's profile. Only name and avatar_url can be changed. All fields are optional — only the fields present in the request body are updated.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Update current user profile",
+                "parameters": [
+                    {
+                        "description": "Fields to update",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.updateMeRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated user profile",
+                        "schema": {
+                            "$ref": "#/definitions/api.UserInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/queues/delete": {
@@ -1794,6 +1856,65 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/v1/mfa/challenge": {
+            "post": {
+                "description": "Complete an MFA challenge by providing the TOTP code. Returns authentication tokens.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Complete MFA challenge",
+                "parameters": [
+                    {
+                        "description": "MFA challenge completion",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.mfaChallengeRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Authentication tokens",
+                        "schema": {
+                            "$ref": "#/definitions/api.TokenPair"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid challenge",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2725,6 +2846,17 @@ const docTemplate = `{
                 }
             }
         },
+        "api.mfaChallengeRequest": {
+            "type": "object",
+            "properties": {
+                "challenge_token": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
         "api.queryRequest": {
             "type": "object",
             "properties": {
@@ -2843,6 +2975,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "signed_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.updateMeRequest": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 }
             }

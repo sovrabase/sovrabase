@@ -95,6 +95,9 @@ type AuthService interface {
 	DisableMFA(userID, code string) error
 	VerifyMFA(userID, code string) error
 	GetMFAStatus(userID string) (bool, error)
+	UpdateUser(id string, name, avatarURL *string) (*UserInfo, error)
+	SignInWithMFA(email, password string) (*SignInResult, error)
+	CompleteMFAChallenge(challengeToken, code string) (*TokenPair, error)
 }
 
 // StorageService is the interface expected from the storage package.
@@ -140,6 +143,16 @@ type TokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int    `json:"expires_in"`
+}
+
+// SignInResult is returned by SignInWithMFA. When MFA is required, Token is nil
+// and the caller must use the ChallengeToken with CompleteMFAChallenge.
+// @name SignInResult
+type SignInResult struct {
+	Token          *TokenPair `json:"token,omitempty"`
+	MFARequired    bool       `json:"mfa_required"`
+	ChallengeToken string     `json:"challenge_token,omitempty"`
+	ExpiresIn      int64      `json:"expires_in,omitempty"`
 }
 
 // FileInfo file metadata.
@@ -331,7 +344,8 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		r.Post("/mfa/setup", s.handleMFASetup)
 		r.Post("/mfa/confirm", s.handleMFAConfirm)
 		r.Post("/mfa/disable", s.handleMFADisable)
-		r.Get("/mfa/status", s.handleMFAStatus)
+			r.Get("/mfa/status", s.handleMFAStatus)
+			r.Post("/mfa/challenge", s.handleMFAChallenge)
 		})
 	// OAuth callback is outside projectMiddleware because it receives
 	// ?code and ?state from the OAuth provider (no X-Project-Key header).
@@ -356,6 +370,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		r.Use(s.authMiddleware)
 		r.Use(s.meteringMiddleware)
 		r.Get("/me", s.handleGetMe)
+			r.Patch("/me", s.handleUpdateMe)
 
 		// Database
 		r.Route("/collections/{collection}", func(r chi.Router) {

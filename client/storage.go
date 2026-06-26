@@ -92,3 +92,27 @@ func (c *Client) DeleteFile(bucket, path string) error {
 	apiPath := fmt.Sprintf("/api/v1/storage/%s/%s", url.PathEscape(bucket), url.PathEscape(path))
 	return c.doJSON("DELETE", apiPath, nil, nil)
 }
+
+// GetSignedURL obtains a pre-signed URL for uploading/downloading a file.
+// expiresIn is the URL lifetime in seconds.
+func (c *Client) GetSignedURL(bucket, path string, expiresIn int) (*SignedURLResponse, error) {
+	apiPath := fmt.Sprintf("/api/v1/storage/%s/signed-url", url.PathEscape(bucket))
+	body := map[string]interface{}{
+		"path":       path,
+		"expires_in": expiresIn,
+	}
+	var resp SignedURLResponse
+	if err := c.doJSON("POST", apiPath, body, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetFileURL is a convenience wrapper that returns just the signed URL string.
+func (c *Client) GetFileURL(bucket, path string, expiresIn int) (string, error) {
+	resp, err := c.GetSignedURL(bucket, path, expiresIn)
+	if err != nil {
+		return "", err
+	}
+	return resp.SignedURL, nil
+}

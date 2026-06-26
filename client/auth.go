@@ -1,7 +1,12 @@
 package client
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 )
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
@@ -36,20 +41,109 @@ func (c *Client) SignUp(email, password string) (*AuthResponse, error) {
 }
 
 // SignIn authenticates a user by email and password.
-func (c *Client) SignIn(email, password string) (*AuthResponse, error) {
+// When MFA is enabled, the returned SignInResult will have MFARequired=true
+// and a ChallengeToken that must be completed via CompleteMFAChallenge.
+func (c *Client) SignIn(email, password string) (*SignInResult, error) {
 	body := map[string]interface{}{
 		"email":    email,
 		"password": password,
 	}
 
-	// SignIn returns the token pair directly.
-	var resp AuthResponse
-	if err := c.doJSON("POST", "/auth/v1/signin", body, &resp); err != nil {
-		return nil, err
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal: %w", err)
 	}
 
-	c.SetAuth(resp.AccessToken, resp.RefreshToken)
-	return &resp, nil
+	fullURL := c.baseURL + "/auth/v1/signin"
+	req, err := http.NewRequest("POST", fullURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("request: %w", err)
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read: %w", err)
+	}
+
+	var raw struct {
+		AccessToken    string `json:"access_token"`
+		RefreshToken   string `json:"refresh_token"`
+		ExpiresIn      int64  `json:"expires_in"`
+		User           *User  `json:"user"`
+		Error          string `json:"error"`
+		ChallengeToken string `json:"challenge_token"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	}
+
+	// MFA required — return challenge without calling SignInWithMFA automatically.
+	if raw.Error == "mfa_required" {
+		return &SignInResult{
+			MFARequired:    true,
+			ChallengeToken: raw.ChallengeToken,
+			ExpiresIn:      raw.ExpiresIn,
+		}, nil
+	}
+
+	if resp.StatusCode >= 400 {
+		if raw.Error != "" {
+			return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, raw.Error)
+		}
+		return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
+	}
+
+	token := &TokenPair{
+		AccessToken:  raw.AccessToken,
+		RefreshToken: raw.RefreshToken,
+		ExpiresIn:    int(raw.ExpiresIn),
+	}
+	c.SetAuth(token.AccessToken, token.RefreshToken)
+
+	return &SignInResult{Token: token}, nil
+}
+
+// SignInWithMFA initiates the MFA sign-in flow, returning a challenge token.
+// The caller must complete the challenge with CompleteMFAChallenge.
+func (c *Client) SignInWithMFA(email, password string) (*SignInResult, error) {
+	body := map[string]interface{}{
+		"email":    email,
+		"password": password,
+	}
+	var result SignInResult
+	if err := c.doJSON("POST", "/auth/v1/signin-mfa", body, &result); err != nil {
+		// If server returned mfa_required, try to extract the SignInResult from the error.
+		if strings.Contains(err.Error(), "mfa_required") {
+			return nil, err
+		}
+		return nil, err
+	}
+	if result.Token != nil {
+		c.SetAuth(result.Token.AccessToken, result.Token.RefreshToken)
+	}
+	return &result, nil
+}
+
+// CompleteMFAChallenge completes an MFA challenge with a TOTP or backup code.
+// Returns the full token pair on success.
+func (c *Client) CompleteMFAChallenge(challengeToken, code string) (*TokenPair, error) {
+	body := map[string]interface{}{
+		"challenge_token": challengeToken,
+		"code":            code,
+	}
+	var token TokenPair
+	if err := c.doJSON("POST", "/auth/v1/mfa/complete", body, &token); err != nil {
+		return nil, err
+	}
+	c.SetAuth(token.AccessToken, token.RefreshToken)
+	return &token, nil
 }
 
 // Refresh uses the stored refresh token to obtain new access and refresh tokens.
@@ -120,6 +214,23 @@ func (c *Client) GetMe() (*User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// UpdateMe updates the current user's name and/or avatar URL.
+// Pass nil for fields that should not be changed.
+func (c *Client) UpdateMe(name, avatarURL *string) (*UserInfo, error) {
+	body := map[string]interface{}{}
+	if name != nil {
+		body["name"] = *name
+	}
+	if avatarURL != nil {
+		body["avatar_url"] = *avatarURL
+	}
+	var info UserInfo
+	if err := c.doJSON("PATCH", "/api/v1/me", body, &info); err != nil {
+		return nil, err
+	}
+	return &info, nil
 }
 
 // OAuthURL returns the authorization URL for an OAuth provider.

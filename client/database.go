@@ -45,6 +45,16 @@ func (c *Client) Delete(collection, id string) error {
 	return c.doJSON("DELETE", path, nil, nil)
 }
 
+// Patch partially updates an existing document. Only the fields present in data are updated.
+func (c *Client) Patch(collection, id string, data Document) (Document, error) {
+	var doc Document
+	path := fmt.Sprintf("/api/v1/collections/%s/%s", url.PathEscape(collection), url.PathEscape(id))
+	if err := c.doJSON("PATCH", path, data, &doc); err != nil {
+		return nil, err
+	}
+	return doc, nil
+}
+
 // ─── List ──────────────────────────────────────────────────────────────────────
 
 // List returns documents from a collection with optional pagination and field selection.

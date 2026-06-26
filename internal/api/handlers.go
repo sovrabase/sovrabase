@@ -140,6 +140,16 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err != nil {
+		if strings.Contains(err.Error(), "mfa_required") {
+			// Fallback: try MFA-aware sign-in
+			result, mfaErr := s.getAuth(r).SignInWithMFA(req.Email, req.Password)
+			if mfaErr != nil {
+				writeError(w, http.StatusUnauthorized, "invalid credentials")
+				return
+			}
+			writeJSON(w, http.StatusOK, result)
+			return
+		}
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -631,6 +641,42 @@ func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"enabled": enabled})
 }
 
+type mfaChallengeRequest struct {
+	ChallengeToken string `json:"challenge_token"`
+	Code           string `json:"code"`
+}
+
+// @Summary Complete MFA challenge
+// @Description Complete an MFA challenge by providing the TOTP code. Returns authentication tokens.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body mfaChallengeRequest true "MFA challenge completion"
+// @Success 200 {object} TokenPair "Authentication tokens"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 401 {object} map[string]string "Invalid challenge"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
+// @Router /auth/v1/mfa/challenge [post]
+func (s *Server) handleMFAChallenge(w http.ResponseWriter, r *http.Request) {
+	var req mfaChallengeRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.ChallengeToken == "" || req.Code == "" {
+		writeError(w, http.StatusBadRequest, "challenge_token and code are required")
+		return
+	}
+
+	tokens, err := s.getAuth(r).CompleteMFAChallenge(req.ChallengeToken, req.Code)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tokens)
+}
+
 // @Summary Get current user
 // @Description Get the profile of the currently authenticated user.
 // @Tags auth
@@ -652,6 +698,49 @@ func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	user, err := s.getAuth(r).GetUser(claims.UserID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+type updateMeRequest struct {
+	Name      *string `json:"name"`
+	AvatarURL *string `json:"avatar_url"`
+}
+
+// @Summary Update current user profile
+// @Description Update the authenticated user's profile. Only name and avatar_url can be changed. All fields are optional — only the fields present in the request body are updated.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body updateMeRequest true "Fields to update"
+// @Success 200 {object} UserInfo "Updated user profile"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 401 {object} map[string]string "Not authenticated"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
+// @Router /api/v1/me [patch]
+func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+
+	var req updateMeRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Name == nil && req.AvatarURL == nil {
+		writeError(w, http.StatusBadRequest, "at least one of name or avatar_url must be provided")
+		return
+	}
+
+	user, err := s.getAuth(r).UpdateUser(claims.UserID, req.Name, req.AvatarURL)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update user: "+err.Error())
 		return
 	}
 

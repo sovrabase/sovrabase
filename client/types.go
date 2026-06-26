@@ -99,3 +99,34 @@ type BatchResponse struct {
 type APIVersion struct {
 	Version string `json:"version"`
 }
+
+// UserInfo represents a user profile returned by UpdateMe / GetMe.
+type UserInfo struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	Name      string `json:"name,omitempty"`
+	AvatarURL string `json:"avatar_url,omitempty"`
+	Role      string `json:"role,omitempty"`
+}
+
+// TokenPair holds access and refresh tokens.
+type TokenPair struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+}
+
+// SignInResult is the response from SignIn, which may require MFA.
+// When MFARequired is true, use ChallengeToken with CompleteMFAChallenge.
+type SignInResult struct {
+	Token          *TokenPair `json:"token,omitempty"`
+	MFARequired    bool       `json:"mfa_required"`
+	ChallengeToken string     `json:"challenge_token,omitempty"`
+	ExpiresIn      int64      `json:"expires_in,omitempty"`
+}
+
+// SignedURLResponse holds a pre-signed URL for file access.
+type SignedURLResponse struct {
+	SignedURL string `json:"signed_url"`
+	ExpiresAt string `json:"expires_at"`
+}

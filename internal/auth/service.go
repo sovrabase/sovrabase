@@ -109,6 +109,8 @@ func (s *AuthService) SignUp(email, password string) (*User, *TokenPair, error) 
 }
 
 // SignIn authenticates a user by email and password, returning a token pair.
+// If the user has MFA enabled, it returns an error containing "mfa_required"
+// so the caller can switch to SignInWithMFA.
 func (s *AuthService) SignIn(email, password string) (*TokenPair, error) {
 	email = strings.TrimSpace(email)
 	if email == "" || password == "" {
@@ -127,6 +129,88 @@ func (s *AuthService) SignIn(email, password string) (*TokenPair, error) {
 
 	if err := CheckPassword(user.PasswordHash, password); err != nil {
 		return nil, fmt.Errorf("invalid email or password")
+	}
+
+	// If MFA is enabled, refuse to issue tokens directly.
+	if user.MFAEnabled {
+		return nil, fmt.Errorf("mfa_required: use SignInWithMFA")
+	}
+
+	return s.generateTokenPair(user)
+}
+
+// SignInResult is returned by SignInWithMFA. When MFA is enabled, Token is nil
+// and the caller must use ChallengeToken with CompleteMFAChallenge.
+type SignInResult struct {
+	Token          *TokenPair `json:"token,omitempty"`
+	MFARequired    bool       `json:"mfa_required"`
+	ChallengeToken string     `json:"challenge_token,omitempty"`
+	ExpiresIn      int64      `json:"expires_in,omitempty"`
+}
+
+// SignInWithMFA authenticates a user and returns either tokens or an MFA
+// challenge. If the user has MFA enabled, a short-lived challenge token
+// is returned instead of tokens. The caller must then call
+// CompleteMFAChallenge with the challenge token and a valid TOTP code.
+func (s *AuthService) SignInWithMFA(email, password string) (*SignInResult, error) {
+	email = strings.TrimSpace(email)
+	if email == "" || password == "" {
+		return nil, fmt.Errorf("email and password are required")
+	}
+
+	user, err := s.store.GetByEmail(email)
+	if err != nil {
+		return nil, fmt.Errorf("invalid email or password")
+	}
+
+	if s.EmailVerificationEnabled && s.SMTPHost != "" && !user.IsVerified {
+		return nil, fmt.Errorf("email not verified")
+	}
+
+	if err := CheckPassword(user.PasswordHash, password); err != nil {
+		return nil, fmt.Errorf("invalid email or password")
+	}
+
+	// If MFA is enabled, return a challenge instead of tokens.
+	if user.MFAEnabled {
+		challengeToken, err := GenerateChallengeToken(user, s.jwtSecret)
+		if err != nil {
+			return nil, fmt.Errorf("generating challenge: %w", err)
+		}
+		return &SignInResult{
+			MFARequired:    true,
+			ChallengeToken: challengeToken,
+			ExpiresIn:      int64(challengeTokenTTL.Seconds()),
+		}, nil
+	}
+
+	tokens, err := s.generateTokenPair(user)
+	if err != nil {
+		return nil, err
+	}
+	return &SignInResult{Token: tokens}, nil
+}
+
+// CompleteMFAChallenge validates the TOTP code against the challenge token
+// and returns a full token pair if successful.
+func (s *AuthService) CompleteMFAChallenge(challengeToken, code string) (*TokenPair, error) {
+	claims, err := ValidateChallengeToken(challengeToken, s.jwtSecret)
+	if err != nil {
+		return nil, fmt.Errorf("invalid or expired challenge: %w", err)
+	}
+
+	user, err := s.store.GetByID(claims.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	if !user.MFAEnabled {
+		return nil, fmt.Errorf("MFA is not enabled for this user")
+	}
+
+	// Validate TOTP code.
+	if !ValidateTOTP(user.MFASecret, code) {
+		return nil, fmt.Errorf("invalid TOTP code")
 	}
 
 	return s.generateTokenPair(user)
@@ -155,6 +239,16 @@ func (s *AuthService) ValidateAccessToken(tokenString string) (*Claims, error) {
 // GetUser retrieves a user by ID.
 func (s *AuthService) GetUser(id string) (*User, error) {
 	return s.store.GetByID(id)
+}
+
+// MustGetUser is like GetUser but panics on error. Use only when the caller
+// has already verified the user exists (e.g. after a successful update).
+func (s *AuthService) MustGetUser(id string) *User {
+	u, err := s.store.GetByID(id)
+	if err != nil {
+		panic("MustGetUser: " + err.Error())
+	}
+	return u
 }
 
 // ListUsers returns all users in the store.
