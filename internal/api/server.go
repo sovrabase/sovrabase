@@ -344,6 +344,10 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	// all middlewares to be defined before routes on a given mux.
 	r.With(s.rateLimitMiddleware, s.projectMiddleware).Get("/api/v1/storage/{bucket}/{path:.*}", s.handleDownload)
 
+	// Signed storage download — no auth, no project key needed. The
+	// signed token in the query string carries all authorisation.
+	r.With(s.rateLimitMiddleware).Get("/api/v1/storage/signed/{bucket}/{path:.*}", s.handleSignedDownload)
+
 	// API routes (rate limited + auth)
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(s.rateLimitMiddleware)
@@ -374,6 +378,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		// Storage
 			r.Route("/storage/{bucket}", func(r chi.Router) {
 				r.Post("/upload", s.handleUpload)
+				r.Post("/signed-url", s.handleSignedURL)
 				r.Get("/list", s.handleStorageList)
 				r.Delete("/{path:.*}", s.handleStorageDelete)
 			})

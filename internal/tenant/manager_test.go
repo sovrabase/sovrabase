@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/ketsuna-org/sovrabase/internal/config"
 )
 
 func newTestManager(t *testing.T) *ProjectManager {
@@ -17,7 +18,7 @@ func newTestManager(t *testing.T) *ProjectManager {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 
-	pm, err := NewProjectManager(dir, nil)
+	pm, err := NewProjectManager(dir, &config.Config{JWTSecret: "test-secret"})
 	if err != nil {
 		t.Fatalf("NewProjectManager: %v", err)
 	}
@@ -152,7 +153,8 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	dir := t.TempDir()
 
 	// First instance
-	pm1, err := NewProjectManager(dir, nil)
+	cfg := &config.Config{JWTSecret: "test-secret"}
+	pm1, err := NewProjectManager(dir, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +162,7 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	pm1.Close()
 
 	// Second instance (simulates restart)
-	pm2, err := NewProjectManager(dir, nil)
+	pm2, err := NewProjectManager(dir, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +181,8 @@ func TestAutoRepairEmptyJWTSecret(t *testing.T) {
 	dir := t.TempDir()
 
 	// 1. Create a project using a ProjectManager
-	pm1, err := NewProjectManager(dir, nil)
+	cfg := &config.Config{JWTSecret: "this-is-a-very-long-test-secret-key-for-testing"}
+	pm1, err := NewProjectManager(dir, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +222,7 @@ func TestAutoRepairEmptyJWTSecret(t *testing.T) {
 	db.Close()
 
 	// 3. Re-open with a new ProjectManager. It should auto-repair the empty JWTSecret.
-	pm2, err := NewProjectManager(dir, nil)
+	pm2, err := NewProjectManager(dir, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

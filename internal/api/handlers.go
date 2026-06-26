@@ -1425,6 +1425,164 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, reader)
 }
 
+// ─── Signed URL ──────────────────────────────────────────────────────────────
+
+type signedURLRequest struct {
+	Path      string `json:"path"`
+	ExpiresIn int    `json:"expires_in"` // seconds; default 3600
+}
+
+type signedURLResponse struct {
+	SignedURL string `json:"signed_url"`
+	ExpiresAt string `json:"expires_at"` // ISO 8601
+}
+
+// @Summary Generate a signed URL for a file
+// @Description Generate a time-limited, cryptographically signed URL that grants temporary access to a file without requiring a project key. The signed URL can be embedded directly in <img> tags, shared links, etc. Default expiry is 1 hour.
+// @Tags storage
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param bucket path string true "Bucket name"
+// @Param request body signedURLRequest true "Signed URL request"
+// @Success 200 {object} signedURLResponse "Signed URL"
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
+// @Router /api/v1/storage/{bucket}/signed-url [post]
+func (s *Server) handleSignedURL(w http.ResponseWriter, r *http.Request) {
+	bucket := chi.URLParam(r, "bucket")
+
+	var req signedURLRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Path == "" {
+		writeError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+	ttl := signedURLTTL
+	if req.ExpiresIn > 0 {
+		ttl = time.Duration(req.ExpiresIn) * time.Second
+		if ttl > 24*time.Hour {
+			writeError(w, http.StatusBadRequest, "expires_in must not exceed 86400 seconds (24 hours)")
+			return
+		}
+	}
+
+	expiresAt := time.Now().UTC().Add(ttl)
+	projectID := getProjectID(r)
+	if projectID == "" {
+		writeError(w, http.StatusUnauthorized, "project context required")
+		return
+	}
+
+	// The signing secret is the per-project JWT secret.
+	proj, err := s.projects.GetProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to resolve project")
+		return
+	}
+
+	token, err := generateSignedToken([]byte(proj.JWTSecret), bucket, req.Path, expiresAt)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to generate signed token")
+		return
+	}
+
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	signedURL := fmt.Sprintf("%s://%s/api/v1/storage/signed/%s/%s?token=%s",
+		scheme, r.Host, bucket, req.Path, token)
+
+	writeJSON(w, http.StatusOK, signedURLResponse{
+		SignedURL: signedURL,
+		ExpiresAt: expiresAt.Format(time.RFC3339),
+	})
+}
+
+// handleSignedDownload serves a file using a signed URL token. No
+// project key or auth header is required — the signed token itself
+// carries the authorisation.
+func (s *Server) handleSignedDownload(w http.ResponseWriter, r *http.Request) {
+	bucket := chi.URLParam(r, "bucket")
+	path := chi.URLParam(r, "path")
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "missing signed token")
+		return
+	}
+
+	// We don't know which project this is for — try all projects.
+	// The signed token payload doesn't carry the project ID, but the
+	// per-project JWT secret is the signing key.  We iterate over all
+	// projects and try to validate the token against each one.
+	var projectID string
+	allProjects := s.projects.ListProjects()
+	for _, proj := range allProjects {
+		b, p, err := validateSignedToken([]byte(proj.JWTSecret), token)
+		if err == nil && b == bucket && p == path {
+			projectID = proj.ID
+			break
+		}
+	}
+	if projectID == "" {
+		writeError(w, http.StatusForbidden, "invalid or expired signed token")
+		return
+	}
+
+	// Load the project's storage driver.
+	env, err := s.projects.GetProjectEnv(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to resolve project")
+		return
+	}
+	store := WrapStorageDriver(env.Storage)
+
+	reader, info, err := store.Download(bucket, path)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "file not found")
+		return
+	}
+	defer reader.Close()
+
+	// Image transformation (same as handleDownload).
+	q := r.URL.Query()
+	imgOpts := imgransform.Options{}
+	if wStr := q.Get("w"); wStr != "" {
+		imgOpts.Width, _ = strconv.Atoi(wStr)
+	}
+	if hStr := q.Get("h"); hStr != "" {
+		imgOpts.Height, _ = strconv.Atoi(hStr)
+	}
+	imgOpts.Format = q.Get("format")
+	imgOpts.Fit = q.Get("fit")
+	if qStr := q.Get("quality"); qStr != "" {
+		imgOpts.Quality, _ = strconv.Atoi(qStr)
+	}
+
+	if imgransform.IsTransformRequested(imgOpts) {
+		outCT := info.ContentType
+		if imgOpts.Format != "" {
+			outCT = "image/" + imgOpts.Format
+		}
+		w.Header().Set("Content-Type", outCT)
+		w.Header().Set("Content-Disposition", "inline; filename=\""+info.Path+"\"")
+		w.Header().Set("X-Image-Transformed", "sovrabase")
+		if err := imgransform.Transform(reader, w, info.ContentType, imgOpts); err != nil {
+			writeError(w, http.StatusInternalServerError, "image transformation failed: "+err.Error())
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", info.ContentType)
+	w.Header().Set("Content-Disposition", "inline; filename=\""+info.Path+"\"")
+	io.Copy(w, reader)
+}
+
 // @Summary Delete a file
 // @Description Delete a file from the specified storage bucket.
 // @Tags storage

@@ -22,7 +22,8 @@ func TestAdminFileDownload(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// 2. Initialize project manager
-	pm, err := tenant.NewProjectManager(dir, nil)
+	cfg := &config.Config{JWTSecret: "test-secret"}
+	pm, err := tenant.NewProjectManager(dir, cfg)
 	if err != nil {
 		t.Fatalf("failed to create project manager: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestAdminFileDownload(t *testing.T) {
 	}
 
 	// 5. Initialize AdminServer
-	cfg := &config.Config{
+	cfg = &config.Config{
 		DataDir:         dir,
 		SessionDuration: 1 * time.Hour,
 	}

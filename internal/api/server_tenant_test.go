@@ -10,9 +10,11 @@ import (
 	"testing"
 
 	"github.com/ketsuna-org/sovrabase/internal/auth"
+	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
+	"github.com/ketsuna-org/sovrabase/plugin"
 )
 
 func TestServerTenantRouting(t *testing.T) {
@@ -24,7 +26,7 @@ func TestServerTenantRouting(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// 2. Initialize project manager
-	pm, err := tenant.NewProjectManager(dir, nil)
+	pm, err := tenant.NewProjectManager(dir, &config.Config{JWTSecret: "test-secret"})
 	if err != nil {
 		t.Fatalf("failed to create project manager: %v", err)
 	}
@@ -48,7 +50,7 @@ func TestServerTenantRouting(t *testing.T) {
 		AllowOrigins: "*",
 		JWTSecret:    "global_secret",
 	}
-	server := NewServer(cfg, globalDB, WrapAuthService(globalAuth), WrapStorageDriver(globalStorage), pm)
+	server := NewServer(cfg, globalDB, WrapAuthService(globalAuth), WrapStorageDriver(globalStorage), pm, plugin.NewHookManager())
 
 	// 6. Test Request to /auth/v1/signup WITH X-Project-Key
 	signUpData := map[string]string{

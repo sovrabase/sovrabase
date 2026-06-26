@@ -14,7 +14,7 @@
         },
         "license": {
             "name": "AGPL-3.0",
-            "url": "https://github.com/ketsuna-org/sovrabase/blob/main/LICENSE"
+            "url": "https://github.com/sovrabase/sovrabase/blob/main/LICENSE"
         },
         "version": "1.0"
     },
@@ -1390,6 +1390,77 @@
                 }
             }
         },
+        "/api/v1/storage/{bucket}/signed-url": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Generate a time-limited, cryptographically signed URL that grants temporary access to a file without requiring a project key. The signed URL can be embedded directly in \u003cimg\u003e tags, shared links, etc. Default expiry is 1 hour.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Generate a signed URL for a file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket name",
+                        "name": "bucket",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Signed URL request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.signedURLRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Project API key for multi-tenant isolation",
+                        "name": "X-Project-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Signed URL",
+                        "schema": {
+                            "$ref": "#/definitions/api.signedURLResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/storage/{bucket}/upload": {
             "post": {
                 "security": [
@@ -2665,6 +2736,13 @@
                 "offset": {
                     "type": "integer"
                 },
+                "order_by": {
+                    "type": "string"
+                },
+                "order_dir": {
+                    "description": "\"asc\" or \"desc\", default \"asc\"",
+                    "type": "string"
+                },
                 "projection": {
                     "type": "array",
                     "items": {
@@ -2739,6 +2817,30 @@
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.signedURLRequest": {
+            "type": "object",
+            "properties": {
+                "expires_in": {
+                    "description": "seconds; default 3600",
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.signedURLResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "description": "ISO 8601",
+                    "type": "string"
+                },
+                "signed_url": {
                     "type": "string"
                 }
             }

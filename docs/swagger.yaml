@@ -119,6 +119,11 @@ definitions:
         type: integer
       offset:
         type: integer
+      order_by:
+        type: string
+      order_dir:
+        description: '"asc" or "desc", default "asc"'
+        type: string
       projection:
         items:
           type: string
@@ -167,6 +172,22 @@ definitions:
       email:
         type: string
       password:
+        type: string
+    type: object
+  api.signedURLRequest:
+    properties:
+      expires_in:
+        description: seconds; default 3600
+        type: integer
+      path:
+        type: string
+    type: object
+  api.signedURLResponse:
+    properties:
+      expires_at:
+        description: ISO 8601
+        type: string
+      signed_url:
         type: string
     type: object
   api.verifyEmailRequest:
@@ -221,7 +242,7 @@ info:
     MB binary.
   license:
     name: AGPL-3.0
-    url: https://github.com/ketsuna-org/sovrabase/blob/main/LICENSE
+    url: https://github.com/sovrabase/sovrabase/blob/main/LICENSE
   title: Sovrabase API
   version: "1.0"
 paths:
@@ -1226,6 +1247,55 @@ paths:
       security:
       - BearerAuth: []
       summary: List files in bucket
+      tags:
+      - storage
+  /api/v1/storage/{bucket}/signed-url:
+    post:
+      consumes:
+      - application/json
+      description: Generate a time-limited, cryptographically signed URL that grants
+        temporary access to a file without requiring a project key. The signed URL
+        can be embedded directly in <img> tags, shared links, etc. Default expiry
+        is 1 hour.
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      - description: Signed URL request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.signedURLRequest'
+      - description: Project API key for multi-tenant isolation
+        in: header
+        name: X-Project-Key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Signed URL
+          schema:
+            $ref: '#/definitions/api.signedURLResponse'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Generate a signed URL for a file
       tags:
       - storage
   /api/v1/storage/{bucket}/upload:

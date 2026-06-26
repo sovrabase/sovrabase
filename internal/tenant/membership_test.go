@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/ketsuna-org/sovrabase/internal/config"
 )
 
 // newTestTeamStore opens a temporary Pebble DB and wraps it in a TeamStore.
@@ -465,7 +466,7 @@ func TestOwnerAutoAddedOnCreateProject(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 
-	pm, err := NewProjectManager(dir, nil)
+	pm, err := NewProjectManager(dir, &config.Config{JWTSecret: "this-is-a-very-long-test-secret-key-for-testing"})
 	if err != nil {
 		t.Fatalf("NewProjectManager: %v", err)
 	}
