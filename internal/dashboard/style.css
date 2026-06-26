@@ -1358,3 +1358,17 @@ textarea:focus { outline: none; border-color: var(--border-focus); }
   animation: fadeSlideIn 0.25s ease;
 }
 
+/* ===== LUCIDE ICON HELPERS ===== */
+.nav-icon svg, .qs-tab svg, .btn svg, .card-title svg, .stat-card-icon svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.nav-icon svg { width: 16px; height: 16px; }
+.stat-card-icon svg { width: 28px; height: 28px; color: var(--accent); }
+.card-title svg { width: 16px; height: 16px; vertical-align: text-bottom; }
+.qs-tab svg { width: 14px; height: 14px; }
+.btn svg { width: 14px; height: 14px; }
+.icon-danger svg { color: var(--danger); }
+
+

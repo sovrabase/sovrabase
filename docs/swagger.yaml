@@ -260,6 +260,114 @@ info:
   title: Sovrabase API
   version: "1.0"
 paths:
+  /admin/invitations/{token}:
+    get:
+      description: Retrieve details of an invitation using its token. This route is public and does not require an authorization header.
+      operationId: getInvitation
+      tags:
+        - Invitations
+      parameters:
+        - description: Invitation token
+          in: path
+          name: token
+          required: true
+          type: string
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Invitation details retrieved
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+              role:
+                type: string
+              project_name:
+                type: string
+        "404":
+          description: Invitation not found or expired
+        "500":
+          description: Internal server error
+  /admin/invitations/{token}/accept:
+    post:
+      description: Accept an invitation to join a project. This requires a Bearer token of the logged-in user who is accepting the invite.
+      operationId: acceptInvitation
+      tags:
+        - Invitations
+      parameters:
+        - description: Invitation token
+          in: path
+          name: token
+          required: true
+          type: string
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Invitation accepted successfully
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+        "400":
+          description: Invalid request or invalid token
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal server error
+      security:
+        - BearerAuth: []
+  /admin/projects/{id}/invite:
+    post:
+      consumes:
+      - application/json
+      description: Create a new invitation for a user to join a project. Requires admin authentication.
+      operationId: createInvitation
+      tags:
+        - Invitations
+      parameters:
+        - description: Project ID
+          in: path
+          name: id
+          required: true
+          type: string
+        - description: Invitation request
+          in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+                description: Email address of the invitee
+              role:
+                type: string
+                description: Role to assign (developer, admin, viewer, owner)
+              ttl:
+                type: string
+                description: Invitation expiry duration (e.g. 72h). Defaults to 72h.
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Invitation created with link
+          schema:
+            type: object
+            properties:
+              invitation:
+                type: object
+              invite_link:
+                type: string
+        "400":
+          description: Invalid request
+        "500":
+          description: Team store not available
+      security:
+        - BearerAuth: []
   /api/v1/collections/{collection}:
     get:
       consumes:
@@ -695,11 +803,6 @@ paths:
         name: X-Project-Key
         required: true
         type: string
-      - description: Project API key for multi-tenant isolation
-        in: header
-        name: X-Project-Key
-        required: true
-        type: string
       produces:
       - application/json
       responses:
@@ -821,11 +924,6 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.configSetRequest'
-      - description: Project API key for multi-tenant isolation
-        in: header
-        name: X-Project-Key
-        required: true
-        type: string
       - description: Project API key for multi-tenant isolation
         in: header
         name: X-Project-Key

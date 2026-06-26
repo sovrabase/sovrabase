@@ -19,6 +19,14 @@ let activeProjectEnv = {
   files: []
 };
 
+// ===== SVG ICON STRINGS (Lucide) =====
+const ICONS = {
+  save: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>',
+  zap:  '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>',
+  copy: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+  refresh: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
+};
+
 // ===== AUTH FLOW =====
 function showLogin() {
   document.getElementById('app').style.display = 'none';
@@ -782,6 +790,8 @@ async function loadSettings() {
     document.getElementById('cfg-node-id').value = cfg.node_id || '';
     document.getElementById('cfg-repl-addr').value = cfg.repl_addr || '';
     document.getElementById('cfg-peers').value = (cfg.peers || []).join('\n');
+    const leaseTTLEl = document.getElementById('cfg-lease-ttl');
+    if (leaseTTLEl) leaseTTLEl.value = cfg.lease_ttl || '5s';
 
     // Security & HTTPS fields
     const envEl = document.getElementById('cfg-env');
@@ -789,6 +799,30 @@ async function loadSettings() {
     document.getElementById('cfg-jwt-secret').value = cfg.jwt_secret || '';
     document.getElementById('cfg-cert-file').value = cfg.cert_file || '';
     document.getElementById('cfg-key-file').value = cfg.key_file || '';
+    
+    // Security extra fields
+    document.getElementById('cfg-allow-origins').value = cfg.allow_origins || '';
+    const rateLimitEl = document.getElementById('cfg-rate-limit-per-minute');
+    if (rateLimitEl) rateLimitEl.value = cfg.rate_limit_per_minute || 100;
+    const rateBurstEl = document.getElementById('cfg-rate-limit-burst');
+    if (rateBurstEl) rateBurstEl.value = cfg.rate_limit_burst || 20;
+
+    // Captcha fields
+    const captchaEnabled = cfg.captcha_enabled === true;
+    const captchaEl = document.getElementById('cfg-captcha-enabled');
+    if (captchaEl) {
+      captchaEl.checked = captchaEnabled;
+      const captchaForm = document.getElementById('captcha-form-fields');
+      if (captchaForm) captchaForm.style.display = captchaEnabled ? 'grid' : 'none';
+    }
+    const captchaProviderEl = document.getElementById('cfg-captcha-provider');
+    if (captchaProviderEl) captchaProviderEl.value = cfg.captcha_provider || 'hcaptcha';
+    const captchaSiteEl = document.getElementById('cfg-captcha-site-key');
+    if (captchaSiteEl) captchaSiteEl.value = cfg.captcha_site_key || '';
+
+    // Plugins dir
+    const pluginsDirEl = document.getElementById('cfg-plugins-dir');
+    if (pluginsDirEl) pluginsDirEl.value = cfg.plugins_dir || '';
 
     // Load backups
     loadBackups();
@@ -808,6 +842,12 @@ function toggleSMTPForm() {
   document.getElementById('smtp-form-fields').style.display = enabled ? 'grid' : 'none';
 }
 
+function toggleCaptchaForm() {
+  const enabled = document.getElementById('cfg-captcha-enabled').checked;
+  const captchaForm = document.getElementById('captcha-form-fields');
+  if (captchaForm) captchaForm.style.display = enabled ? 'grid' : 'none';
+}
+
 async function saveConfig() {
   const btn = document.getElementById('btn-save-config');
   btn.disabled = true;
@@ -819,7 +859,7 @@ async function saveConfig() {
   if (newPwd && newPwd !== confirmPwd) {
     showToast('Passwords do not match', 'error');
     btn.disabled = false;
-    btn.innerHTML = '💾 Save Config';
+    btn.innerHTML = ICONS.save + ' Save Config';
     return;
   }
 
@@ -856,6 +896,15 @@ async function saveConfig() {
         node_id:            document.getElementById('cfg-node-id').value,
         repl_addr:          document.getElementById('cfg-repl-addr').value,
         peers:              peers,
+        lease_ttl:          document.getElementById('cfg-lease-ttl')?.value || '5s',
+        allow_origins:      document.getElementById('cfg-allow-origins')?.value || '*',
+        rate_limit_per_minute: parseInt(document.getElementById('cfg-rate-limit-per-minute')?.value || '100', 10),
+        rate_limit_burst:   parseInt(document.getElementById('cfg-rate-limit-burst')?.value || '20', 10),
+        captcha_enabled:    document.getElementById('cfg-captcha-enabled')?.checked || false,
+        captcha_provider:   document.getElementById('cfg-captcha-provider')?.value || 'hcaptcha',
+        captcha_site_key:   document.getElementById('cfg-captcha-site-key')?.value || '',
+        captcha_secret:     (() => { const v = document.getElementById('cfg-captcha-secret')?.value; return v || '••••••••'; })(),
+        plugins_dir:        document.getElementById('cfg-plugins-dir')?.value || ''
       })
     });
     showToast('Config saved to config.yaml ✓', 'success');
@@ -866,7 +915,7 @@ async function saveConfig() {
     showToast('Save failed: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '💾 Save Config';
+    btn.innerHTML = ICONS.save + ' Save Config';
   }
 }
 
@@ -958,6 +1007,14 @@ function switchSettingsTab(name) {
   if (name === 'admins') loadAdmins();
   if (name === 'audit') loadAuditLogs();
   if (name === 'backups') loadBackups();
+
+  // Show/hide Save & Restart footer — only relevant for config-editing tabs
+  const configTabs = ['admin', 'security', 's3', 'smtp', 'replication', 'backups'];
+  const footer = document.getElementById('settings-save-footer');
+  const danger = document.getElementById('settings-danger-zone');
+  const isConfigTab = configTabs.includes(name);
+  if (footer) footer.style.display = isConfigTab ? '' : 'none';
+  if (danger) danger.style.display = isConfigTab ? '' : 'none';
 }
 
 // ===== ADMIN MANAGEMENT =====

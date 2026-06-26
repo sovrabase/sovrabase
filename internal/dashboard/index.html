@@ -58,21 +58,21 @@ window.onerror = function(message, source, lineno, colno, error) {
     <nav class="sidebar-nav">
       <div class="nav-section-label">Main</div>
       <div class="nav-item active" data-view="dashboard" onclick="navigateTo('dashboard')">
-        <span class="nav-icon">⊞</span> Dashboard
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span> Dashboard
       </div>
       <div class="nav-item" data-view="projects" onclick="navigateTo('projects')">
-        <span class="nav-icon">⊡</span> Projects
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span> Projects
       </div>
       <div class="nav-divider"></div>
       <div class="nav-section-label">System</div>
       <div class="nav-item" data-view="settings" onclick="navigateTo('settings')">
-        <span class="nav-icon">⚙</span> Settings
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span> Settings
       </div>
       <div class="nav-item" data-view="plugins" onclick="navigateTo('plugins')">
-        <span class="nav-icon">🧩</span> Plugins
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.61 1.61a2.404 2.404 0 0 1-3.408 0l-1.569-1.568a.896.896 0 0 0-.879-.289 2.497 2.497 0 0 1-2.91-2.91.896.896 0 0 0-.289-.88L4.208 11.06a2.403 2.403 0 0 1 0-3.408l1.568-1.568a.897.897 0 0 0 .289-.879 2.497 2.497 0 0 1 2.91-2.909.896.896 0 0 0 .879-.289l1.568-1.568a2.403 2.403 0 0 1 3.408 0l1.568 1.568c.23.23.557.338.878.29a2.497 2.497 0 0 1 2.91 2.908z"/></svg></span> Plugins
       </div>
       <div class="nav-item" onclick="logout()" style="color:var(--danger);">
-        <span class="nav-icon" style="color:var(--danger);">⎋</span> Logout
+        <span class="nav-icon" style="color:var(--danger);"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg></span> Logout
       </div>
     </nav>
     <div class="sidebar-footer">
@@ -81,7 +81,7 @@ window.onerror = function(message, source, lineno, colno, error) {
         <span id="sidebar-version">v0.3.0</span>
       </div>
       <div id="sidebar-region">eu-west</div>
-      <div class="license-link"><a href="https://forgejo.puffer.fish/sovrabase/sovrabase" target="_blank" rel="noopener">📜 Source code (AGPL v3)</a></div>
+      <div class="license-link"><a href="https://forgejo.puffer.fish/sovrabase/sovrabase" target="_blank" rel="noopener"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg> Source code (AGPL v3)</a></div>
     </div>
   </aside>
 
@@ -98,23 +98,23 @@ window.onerror = function(message, source, lineno, colno, error) {
       <!-- Stat cards -->
       <div class="stats-grid" id="stats-grid">
         <div class="stat-card">
-          <div class="stat-card-icon">📦</div>
+          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></div>
           <div class="stat-card-label">Active Projects</div>
           <div class="stat-card-value" id="stat-projects">—</div>
         </div>
         <div class="stat-card">
-          <div class="stat-card-icon">🖥</div>
+          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg></div>
           <div class="stat-card-label">Database Nodes</div>
           <div class="stat-card-value" id="stat-nodes">1</div>
           <div class="stat-card-sub">Standalone mode</div>
         </div>
         <div class="stat-card">
-          <div class="stat-card-icon">💾</div>
+          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/></svg></div>
           <div class="stat-card-label">Storage Used</div>
           <div class="stat-card-value" id="stat-storage">0 MB</div>
         </div>
         <div class="stat-card">
-          <div class="stat-card-icon">🌍</div>
+          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div>
           <div class="stat-card-label">European Region</div>
           <div class="stat-card-value" id="stat-region">—</div>
           <div class="stat-card-sub" id="stat-region-flag"></div>
@@ -124,25 +124,25 @@ window.onerror = function(message, source, lineno, colno, error) {
       <!-- Usage stat cards -->
       <div class="usage-stats-grid" id="usage-stats-grid">
         <div class="stat-card usage-card">
-          <div class="stat-card-icon">📊</div>
+          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg></div>
           <div class="stat-card-label">Total API Requests</div>
           <div class="stat-card-value" id="usage-total-requests">—</div>
           <div class="stat-card-sub">Across all projects</div>
         </div>
         <div class="stat-card usage-card">
-          <div class="stat-card-icon">⬆</div>
+          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg></div>
           <div class="stat-card-label">Bandwidth Up</div>
           <div class="stat-card-value" id="usage-bandwidth-up">0 B</div>
           <div class="stat-card-sub">Total uploads</div>
         </div>
         <div class="stat-card usage-card">
-          <div class="stat-card-icon">⬇</div>
+          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg></div>
           <div class="stat-card-label">Bandwidth Down</div>
           <div class="stat-card-value" id="usage-bandwidth-down">0 B</div>
           <div class="stat-card-sub">Total downloads</div>
         </div>
         <div class="stat-card usage-card">
-          <div class="stat-card-icon">📈</div>
+          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
           <div class="stat-card-label">Usage Tracking</div>
           <div class="stat-card-value" id="usage-tracking-status" style="font-size:16px;">Active</div>
           <div class="stat-card-sub">Per-project metering</div>
@@ -153,17 +153,13 @@ window.onerror = function(message, source, lineno, colno, error) {
       <div class="card" id="replication-card">
         <div class="card-header">
           <div>
-            <div class="card-title">🔄 Replication Status</div>
+            <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg> Replication Status</div>
           </div>
         </div>
         <div id="replication-info">
-          <p style="font-size:13px;color:var(--text-secondary)">Standalone — replication not configured</p>
-        </div>
-      </div>
-
-      <!-- Quick Start -->
+          <p style="font-size:13px;color:var(--text-secondary)">Standalone — replication not config      <!-- Quick Start -->
       <div class="card">
-        <div class="card-title mb-3">🚀 Quick Start</div>
+        <div class="card-title mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Quick Start</div>
         <div class="quick-start-tabs">
           <button class="qs-tab active" onclick="switchQuickStartTab('create')">Create Project</button>
           <button class="qs-tab" onclick="switchQuickStartTab('flutter')">Flutter SDK</button>
@@ -172,7 +168,7 @@ window.onerror = function(message, source, lineno, colno, error) {
         <div class="qs-panel active" id="qs-create">
           <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Create your first Sovrabase project and get an API key instantly.</p>
           <button class="btn btn-primary" onclick="navigateTo('projects'); setTimeout(openCreateModal,200);">
-            ✨ Create your first project
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg> Create your first project
           </button>
         </div>
         <div class="qs-panel" id="qs-flutter">
@@ -188,7 +184,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 curl -H "X-Project-Key: YOUR_API_KEY" \
   -H "Authorization: Bearer USER_TOKEN" \
   http://localhost:6070/api/v1/collections/users
-
+ 
 # Create a document
 curl -X POST \
   -H "X-Project-Key: YOUR_API_KEY" \
@@ -210,7 +206,7 @@ curl -X POST \
       </div>
 
       <div class="search-wrap" style="margin-bottom:16px">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
         <input type="text" class="search-input" id="project-search"
           placeholder="Filter projects..." oninput="filterProjects()">
       </div>
@@ -242,7 +238,7 @@ curl -X POST \
 
       <!-- System information -->
       <div class="card">
-        <div class="card-title mb-3">💻 System Information</div>
+        <div class="card-title mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg> System Information</div>
         <div class="info-grid">
           <div class="detail-row">
             <span class="detail-label">Version</span>
@@ -277,20 +273,20 @@ curl -X POST \
 
       <!-- Settings Navigation Tabs -->
       <div class="quick-start-tabs" id="settings-tabs" style="margin-bottom:20px;">
-        <button class="qs-tab active" data-stab="admin" onclick="switchSettingsTab('admin')">🔐 Admin Account</button>
-        <button class="qs-tab" data-stab="admins" onclick="switchSettingsTab('admins')">👥 Admins</button>
-        <button class="qs-tab" data-stab="security" onclick="switchSettingsTab('security')">🔒 Security &amp; HTTPS</button>
-        <button class="qs-tab" data-stab="s3" onclick="switchSettingsTab('s3')">🪣 S3 Storage</button>
-        <button class="qs-tab" data-stab="smtp" onclick="switchSettingsTab('smtp')">✉️ SMTP</button>
-        <button class="qs-tab" data-stab="replication" onclick="switchSettingsTab('replication')">🔄 Replication</button>
-        <button class="qs-tab" data-stab="audit" onclick="switchSettingsTab('audit')">📋 Audit Log</button>
-        <button class="qs-tab" data-stab="backups" onclick="switchSettingsTab('backups')">💾 Backups</button>
+        <button class="qs-tab active" data-stab="admin" onclick="switchSettingsTab('admin')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg> Admin Account</button>
+        <button class="qs-tab" data-stab="admins" onclick="switchSettingsTab('admins')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Admins</button>
+        <button class="qs-tab" data-stab="security" onclick="switchSettingsTab('security')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg> Security &amp; HTTPS</button>
+        <button class="qs-tab" data-stab="s3" onclick="switchSettingsTab('s3')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg> S3 Storage</button>
+        <button class="qs-tab" data-stab="smtp" onclick="switchSettingsTab('smtp')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> SMTP</button>
+        <button class="qs-tab" data-stab="replication" onclick="switchSettingsTab('replication')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> Replication</button>
+        <button class="qs-tab" data-stab="audit" onclick="switchSettingsTab('audit')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg> Audit Log</button>
+        <button class="qs-tab" data-stab="backups" onclick="switchSettingsTab('backups')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg> Backups</button>
       </div>
 
       <!-- Settings Tab: Admin Account -->
       <div class="settings-tab-panel active" id="stab-admin">
       <div class="card">
-        <div class="card-title mb-3">🔐 Admin Account</div>
+        <div class="card-title mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg> Admin Account</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
           Credentials used to log in to this dashboard. Changes apply after restart.
         </p>
@@ -311,9 +307,9 @@ curl -X POST \
             <label for="cfg-session-duration">Session Duration <span style="font-size:11px;color:var(--text-muted)">(e.g. 24h, 168h, 30m)</span></label>
             <input type="text" id="cfg-session-duration" placeholder="24h" autocomplete="off">
           </div>
-          <div class="form-group">
-            <label for="cfg-backup-interval">Backup Interval <span style="font-size:11px;color:var(--text-muted)">(e.g. 1h, 12h, 24h, or 0s to disable)</span></label>
-            <input type="text" id="cfg-backup-interval" placeholder="1h" autocomplete="off">
+          <div class="form-group" style="grid-column: span 2">
+            <label for="cfg-plugins-dir">Plugins Directory <span style="font-size:11px;color:var(--text-muted)">(path to .so plugin files, relative or absolute)</span></label>
+            <input type="text" id="cfg-plugins-dir" placeholder="./plugins" autocomplete="off">
           </div>
         </div>
       </div>
@@ -323,7 +319,7 @@ curl -X POST \
       <div class="settings-tab-panel" id="stab-admins">
       <div class="card">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-          <div class="card-title">👥 Admin Users</div>
+          <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Admin Users</div>
           <button class="btn btn-sm btn-primary" onclick="openCreateAdminModal()">+ Add Admin</button>
         </div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
@@ -352,7 +348,7 @@ curl -X POST \
       <!-- Settings Tab: Security & HTTPS -->
       <div class="settings-tab-panel" id="stab-security">
       <div class="card">
-        <div class="card-title mb-3">🔒 Security &amp; HTTPS</div>
+        <div class="card-title mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg> Security &amp; HTTPS</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
           TLS certificate, environment mode, and JWT secret configuration. Changes apply after restart.
         </p>
@@ -376,6 +372,52 @@ curl -X POST \
             <label for="cfg-key-file">TLS Key File Path</label>
             <input type="text" id="cfg-key-file" placeholder="/etc/ssl/private/server.key" autocomplete="off">
           </div>
+          <!-- CORS -->
+          <div class="form-group" style="grid-column: span 2">
+            <label for="cfg-allow-origins">Allowed Origins (CORS) <span style="font-size:11px;color:var(--text-muted)">(comma-separated, * for all)</span></label>
+            <input type="text" id="cfg-allow-origins" placeholder="https://app.example.com,https://admin.example.com" autocomplete="off">
+          </div>
+          <!-- Rate Limiting -->
+          <div class="form-group">
+            <label for="cfg-rate-limit-per-minute">Rate Limit <span style="font-size:11px;color:var(--text-muted)">(requests/min per IP)</span></label>
+            <input type="number" id="cfg-rate-limit-per-minute" placeholder="100" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="cfg-rate-limit-burst">Burst Size <span style="font-size:11px;color:var(--text-muted)">(max burst)</span></label>
+            <input type="number" id="cfg-rate-limit-burst" placeholder="20" autocomplete="off">
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div class="card-title" style="margin-bottom:0"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg> Captcha Protection</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary);">
+            <div class="toggle-switch">
+              <input type="checkbox" id="cfg-captcha-enabled" onchange="toggleCaptchaForm()">
+              <span class="toggle-slider"></span>
+            </div>
+            Enable Captcha
+          </label>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
+          Protect signup and login endpoints with hCaptcha or Cloudflare Turnstile.
+        </p>
+        <div id="captcha-form-fields" style="display:none;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label for="cfg-captcha-provider">Provider</label>
+            <select id="cfg-captcha-provider">
+              <option value="hcaptcha">hCaptcha</option>
+              <option value="turnstile">Cloudflare Turnstile</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="cfg-captcha-site-key">Site Key</label>
+            <input type="text" id="cfg-captcha-site-key" placeholder="Your captcha site key" autocomplete="off">
+          </div>
+          <div class="form-group" style="grid-column: span 2">
+            <label for="cfg-captcha-secret">Secret Key</label>
+            <input type="password" id="cfg-captcha-secret" placeholder="Leave blank to keep current" autocomplete="new-password">
+          </div>
         </div>
       </div>
       </div>
@@ -384,7 +426,7 @@ curl -X POST \
       <div class="settings-tab-panel" id="stab-s3">
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-          <div class="card-title" style="margin-bottom:0">🪣 External S3 Storage</div>
+          <div class="card-title" style="margin-bottom:0"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg> External S3 Storage</div>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary);">
             <div class="toggle-switch">
               <input type="checkbox" id="cfg-s3-enabled" onchange="toggleS3Form()">
@@ -427,7 +469,7 @@ curl -X POST \
       <div class="settings-tab-panel" id="stab-smtp">
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-          <div class="card-title" style="margin-bottom:0">✉️ SMTP & Email Verification</div>
+          <div class="card-title" style="margin-bottom:0"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> SMTP & Email Verification</div>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary);">
             <input type="checkbox" id="cfg-email-verification" onchange="toggleSMTPForm()">
             Enable Email Verification
@@ -464,7 +506,7 @@ curl -X POST \
       <!-- Settings Tab: Replication -->
       <div class="settings-tab-panel" id="stab-replication">
       <div class="card">
-        <div class="card-title mb-3">🔄 Database Replication</div>
+        <div class="card-title mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> Database Replication</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
           Configure this node's role in the cluster. Changes apply after restart.
         </p>
@@ -490,6 +532,10 @@ curl -X POST \
             <label for="cfg-peers">Peers <span style="font-size:11px;color:var(--text-muted)">(one per line, e.g. host:9090)</span></label>
             <textarea id="cfg-peers" rows="3" style="resize:vertical;" placeholder="node2.host:9090&#10;node3.host:9090"></textarea>
           </div>
+          <div class="form-group">
+            <label for="cfg-lease-ttl">Lease TTL <span style="font-size:11px;color:var(--text-muted)">(e.g. 5s, 10s — failover detection delay)</span></label>
+            <input type="text" id="cfg-lease-ttl" placeholder="5s" autocomplete="off">
+          </div>
         </div>
       </div>
       </div>
@@ -498,10 +544,10 @@ curl -X POST \
       <div class="settings-tab-panel" id="stab-audit">
       <div class="card">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-          <div class="card-title">📋 Audit Log</div>
+          <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg> Audit Log</div>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-sm btn-danger" onclick="clearAuditLogs()">🗑️ Clear Logs</button>
-            <button class="btn btn-sm btn-secondary" onclick="loadAuditLogs()">🔄 Refresh</button>
+            <button class="btn btn-sm btn-danger" onclick="clearAuditLogs()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> Clear Logs</button>
+            <button class="btn btn-sm btn-secondary" onclick="loadAuditLogs()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Refresh</button>
           </div>
         </div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
@@ -552,12 +598,16 @@ curl -X POST \
       <div class="settings-tab-panel" id="stab-backups">
       <div class="card" id="backups-card">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-          <div class="card-title">💾 Database Backups</div>
+          <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg> Database Backups</div>
           <button class="btn btn-sm btn-primary" id="btn-create-backup" onclick="createBackup()">+ Create Backup</button>
         </div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
           Point-in-time snapshots of all project databases. Backups are stored under the data directory.
         </p>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label for="cfg-backup-interval">Backup Interval <span style="font-size:11px;color:var(--text-muted)">(e.g. 1h, 12h, 24h — set 0s to disable)</span></label>
+          <input type="text" id="cfg-backup-interval" placeholder="1h" autocomplete="off">
+        </div>
         <div id="backups-list" style="display:flex;flex-direction:column;gap:8px;">
           <div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;">Loading backups...</div>
         </div>
@@ -565,7 +615,7 @@ curl -X POST \
       </div>
 
       <!-- Save & Restart -->
-      <div class="card" style="background: linear-gradient(135deg, rgba(91,91,255,0.06) 0%, rgba(91,91,255,0.02) 100%); border-color: rgba(91,91,255,0.2);">
+      <div class="card" id="settings-save-footer" style="background: linear-gradient(135deg, rgba(91,91,255,0.06) 0%, rgba(91,91,255,0.02) 100%); border-color: rgba(91,91,255,0.2);">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div>
             <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Apply Changes</div>
@@ -573,17 +623,17 @@ curl -X POST \
           </div>
           <div style="display:flex;gap:10px;flex-shrink:0;">
             <button class="btn btn-secondary" onclick="loadSettings()">↺ Reset</button>
-            <button class="btn btn-primary" id="btn-save-config" onclick="saveConfig()">💾 Save Config</button>
+            <button class="btn btn-primary" id="btn-save-config" onclick="saveConfig()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> Save Config</button>
             <button class="btn" id="btn-restart-server" onclick="restartServer()" style="background:var(--warning);color:#000;font-weight:700;" title="Save config and restart the server process">
-              ⚡ Save &amp; Restart
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Save &amp; Restart
             </button>
           </div>
         </div>
       </div>
 
       <!-- Danger Zone -->
-      <div class="danger-zone">
-        <h4>⚠ Danger Zone</h4>
+      <div class="danger-zone" id="settings-danger-zone">
+        <h4><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Danger Zone</h4>
         <p>Irreversible actions. Please proceed with caution.</p>
         <div class="coming-soon" style="display:inline-block">
           <button class="btn btn-danger" disabled>Reset All Data</button>
@@ -606,11 +656,11 @@ curl -X POST \
         <button class="qs-tab" data-pdtab="database" onclick="switchProjectDetailTab('database')">Database</button>
         <button class="qs-tab" data-pdtab="auth" onclick="switchProjectDetailTab('auth')">Auth</button>
         <button class="qs-tab" data-pdtab="storage" onclick="switchProjectDetailTab('storage')">Storage</button>
-        <button class="qs-tab" data-pdtab="config" onclick="switchProjectDetailTab('config')">⚙️ Config</button>
-        <button class="qs-tab" data-pdtab="cron" onclick="switchProjectDetailTab('cron')">⏰ Cron</button>
-        <button class="qs-tab" data-pdtab="webhooks" onclick="switchProjectDetailTab('webhooks')">🔗 Webhooks</button>
-        <button class="qs-tab" data-pdtab="analytics" onclick="switchProjectDetailTab('analytics')">📊 Analytics</button>
-        <button class="qs-tab" data-pdtab="queues" onclick="switchProjectDetailTab('queues')">🔄 Queues</button>
+        <button class="qs-tab" data-pdtab="config" onclick="switchProjectDetailTab('config')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg> Config</button>
+        <button class="qs-tab" data-pdtab="cron" onclick="switchProjectDetailTab('cron')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Cron</button>
+        <button class="qs-tab" data-pdtab="webhooks" onclick="switchProjectDetailTab('webhooks')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/><path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/></svg> Webhooks</button>
+        <button class="qs-tab" data-pdtab="analytics" onclick="switchProjectDetailTab('analytics')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg> Analytics</button>
+        <button class="qs-tab" data-pdtab="queues" onclick="switchProjectDetailTab('queues')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg> Queues</button>
         <button class="qs-tab" data-pdtab="api" onclick="switchProjectDetailTab('api')">API</button>
         <button class="qs-tab" data-pdtab="logs" onclick="switchProjectDetailTab('logs')">Logs & Metrics</button>
       </div>
@@ -667,7 +717,7 @@ curl -X POST \
                   <div id="invite-result-link" style="display:none;margin-top:8px;padding:12px;background:var(--success-bg);border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius);word-break:break-all;">
                     <div style="font-size:11px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">✓ Invite Link</div>
                     <code id="invite-link-value" style="font-size:12px;color:var(--text-primary);font-family:var(--font-mono);word-break:break-all;"></code>
-                    <button class="btn btn-xs btn-secondary" onclick="copyInviteLink()" style="margin-top:6px;">📋 Copy Link</button>
+                    <button class="btn btn-xs btn-secondary" onclick="copyInviteLink()" style="margin-top:6px;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy Link</button>
                   </div>
                 </div>
                 <div class="modal-actions">
@@ -850,7 +900,7 @@ curl -X POST \
             <!-- Magic Links -->
             <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border);">
               <div>
-                <div style="font-size:14px; font-weight:600;">🔗 Magic Links</div>
+                <div style="font-size:14px; font-weight:600;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg> Magic Links</div>
                 <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Passwordless login via email. Endpoint: <code style="font-size:11px;background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px;">POST /auth/v1/magic-link</code></div>
               </div>
               <div style="font-size:11px; color:var(--success); background:rgba(34,197,94,0.1); padding:4px 10px; border-radius:4px;">✓ Available</div>
@@ -859,7 +909,7 @@ curl -X POST \
             <!-- MFA -->
             <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border);">
               <div>
-                <div style="font-size:14px; font-weight:600;">🔐 MFA (TOTP)</div>
+                <div style="font-size:14px; font-weight:600;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg> MFA (TOTP)</div>
                 <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Two-factor auth via Google Authenticator. Endpoints: <code style="font-size:11px;background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px;">POST /auth/v1/mfa/setup</code></div>
               </div>
               <div style="font-size:11px; color:var(--success); background:rgba(34,197,94,0.1); padding:4px 10px; border-radius:4px;">✓ Available</div>
@@ -868,7 +918,7 @@ curl -X POST \
             <!-- Email Verification -->
             <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0;">
               <div>
-                <div style="font-size:14px; font-weight:600;">✉️ Email Verification</div>
+                <div style="font-size:14px; font-weight:600;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h8"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="m16 19 2 2 4-4"/></svg> Email Verification</div>
                 <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Require email verification on signup. Configured in server SMTP settings.</div>
               </div>
               <div id="auth-email-ver-status" style="font-size:11px; color:var(--text-muted); background:rgba(255,255,255,0.06); padding:4px 10px; border-radius:4px;">Loading...</div>
@@ -890,7 +940,7 @@ curl -X POST \
             <!-- Right: Files Browser -->
             <div id="storage-files-browser" style="flex:1; display:flex; flex-direction:column; gap:12px;">
               <div style="text-align:center; padding-top:80px; color:var(--text-secondary);" id="storage-no-bucket-selected">
-                <span style="font-size:36px;">📁</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted)"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
                 <p style="margin-top:8px; font-size:13px;">Select a bucket to view and upload files</p>
               </div>
               <div id="storage-bucket-content" style="display:none; flex-direction:column; gap:12px; flex:1;">
@@ -1021,7 +1071,7 @@ curl -X POST \
           <!-- Summary cards -->
           <div class="stats-grid" style="margin-bottom:20px;">
             <div class="stat-card">
-              <div class="stat-card-icon">📊</div>
+              <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg></div>
               <div class="stat-card-label">Total Events (24h)</div>
               <div class="stat-card-value" id="analytics-total">—</div>
             </div>
@@ -1146,7 +1196,7 @@ curl -H "Authorization: Bearer API_KEY" \
 
           <!-- Database & Storage Grid -->
           <div style="margin-bottom: 20px;">
-            <div style="font-size: 10px; font-weight: 700; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px;">💾 Database & Storage</div>
+            <div style="font-size: 10px; font-weight: 700; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg> Database &amp; Storage</div>
             <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:16px;">
               <div class="stat-card" style="padding:14px; background:var(--bg-card-elevated);">
                 <div class="stat-card-label" style="font-size:10px; color:var(--text-secondary);">DB Reads</div>
@@ -1196,13 +1246,13 @@ curl -H "Authorization: Bearer API_KEY" \
     <!-- ===== PLUGINS VIEW ===== -->
     <div id="view-plugins" class="view">
       <div class="page-hero">
-        <h1>🧩 Plugins</h1>
+        <h1><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.61 1.61a2.404 2.404 0 0 1-3.408 0l-1.569-1.568a.896.896 0 0 0-.879-.289 2.497 2.497 0 0 1-2.91-2.91.896.896 0 0 0-.289-.88L4.208 11.06a2.403 2.403 0 0 1 0-3.408l1.568-1.568a.897.897 0 0 0 .289-.879 2.497 2.497 0 0 1 2.91-2.909.896.896 0 0 0 .879-.289l1.568-1.568a2.403 2.403 0 0 1 3.408 0l1.568 1.568c.23.23.557.338.878.29a2.497 2.497 0 0 1 2.91 2.908z"/></svg>Plugins</h1>
         <p class="hero-sub">Registered plugins, hooks, and custom routes</p>
       </div>
 
       <!-- Registered plugins -->
       <div class="card">
-        <div class="card-title mb-3">📦 Registered Plugins</div>
+        <div class="card-title mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg> Registered Plugins</div>
         <div id="plugins-list" style="font-size:13px;color:var(--text-secondary);">
           <span class="text-muted">Loading...</span>
         </div>
@@ -1210,7 +1260,7 @@ curl -H "Authorization: Bearer API_KEY" \
 
       <!-- Active hooks -->
       <div class="card" style="margin-top:16px;">
-        <div class="card-title mb-3">🪝 Active Hooks</div>
+        <div class="card-title mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><circle cx="12" cy="5" r="3"/><path d="M6.48 8a10 10 0 0 0 11.04 0"/></svg> Active Hooks</div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -1230,7 +1280,7 @@ curl -H "Authorization: Bearer API_KEY" \
 
       <!-- Custom routes -->
       <div class="card" style="margin-top:16px;">
-        <div class="card-title mb-3">🔗 Custom Routes</div>
+        <div class="card-title mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg> Custom Routes</div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -1282,7 +1332,7 @@ curl -H "Authorization: Bearer API_KEY" \
         <div class="key-display">
           <div class="key-display-header">
             <span class="key-display-label">✓ Project Created — API Key</span>
-            <button class="btn btn-sm btn-secondary" onclick="copyText('create-api-key-value')">📋 Copy</button>
+            <button class="btn btn-sm btn-secondary" onclick="copyText('create-api-key-value')"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy</button>
           </div>
           <div class="code-block" id="create-api-key-value" style="margin:0"></div>
         </div>
