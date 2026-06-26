@@ -370,7 +370,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		r.Use(s.authMiddleware)
 		r.Use(s.meteringMiddleware)
 		r.Get("/me", s.handleGetMe)
-			r.Patch("/me", s.handleUpdateMe)
+		r.Patch("/me", s.handleUpdateMe)
 
 		// Database
 		r.Route("/collections/{collection}", func(r chi.Router) {
