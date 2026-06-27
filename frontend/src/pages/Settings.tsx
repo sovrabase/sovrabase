@@ -515,6 +515,15 @@ export default function Settings() {
           </div>
         </div>
       </Modal>
+
+      {/* Danger Zone */}
+      <div className="mt-8 p-6 bg-danger/5 border border-danger/20 rounded-xl">
+        <h3 className="text-base font-bold text-danger mb-2">⚠ Danger Zone</h3>
+        <p className="text-text-muted text-sm mb-4">Irreversible actions. Please proceed with caution.</p>
+        <button disabled className="px-4 py-2 rounded-lg bg-danger/30 text-danger/60 text-sm font-medium cursor-not-allowed">
+          Reset All Data (coming soon)
+        </button>
+      </div>
     </div>
   );
 }
