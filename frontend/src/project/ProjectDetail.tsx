@@ -35,7 +35,7 @@ const TABS = [
 type Tab = typeof TABS[number]['id'];
 
 export default function ProjectDetail() {
-  const { projectId } = useParams<{ projectId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,14 +43,14 @@ export default function ProjectDetail() {
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!id) return;
     setLoading(true);
     setError(null);
-    api<Project>(`/admin/projects/${encodeURIComponent(projectId)}`)
+    api<Project>(`/admin/projects/${encodeURIComponent(id)}`)
       .then(setProject)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [projectId]);
+  }, [id]);
 
   if (loading) {
     return (
@@ -74,7 +74,7 @@ export default function ProjectDetail() {
   }
 
   const renderTab = () => {
-    const props = { projectId: projectId!, apiKey: project.api_key };
+    const props = { projectId: id!, apiKey: project.api_key };
     switch (activeTab) {
       case 'Overview': return <OverviewTab {...props} />;
       case 'Team': return <TeamTab {...props} />;
