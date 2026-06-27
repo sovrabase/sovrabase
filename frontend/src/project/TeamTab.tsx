@@ -15,7 +15,7 @@ const ROLES = ['owner', 'admin', 'developer', 'viewer'] as const;
 type Role = (typeof ROLES)[number];
 
 export default function TeamTab({ projectId }: Props) {
-  const { show } = useToast();
+  const { showToast } = useToast();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -38,9 +38,9 @@ export default function TeamTab({ projectId }: Props) {
         body: JSON.stringify({ role }),
       });
       setMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, role } : m)));
-      show('Role updated', 'success');
+      showToast('Role updated', 'success');
     } catch (e) {
-      show((e as Error).message, 'error');
+      showToast((e as Error).message, 'error');
     }
   };
 
@@ -50,9 +50,9 @@ export default function TeamTab({ projectId }: Props) {
     try {
       await api(`/admin/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(removeTarget)}`, { method: 'DELETE' });
       setMembers((prev) => prev.filter((m) => m.user_id !== removeTarget));
-      show('Member removed', 'success');
+      showToast('Member removed', 'success');
     } catch (e) {
-      show((e as Error).message, 'error');
+      showToast((e as Error).message, 'error');
     } finally {
       setSubmitting(false);
       setRemoveTarget(null);
@@ -71,11 +71,11 @@ export default function TeamTab({ projectId }: Props) {
         method: 'POST',
         body: JSON.stringify({ email, role }),
       });
-      show('Invitation sent', 'success');
+      showToast('Invitation sent', 'success');
       setInviteOpen(false);
       loadMembers();
     } catch (e) {
-      show((e as Error).message, 'error');
+      showToast((e as Error).message, 'error');
     } finally {
       setSubmitting(false);
     }

@@ -14,7 +14,7 @@ interface Props {
 const TYPES = ['string', 'number', 'boolean', 'json'] as const;
 
 export default function ConfigTab({ projectId }: Props) {
-  const { show } = useToast();
+  const { showToast } = useToast();
   const [entries, setEntries] = useState<ConfigEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
@@ -49,11 +49,11 @@ export default function ConfigTab({ projectId }: Props) {
         method: 'POST',
         body: JSON.stringify({ key, value: parsedValue, type, public: pub }),
       });
-      show('Config entry added', 'success');
+      showToast('Config entry added', 'success');
       setAddOpen(false);
       loadEntries();
     } catch (e) {
-      show((e as Error).message, 'error');
+      showToast((e as Error).message, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -65,9 +65,9 @@ export default function ConfigTab({ projectId }: Props) {
     try {
       await api(`/admin/projects/${encodeURIComponent(projectId)}/config/${encodeURIComponent(deleteTarget)}`, { method: 'DELETE' });
       setEntries((prev) => prev.filter((e) => e.key !== deleteTarget));
-      show('Config entry deleted', 'success');
+      showToast('Config entry deleted', 'success');
     } catch (e) {
-      show((e as Error).message, 'error');
+      showToast((e as Error).message, 'error');
     } finally {
       setSubmitting(false);
       setDeleteTarget(null);
