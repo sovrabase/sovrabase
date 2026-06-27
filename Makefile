@@ -13,7 +13,7 @@ deps:
 	go mod download
 
 build-frontend:
-	cd frontend && npm install --silent && npm run build && cp -r dist ../internal/dashboard/dist
+	cd frontend && npm install --silent && npm run build && rm -rf ../internal/dashboard/dist && cp -r dist ../internal/dashboard/dist
 
 build: build-frontend deps
 	go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/sovrabase
