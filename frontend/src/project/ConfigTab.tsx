@@ -23,8 +23,8 @@ export default function ConfigTab({ projectId }: Props) {
 
   const loadEntries = () => {
     setLoading(true);
-    api<ConfigEntry[]>(`/admin/projects/${encodeURIComponent(projectId)}/config`)
-      .then(setEntries)
+    api<{ data: ConfigEntry[] }>(`/admin/projects/${encodeURIComponent(projectId)}/config`)
+      .then((res) => setEntries(res.data || []))
       .finally(() => setLoading(false));
   };
 

@@ -24,8 +24,8 @@ export default function TeamTab({ projectId }: Props) {
 
   const loadMembers = () => {
     setLoading(true);
-    api<TeamMember[]>(`/admin/projects/${encodeURIComponent(projectId)}/members`)
-      .then(setMembers)
+    api<{ members: TeamMember[] }>(`/admin/projects/${encodeURIComponent(projectId)}/members`)
+      .then((res) => setMembers(res.members || []))
       .finally(() => setLoading(false));
   };
 

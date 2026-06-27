@@ -20,8 +20,8 @@ export default function QueuesTab({ projectId }: Props) {
 
   const load = () => {
     setLoading(true);
-    api<QueueMessage[]>(`/admin/projects/${encodeURIComponent(projectId)}/queues`)
-      .then(setMessages)
+    api<{ data: QueueMessage[] }>(`/admin/projects/${encodeURIComponent(projectId)}/queues`)
+      .then((res) => setMessages(res.data || []))
       .finally(() => setLoading(false));
   };
 

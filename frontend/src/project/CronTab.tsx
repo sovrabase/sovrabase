@@ -17,8 +17,8 @@ export default function CronTab({ projectId }: Props) {
 
   const load = () => {
     setLoading(true);
-    api<CronJob[]>(`/admin/projects/${encodeURIComponent(projectId)}/cron`)
-      .then(setJobs)
+    api<{ data: CronJob[] }>(`/admin/projects/${encodeURIComponent(projectId)}/cron`)
+      .then((res) => setJobs(res.data || []))
       .finally(() => setLoading(false));
   };
 

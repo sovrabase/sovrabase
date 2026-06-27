@@ -17,8 +17,8 @@ export default function WebhooksTab({ projectId }: Props) {
 
   const load = () => {
     setLoading(true);
-    api<WebhookType[]>(`/admin/projects/${encodeURIComponent(projectId)}/webhooks`)
-      .then(setWebhooks)
+    api<{ data: WebhookType[] }>(`/admin/projects/${encodeURIComponent(projectId)}/webhooks`)
+      .then((res) => setWebhooks(res.data || []))
       .finally(() => setLoading(false));
   };
 
