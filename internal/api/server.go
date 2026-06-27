@@ -445,8 +445,9 @@ func (s *Server) RegisterAdmin(mux *http.ServeMux) {
 func (s *Server) SetDashboard(handler http.Handler) {
 	s.dashboard = handler
 	s.router.Handle("/", handler)
-	s.router.Handle("/style.css", handler)
-	s.router.Handle("/js/*", handler)
+	s.router.Handle("/assets/*", handler)
+	s.router.Handle("/favicon.svg", handler)
+	s.router.Handle("/icons.svg", handler)
 }
 
 // ListenAndServe starts the HTTP server.

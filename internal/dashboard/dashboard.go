@@ -13,11 +13,13 @@ import (
 //go:embed dist
 var content embed.FS
 
-// Handler returns an http.Handler that serves the embedded dashboard.
+// Handler returns an http.Handler that serves the embedded React SPA.
 func Handler() http.Handler {
 	sub, err := fs.Sub(content, "dist")
 	if err != nil {
-		panic("dashboard: embedded dist/ directory not found — run: cd frontend && npm run build && cp -r dist ../internal/dashboard/")
+		panic("dashboard: embedded dist/ not found — run: cd frontend && npm run build && cp -r dist ../internal/dashboard/")
 	}
-	return http.FileServer(http.FS(sub))
+
+	// Use FileServerFS (Go 1.22+) for proper MIME detection
+	return http.FileServerFS(sub)
 }
