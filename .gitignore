@@ -46,5 +46,5 @@ devenv.local.yaml
 # pre-commit
 .pre-commit-config.yaml
 
-# Frontend build artifacts
-internal/dashboard/dist/
+# Frontend dev deps (dist/ IS committed for Go package consumers)
+frontend/node_modules/

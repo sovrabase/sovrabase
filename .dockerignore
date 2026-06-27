@@ -1,0 +1,38 @@
+# VCS
+.git
+.gitignore
+
+# Build artifacts
+/build/
+
+# Data / runtime
+/data/
+/data_tmp/
+/data_test_*/
+
+# Frontend deps (rebuilt inside Docker)
+frontend/node_modules/
+frontend/dist/
+
+# Devenv / Nix
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+.direnv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Misc
+.env
+.env.local
+.DS_Store
+Thumbs.db
+*.exe
+*.dll
+*.so
+*.dylib
+README.md
