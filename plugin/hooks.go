@@ -355,7 +355,7 @@ type PluginInfo struct {
 
 // Info returns a summary of all registered hooks and plugins.
 func (m *HookManager) Info() []HookInfo {
-	var hooks []HookInfo
+	hooks := []HookInfo{}
 
 	for key, fns := range m.recordHooks {
 		parts := splitKey(key) // "posts:create" → col="posts", action="create"

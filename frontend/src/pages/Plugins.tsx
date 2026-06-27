@@ -38,7 +38,11 @@ export default function Plugins() {
   }, [loadPlugins]);
 
   const categories = [...new Set(catalog.map((c) => c.category))].sort();
-  const hasSystemPlugins = plugins && (plugins.plugins.length > 0 || plugins.hooks.length > 0 || plugins.routes.length > 0);
+  const hasSystemPlugins = plugins && (
+    (plugins.plugins?.length ?? 0) > 0 ||
+    (plugins.hooks?.length ?? 0) > 0 ||
+    (plugins.routes?.length ?? 0) > 0
+  );
 
   return (
     <div className="space-y-8">
@@ -88,11 +92,11 @@ export default function Plugins() {
             <p className="text-text-muted text-sm mb-4">Internal Go plugins registered on the server. These are developer-facing and require code changes to configure.</p>
           </div>
 
-          {plugins.plugins.length > 0 && (
+          {(plugins.plugins?.length ?? 0) > 0 && (
             <section>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Check className="w-4 h-4 text-success" /> Registered Plugins ({plugins.plugins.length})</h3>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Check className="w-4 h-4 text-success" /> Registered Plugins ({plugins.plugins?.length ?? 0})</h3>
               <div className="flex flex-wrap gap-2">
-                {plugins.plugins.map((name) => (
+                {plugins.plugins?.map((name) => (
                   <span key={name} className="inline-flex items-center gap-2 px-3 py-1.5 bg-bg-card border border-border rounded-lg text-text-primary text-sm">
                     <span className="w-2 h-2 rounded-full bg-success" /> {name}
                   </span>
@@ -101,11 +105,11 @@ export default function Plugins() {
             </section>
           )}
 
-          {plugins.hooks.length > 0 && (
+          {(plugins.hooks?.length ?? 0) > 0 && (
             <section>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Zap className="w-4 h-4 text-accent" /> Active Hooks ({plugins.hooks.length})</h3>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Zap className="w-4 h-4 text-accent" /> Active Hooks ({plugins.hooks?.length ?? 0})</h3>
               <div className="flex flex-wrap gap-2">
-                {plugins.hooks.map((h, i) => (
+                {plugins.hooks?.map((h, i) => (
                   <span key={i} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono ${hookColors[h.type] || otherHookColor}`}>
                     {h.type}{h.action && `:${h.action}`}{h.collection && ` (${h.collection})`} {h.count > 1 && <span className="opacity-60">x{h.count}</span>}
                   </span>
@@ -114,11 +118,11 @@ export default function Plugins() {
             </section>
           )}
 
-          {plugins.routes.length > 0 && (
+          {(plugins.routes?.length ?? 0) > 0 && (
             <section>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Route className="w-4 h-4 text-accent" /> Custom Routes ({plugins.routes.length})</h3>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Route className="w-4 h-4 text-accent" /> Custom Routes ({plugins.routes?.length ?? 0})</h3>
               <div className="flex flex-wrap gap-2">
-                {plugins.routes.map((r, i) => (
+                {plugins.routes?.map((r, i) => (
                   <span key={i} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono ${methodColors[r.method] || otherMethodColor}`}>
                     {r.method} {r.path}
                   </span>

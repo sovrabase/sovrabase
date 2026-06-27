@@ -133,7 +133,12 @@ export const usePlugins = create<PluginsState>((set) => ({
     set({ loading: true });
     try {
       const data = await api<PluginInfo>('/admin/plugins');
-      set({ plugins: data, loading: false });
+      const normalizedData: PluginInfo = {
+        plugins: data?.plugins || [],
+        hooks: data?.hooks || [],
+        routes: data?.routes || [],
+      };
+      set({ plugins: normalizedData, loading: false });
     } catch {
       set({ loading: false });
     }

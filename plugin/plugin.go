@@ -36,6 +36,9 @@ func (a *App) RegisterPlugin(name string) {
 
 // Plugins returns the list of registered plugin names.
 func (a *App) Plugins() []string {
+	if a.plugins == nil {
+		return []string{}
+	}
 	return a.plugins
 }
 

@@ -46,10 +46,11 @@ type MeterRecord struct {
 // MeterStore persists per-project usage counters in a Pebble database.
 // Hot-path writes go to in-memory atomics; a background goroutine flushes to Pebble.
 type MeterStore struct {
-	db     *pebble.DB
-	deltas sync.Map // key: string ("projectID:metric") -> *atomic.Int64
-	stopCh chan struct{}
-	done   chan struct{}
+	db        *pebble.DB
+	deltas    sync.Map // key: string ("projectID:metric") -> *atomic.Int64
+	stopCh    chan struct{}
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 // NewMeterStore creates a MeterStore backed by the given Pebble database.
@@ -76,9 +77,13 @@ func OpenMeterStore(dbPath string) (*MeterStore, error) {
 
 // Close flushes pending counters and shuts down the Pebble database.
 func (ms *MeterStore) Close() error {
-	close(ms.stopCh)
-	<-ms.done
-	return ms.db.Close()
+	var err error
+	ms.closeOnce.Do(func() {
+		close(ms.stopCh)
+		<-ms.done
+		err = ms.db.Close()
+	})
+	return err
 }
 
 // Valid metric names.
