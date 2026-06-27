@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { FolderKanban, HardDrive, Globe, Cloud, Activity, ArrowUp, ArrowDown, Loader2, AlertTriangle } from 'lucide-react';
 import { useDashboard } from '../store';
 import { formatBytes } from '../api';
-import StatCard from '../components/StatCard';
+import { StatCard } from '../components/StatCard';
 
 const regionFlags: Record<string, string> = {
   'us-east-1': '\u{1F1FA}\u{1F1F8}', 'us-west-1': '\u{1F1FA}\u{1F1F8}',

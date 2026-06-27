@@ -2,6 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { hasToken } from './api';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Projects from './pages/Projects';
+import Settings from './pages/Settings';
+import Plugins from './pages/Plugins';
+import ProjectDetail from './project/ProjectDetail';
 
 function AuthGuard() {
   if (!hasToken()) {
@@ -24,11 +29,11 @@ function AppRoutes() {
 
       <Route element={<AuthGuard />}>
         <Route element={<Layout />}>
-          <Route path="/dashboard" element={<div />} />
-          <Route path="/projects" element={<div />} />
-          <Route path="/projects/:id" element={<div />} />
-          <Route path="/settings" element={<div />} />
-          <Route path="/plugins" element={<div />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/plugins" element={<Plugins />} />
         </Route>
       </Route>
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { UserPlus, Trash2, Loader2, Users } from 'lucide-react';
 import { api, formatDate } from '../api';
 import type { TeamMember } from '../types';
-import { Modal } from '../components/Modal';
+import Modal from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Globe, Lock, Loader2, Settings } from 'lucide-react';
 import { api } from '../api';
 import type { ConfigEntry } from '../types';
-import { Modal } from '../components/Modal';
+import Modal from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 
