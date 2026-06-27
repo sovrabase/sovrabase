@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { FolderKanban, HardDrive, Globe, Cloud, Activity, ArrowUp, ArrowDown, Loader2, AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FolderKanban, HardDrive, Globe, Cloud, Activity, ArrowUp, ArrowDown, Loader2, AlertTriangle, Zap, Copy, Check } from 'lucide-react';
 import { useDashboard } from '../store';
 import { formatBytes } from '../api';
 import { StatCard } from '../components/StatCard';
@@ -11,12 +12,44 @@ const regionFlags: Record<string, string> = {
   'sa-east-1': '\u{1F1E7}\u{1F1F7}',
 };
 
+type QuickTab = 'create' | 'flutter' | 'rest';
+
+const quickTabs: { key: QuickTab; label: string }[] = [
+  { key: 'create', label: 'Create Project' },
+  { key: 'flutter', label: 'Flutter SDK' },
+  { key: 'rest', label: 'REST API' },
+];
+
+const flutterSnippet = `import 'package:sovrabase_client/sovrabase_client.dart';
+
+final client = SovrabaseClient(
+  projectId: 'YOUR_PROJECT_ID',
+  apiKey: 'YOUR_API_KEY',
+);
+
+// Fetch a collection
+final docs = await client.from('todos').find();`;
+
+const restExamples = (origin: string) => [
+  { label: 'List collections', cmd: `curl -H "Authorization: Bearer API_KEY" \\\n  "${origin}/api/rest/v1/collections"` },
+  { label: 'Create document', cmd: `curl -X POST \\\n  -H "Authorization: Bearer API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Hello"}' \\\n  "${origin}/api/rest/v1/collections/todos/documents"` },
+];
+
 export default function Dashboard() {
   const { stats, usage, replication, loading, error, loadDashboard } = useDashboard();
+  const navigate = useNavigate();
+  const [quickTab, setQuickTab] = useState<QuickTab>('create');
+  const [copied, setCopied] = useState<number | null>(null);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  const copyText = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopied(idx);
+    setTimeout(() => setCopied(null), 2000);
+  };
 
   if (loading) {
     return (
@@ -124,6 +157,77 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Quick Start */}
+      <div className="bg-bg-card border border-border rounded-xl p-6">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4">
+          <Zap className="w-5 h-5 text-accent" />
+          Quick Start
+        </h2>
+
+        <div className="flex gap-1 border-b border-border mb-5">
+          {quickTabs.map((qt) => (
+            <button
+              key={qt.key}
+              onClick={() => { setQuickTab(qt.key); setCopied(null); }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                quickTab === qt.key
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              {qt.label}
+            </button>
+          ))}
+        </div>
+
+        {quickTab === 'create' && (
+          <div className="space-y-3">
+            <p className="text-text-secondary text-sm">Create a project to get your API keys, database, and storage bucket — everything you need to start building.</p>
+            <button
+              onClick={() => navigate('/projects')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors"
+            >
+              Create your first project
+            </button>
+          </div>
+        )}
+
+        {quickTab === 'flutter' && (
+          <div className="relative">
+            <div className="bg-bg-input rounded-lg p-4 overflow-x-auto">
+              <pre className="text-text-secondary text-sm font-mono leading-relaxed whitespace-pre">{flutterSnippet}</pre>
+            </div>
+            <button
+              onClick={() => copyText(flutterSnippet, 0)}
+              className="absolute top-3 right-3 p-1.5 rounded-md bg-bg-card border border-border text-text-muted hover:text-text-primary transition-colors"
+              title="Copy"
+            >
+              {copied === 0 ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+        )}
+
+        {quickTab === 'rest' && (
+          <div className="space-y-4">
+            {restExamples(window.location.origin).map((ex, idx) => (
+              <div key={idx} className="relative">
+                <p className="text-text-secondary text-sm font-medium mb-1.5">{ex.label}</p>
+                <div className="bg-bg-input rounded-lg p-4 overflow-x-auto">
+                  <pre className="text-text-secondary text-sm font-mono leading-relaxed whitespace-pre">{ex.cmd}</pre>
+                </div>
+                <button
+                  onClick={() => copyText(ex.cmd, idx + 1)}
+                  className="absolute top-7 right-3 p-1.5 rounded-md bg-bg-card border border-border text-text-muted hover:text-text-primary transition-colors"
+                  title="Copy"
+                >
+                  {copied === idx + 1 ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

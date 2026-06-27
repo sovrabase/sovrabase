@@ -7,11 +7,13 @@ import { useProjects } from '../store';
 import { formatDate } from '../api';
 import { useToast } from '../components/Toast';
 import Modal from '../components/Modal';
+import { useNavigate } from 'react-router-dom';
 import type { Project } from '../types';
 
 export default function Projects() {
   const { projects, loading, error, loadProjects, createProject, deleteProject } = useProjects();
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
@@ -50,7 +52,8 @@ export default function Projects() {
     }
   }, [deleteTarget, deleteProject, showToast]);
 
-  const toggleKey = (id: string) => {
+  const toggleKey = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
     setRevealedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -59,7 +62,8 @@ export default function Projects() {
     });
   };
 
-  const copyKey = (key: string) => {
+  const copyKey = (e: React.MouseEvent, key: string) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(key).then(() => showToast('API key copied', 'success'));
   };
 
@@ -128,7 +132,11 @@ export default function Projects() {
                 const isRevealed = revealedKeys.has(p.id);
                 const apiKey = p.api_key || '';
                 return (
-                  <tr key={p.id} className="border-b border-border/50 hover:bg-bg-input/30 transition-colors">
+                  <tr
+                    key={p.id}
+                    onClick={() => navigate(`/projects/${p.id}`)}
+                    className="border-b border-border/50 hover:bg-bg-input/30 transition-colors cursor-pointer"
+                  >
                     <td className="px-6 py-4 font-medium text-text-primary">{p.name}</td>
                     <td className="px-6 py-4">
                       {apiKey ? (
@@ -137,7 +145,7 @@ export default function Projects() {
                             {isRevealed ? apiKey : maskKey(apiKey)}
                           </code>
                           <button
-                            onClick={() => toggleKey(p.id)}
+                            onClick={(e) => toggleKey(e, p.id)}
                             className="p-1 rounded text-text-muted hover:text-text-primary transition-colors"
                             title={isRevealed ? 'Hide' : 'Reveal'}
                           >
@@ -145,7 +153,7 @@ export default function Projects() {
                           </button>
                           {isRevealed && (
                             <button
-                              onClick={() => copyKey(apiKey)}
+                              onClick={(e) => copyKey(e, apiKey)}
                               className="p-1 rounded text-text-muted hover:text-accent transition-colors"
                               title="Copy"
                             >
@@ -154,7 +162,7 @@ export default function Projects() {
                           )}
                         </div>
                       ) : (
-                        <span className="text-text-muted text-sm">—</span>
+                        <span className="text-text-muted text-sm">&mdash;</span>
                       )}
                     </td>
                     <td className="px-6 py-4">
@@ -172,7 +180,7 @@ export default function Projects() {
                     <td className="px-6 py-4 text-text-secondary text-sm">{formatDate(p.created_at)}</td>
                     <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => setDeleteTarget(p)}
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); }}
                         className="p-2 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
                         title="Delete project"
                       >
