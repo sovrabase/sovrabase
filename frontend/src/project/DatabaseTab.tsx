@@ -28,7 +28,16 @@ export default function DatabaseTab({ projectId }: Props) {
   const [subTab, setSubTab] = useState<'fields' | 'rules'>('fields');
   const [rls, setRls] = useState<RlsRules>({ get: '', list: '', create: '', update: '', delete: '', enabled: false });
   const [savingRules, setSavingRules] = useState(false);
-  const [editingField, setEditingField] = useState('');
+
+  // Add document modal
+  const [showAddDoc, setShowAddDoc] = useState(false);
+  const [newDocJson, setNewDocJson] = useState('{\n  \n}');
+  const [addingDoc, setAddingDoc] = useState(false);
+
+  // Import modal
+  const [showImport, setShowImport] = useState(false);
+  const [importJson, setImportJson] = useState('');
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     setLoadingCols(true);
@@ -87,6 +96,45 @@ export default function DatabaseTab({ projectId }: Props) {
 
   const insertChip = (field: keyof RlsRules, chip: string) => setRls((prev) => ({ ...prev, [field]: (prev[field] || '') + chip }));
 
+  const addDocument = async () => {
+    if (!selectedCol) return;
+    setAddingDoc(true);
+    try {
+      const doc = JSON.parse(newDocJson);
+      await api(`/admin/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(selectedCol)}/documents`, {
+        method: 'POST',
+        body: JSON.stringify(doc),
+      });
+      showToast('Document created', 'success');
+      setShowAddDoc(false);
+      setNewDocJson('{\n  \n}');
+      loadDocs(selectedCol);
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Invalid JSON', 'error');
+    }
+    setAddingDoc(false);
+  };
+
+  const importDocuments = async () => {
+    if (!selectedCol) return;
+    setImporting(true);
+    try {
+      const docs = JSON.parse(importJson);
+      if (!Array.isArray(docs)) throw new Error('Expected a JSON array');
+      await api(`/admin/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(selectedCol)}/import`, {
+        method: 'POST',
+        body: JSON.stringify(docs),
+      });
+      showToast(`${docs.length} documents imported`, 'success');
+      setShowImport(false);
+      setImportJson('');
+      loadDocs(selectedCol);
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Invalid JSON array', 'error');
+    }
+    setImporting(false);
+  };
+
   const activeDoc = docs.find((d) => d._id === selectedDoc);
   const filteredDocs = docs.filter((d) => !docFilter.trim() ? true : Object.values(d).some((v) => String(v).toLowerCase().includes(docFilter.toLowerCase())));
 
@@ -94,7 +142,7 @@ export default function DatabaseTab({ projectId }: Props) {
 
   return (
     <div className="flex gap-0 h-[calc(100vh-280px)] min-h-[500px] border border-border rounded-lg overflow-hidden">
-      {/* Col 1: Collections (240px) */}
+      {/* Col 1: Collections */}
       <div className="w-[240px] shrink-0 border-r border-border flex flex-col bg-bg-card">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <h3 className="text-text-primary font-semibold text-sm">Collections</h3>
@@ -117,13 +165,13 @@ export default function DatabaseTab({ projectId }: Props) {
         )}
       </div>
 
-      {/* Col 2: Documents (280px) */}
+      {/* Col 2: Documents */}
       <div className="w-[280px] shrink-0 border-r border-border flex flex-col bg-bg-card">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
           <h3 className="text-text-primary font-semibold text-sm">Documents</h3>
           <div className="flex items-center gap-1">
-            <button onClick={() => {}} className="p-1 rounded hover:bg-bg-input text-text-muted hover:text-text-primary" title="Add"><Plus className="w-3.5 h-3.5" /></button>
-            <button onClick={() => {}} className="p-1 rounded hover:bg-bg-input text-text-muted hover:text-text-primary" title="Import"><Upload className="w-3.5 h-3.5" /></button>
+            <button onClick={() => selectedCol && setShowAddDoc(true)} className="p-1 rounded hover:bg-bg-input text-text-muted hover:text-text-primary" title="Add"><Plus className="w-3.5 h-3.5" /></button>
+            <button onClick={() => selectedCol && setShowImport(true)} className="p-1 rounded hover:bg-bg-input text-text-muted hover:text-text-primary" title="Import"><Upload className="w-3.5 h-3.5" /></button>
           </div>
         </div>
         <div className="px-3 py-2 border-b border-border/50">
@@ -151,7 +199,7 @@ export default function DatabaseTab({ projectId }: Props) {
         </div>
       </div>
 
-      {/* Col 3: Fields & Rules (flex) */}
+      {/* Col 3: Fields & Rules */}
       <div className="flex-1 flex flex-col bg-bg-card">
         <div className="px-4 py-3 border-b border-border flex items-center gap-1">
           {(['fields', 'rules'] as const).map((t) => (
@@ -159,19 +207,24 @@ export default function DatabaseTab({ projectId }: Props) {
               {t === 'fields' ? 'Fields' : 'Rules (RLS)'}
             </button>
           ))}
+          <button onClick={() => { if (selectedDoc && selectedCol) { if (confirm('Delete this document?')) { api(`/admin/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(selectedCol)}/documents/${encodeURIComponent(selectedDoc)}`, { method: 'DELETE' }).then(() => { showToast('Document deleted', 'success'); setSelectedDoc(null); loadDocs(selectedCol); }).catch((e) => showToast(e.message, 'error')); } } }} className="ml-auto px-2 py-1 rounded text-xs text-text-muted hover:text-danger hover:bg-danger/10 disabled:opacity-30" disabled={!selectedDoc} title="Delete"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
         </div>
+
         <div className="flex-1 overflow-y-auto p-4">
-          {!selectedDoc ? (
-            <div className="flex flex-col items-center py-16 text-text-muted gap-2"><FileText className="w-6 h-6" /><p className="text-xs">Select a document</p></div>
-          ) : subTab === 'fields' ? (
-            <div className="space-y-3">
-              <h4 className="text-text-primary font-semibold text-sm">Document Fields</h4>
-              <textarea className="w-full h-[300px] bg-bg-input border border-border rounded-lg p-4 text-text-primary text-xs font-mono focus:outline-none focus:border-accent resize-none" value={editingField || JSON.stringify(activeDoc, null, 2)} onChange={(e) => setEditingField(e.target.value)} readOnly={!editingField} />
-              <div className="flex items-center justify-between">
-                <button onClick={() => { if (activeDoc) setEditingField(JSON.stringify(activeDoc, null, 2)); }} className="px-3 py-1.5 bg-bg-input border border-border rounded text-text-secondary text-xs hover:text-text-primary">Edit JSON</button>
-                <button onClick={() => setSelectedDoc(null)} className="flex items-center gap-1 px-3 py-1.5 bg-danger/10 border border-danger/30 rounded text-danger text-xs hover:bg-danger/20"><Trash2 className="w-3 h-3" /> Delete Document</button>
+          {subTab === 'fields' ? (
+            !activeDoc ? (
+              <div className="flex flex-col items-center py-12 text-text-muted gap-2"><FileText className="w-6 h-6" /><p className="text-xs">Select a document</p></div>
+            ) : (
+              <div className="space-y-2">
+                <h4 className="text-text-primary font-semibold text-sm mb-3 font-mono">{activeDoc._id}</h4>
+                {Object.entries(activeDoc).map(([key, value]) => (
+                  <div key={key} className="flex gap-2">
+                    <span className="w-32 shrink-0 text-text-muted text-xs font-mono truncate">{key}</span>
+                    <span className="flex-1 text-text-primary text-xs font-mono bg-bg-input border border-border rounded px-2 py-1 break-all">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                  </div>
+                ))}
               </div>
-            </div>
+            )
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -182,9 +235,9 @@ export default function DatabaseTab({ projectId }: Props) {
                 </label>
               </div>
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-text-muted text-[10px] mr-1">Insert:</span>
+                <span className="text-text-muted text-[10px] mr-1">Insert into get:</span>
                 {QUICK_CHIPS.map((chip) => (
-                  <button key={chip} onClick={() => {}} className="px-2 py-0.5 bg-bg-input border border-border rounded text-text-secondary text-[10px] font-mono hover:border-accent hover:text-accent">{chip}</button>
+                  <button key={chip} onClick={() => insertChip('get', chip)} className="px-2 py-0.5 bg-bg-input border border-border rounded text-text-secondary text-[10px] font-mono hover:border-accent hover:text-accent">{chip}</button>
                 ))}
               </div>
               {RLACTIONS.map((action) => (
@@ -208,14 +261,38 @@ export default function DatabaseTab({ projectId }: Props) {
         </div>
       </div>
 
-      {/* New Collection Modal */}
-      <Modal isOpen={showNewCol} onClose={() => setShowNewCol(false)} title="New Collection" size="sm">
+      {/* Modals */}
+      <Modal isOpen={showNewCol} onClose={() => setShowNewCol(false)} title="Create Collection" size="sm">
         <div className="space-y-4">
           <input type="text" value={newColName} onChange={(e) => setNewColName(e.target.value)} placeholder="e.g. posts, users" className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent" autoFocus onKeyDown={(e) => e.key === 'Enter' && createCollection()} />
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowNewCol(false)} className="px-4 py-2 border border-border rounded-lg text-text-secondary text-sm hover:text-text-primary">Cancel</button>
             <button onClick={createCollection} disabled={creatingCol || !newColName.trim()} className="flex items-center gap-1 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50">
               {creatingCol ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showAddDoc} onClose={() => setShowAddDoc(false)} title="Add Document" size="md">
+        <div className="space-y-4">
+          <textarea value={newDocJson} onChange={(e) => setNewDocJson(e.target.value)} rows={10} className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm font-mono placeholder:text-text-muted focus:outline-none focus:border-accent resize-y" placeholder='{"field": "value"}' />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowAddDoc(false)} className="px-4 py-2 border border-border rounded-lg text-text-secondary text-sm hover:text-text-primary">Cancel</button>
+            <button onClick={addDocument} disabled={addingDoc} className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50">
+              {addingDoc ? 'Creating...' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showImport} onClose={() => setShowImport(false)} title="Import Documents (JSON Array)" size="md">
+        <div className="space-y-4">
+          <textarea value={importJson} onChange={(e) => setImportJson(e.target.value)} rows={10} className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm font-mono placeholder:text-text-muted focus:outline-none focus:border-accent resize-y" placeholder='[{"name": "Alice"}, {"name": "Bob"}]' />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowImport(false)} className="px-4 py-2 border border-border rounded-lg text-text-secondary text-sm hover:text-text-primary">Cancel</button>
+            <button onClick={importDocuments} disabled={importing} className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50">
+              {importing ? 'Importing...' : 'Import'}
             </button>
           </div>
         </div>
