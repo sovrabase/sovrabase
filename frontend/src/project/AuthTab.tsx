@@ -30,14 +30,14 @@ export default function AuthTab({ projectId }: Props) {
     setLoading(true);
     Promise.all([
       api<{ users: UserRow[] }>(`/admin/projects/${encodeURIComponent(projectId)}/users`).then((d) => setUsers(d.users || [])).catch(() => {}),
-      api<{ providers: OAuthProvider[] }>(`/admin/projects/${encodeURIComponent(projectId)}/oauth-providers`).then((d) => setProviders(d.providers || [])).catch(() => {}),
+      api<{ providers: OAuthProvider[] }>(`/admin/projects/${encodeURIComponent(projectId)}/auth/providers`).then((d) => setProviders(d.providers || [])).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, [projectId]);
 
   const filtered = users.filter((u) => (u.email || '').toLowerCase().includes(search.toLowerCase()) || (u.username || '').toLowerCase().includes(search.toLowerCase()) || (u.name || '').toLowerCase().includes(search.toLowerCase()));
 
   const refreshUsers = async () => { const d = await api<{ users: UserRow[] }>(`/admin/projects/${encodeURIComponent(projectId)}/users`); setUsers(d.users || []); };
-  const refreshProviders = async () => { const d = await api<{ providers: OAuthProvider[] }>(`/admin/projects/${encodeURIComponent(projectId)}/oauth-providers`); setProviders(d.providers || []); };
+  const refreshProviders = async () => { const d = await api<{ providers: OAuthProvider[] }>(`/admin/projects/${encodeURIComponent(projectId)}/auth/providers`); setProviders(d.providers || []); };
 
   const addUser = async () => {
     if (!uf.username.trim() || !uf.email.trim() || !uf.password.trim()) return;
@@ -61,7 +61,7 @@ export default function AuthTab({ projectId }: Props) {
   const addProvider = async () => {
     if (!pf.name.trim()) return;
     setSavingP(true);
-    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/oauth-providers`, { method: 'POST', body: JSON.stringify(pf) }); showToast('Provider added', 'success'); setShowAddProv(false); refreshProviders(); } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
+    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/auth/providers`, { method: 'POST', body: JSON.stringify(pf) }); showToast('Provider added', 'success'); setShowAddProv(false); refreshProviders(); } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
     setSavingP(false);
   };
 

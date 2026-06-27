@@ -32,11 +32,9 @@ export default function DatabaseTab({ projectId }: Props) {
 
   useEffect(() => {
     setLoadingCols(true);
-    api<{ collections: Record<string, { doc_count?: number; schema_columns?: string[]; indexes?: string[] }> }>(`/admin/projects/${encodeURIComponent(projectId)}/db-analysis`)
-      .then((d) => {
-        const cols = d.collections || {};
-        setCollections(Object.entries(cols).map(([name, info]) => ({ name, ...info })));
-      }).catch(() => {}).finally(() => setLoadingCols(false));
+    api<{ collections: CollectionInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/collections`)
+      .then((d) => setCollections(d.collections || []))
+      .catch(() => {}).finally(() => setLoadingCols(false));
   }, [projectId]);
 
   const loadDocs = useCallback(async (colName: string) => {
@@ -61,9 +59,8 @@ export default function DatabaseTab({ projectId }: Props) {
       await api(`/admin/projects/${encodeURIComponent(projectId)}/collections`, { method: 'POST', body: JSON.stringify({ name: newColName.trim() }) });
       showToast(`Collection "${newColName.trim()}" created`, 'success');
       setShowNewCol(false); setNewColName('');
-      const d = await api<{ collections: Record<string, { doc_count?: number }> }>(`/admin/projects/${encodeURIComponent(projectId)}/db-analysis`);
-      const cols = d.collections || {};
-      setCollections(Object.entries(cols).map(([name, info]) => ({ name, ...info })));
+      const d = await api<{ collections: CollectionInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/collections`);
+      setCollections(d.collections || []);
     } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
     setCreatingCol(false);
   };
