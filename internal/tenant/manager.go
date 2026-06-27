@@ -49,8 +49,10 @@ type Project struct {
 
 // ProjectIntegration holds the configuration for a single integration enabled on a project.
 type ProjectIntegration struct {
-	ID     string                 `json:"id"`
-	Config map[string]interface{} `json:"config"`
+	ID          string                 `json:"id"`
+	Config      map[string]interface{} `json:"config"`
+	Events      []string               `json:"events,omitempty"`      // which trigger events fire this integration; empty = all
+	Collections []string               `json:"collections,omitempty"` // restrict to specific collections; empty = all (only for record:* events)
 }
 
 // ProjectEnv holds project-specific database, auth service, and storage driver.

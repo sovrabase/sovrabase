@@ -5,8 +5,8 @@ import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
 interface ConfigField { key: string; label: string; type: string; required: boolean; placeholder?: string; help_text?: string; }
-interface IntegrationDef { id: string; name: string; description: string; category: string; icon: string; color: string; config_fields: ConfigField[]; }
-interface ProjectIntegration { id: string; config: Record<string, unknown>; }
+interface IntegrationDef { id: string; name: string; description: string; category: string; icon: string; color: string; config_fields: ConfigField[]; supports_triggers?: boolean; }
+interface ProjectIntegration { id: string; config: Record<string, unknown>; events?: string[]; collections?: string[]; }
 
 interface Props { projectId: string; }
 
@@ -21,6 +21,8 @@ export default function IntegrationsTab({ projectId }: Props) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<IntegrationDef | null>(null);
   const [editConfig, setEditConfig] = useState<Record<string, string>>({});
+  const [editEvents, setEditEvents] = useState<string[]>([]);
+  const [editCollections, setEditCollections] = useState('');
   const [saving, setSaving] = useState(false);
   const [showUsage, setShowUsage] = useState<string | null>(null);
 
@@ -52,6 +54,8 @@ export default function IntegrationsTab({ projectId }: Props) {
       }
     }
     setEditConfig(cfg);
+    setEditEvents(existing?.events ? [...existing.events] : []);
+    setEditCollections(existing?.collections ? existing.collections.join(', ') : '');
   };
 
   const saveIntegration = async () => {
@@ -72,13 +76,18 @@ export default function IntegrationsTab({ projectId }: Props) {
       }
 
       // Build new enabled list: replace or add
+      const integration: ProjectIntegration = { id: editing.id, config };
+      if (editing.supports_triggers) {
+        integration.events = editEvents;
+        integration.collections = editCollections.split(',').map((s) => s.trim()).filter(Boolean);
+      }
       let newList: ProjectIntegration[];
       const idx = enabled.findIndex((e) => e.id === editing.id);
       if (idx >= 0) {
         newList = [...enabled];
-        newList[idx] = { id: editing.id, config };
+        newList[idx] = integration;
       } else {
-        newList = [...enabled, { id: editing.id, config }];
+        newList = [...enabled, integration];
       }
 
       await api(`/admin/projects/${encodeURIComponent(projectId)}/integrations`, {
@@ -135,7 +144,7 @@ await fetch('${window.location.origin}/api/v1/integrations/paypal/action', {
 //   ${window.location.origin}/api/v1/integrations/paypal/webhook?project_key=PROJECT_KEY`;
     }
     if (def.category === 'notifications') {
-      return `// AUTOMATIC: Discord/Slack webhooks fire on every DB/API event.
+      return `// AUTOMATIC: Notification webhooks fire on DB/API events.
 // You do NOT need to call the action API manually. As soon as this
 // integration is enabled, the server sends a message on:
 //   - record:create (new document inserted)
@@ -143,6 +152,11 @@ await fetch('${window.location.origin}/api/v1/integrations/paypal/action', {
 //   - record:delete (document removed)
 //   - auth:signup (new user registered)
 //   - auth:signin (user logged in)
+//
+// EVENT FILTERING: Use the config modal to select which events trigger
+// this integration, and optionally restrict it to specific collections
+// (e.g. only "orders" document creations). Leave events unchecked to
+// fire on everything; leave collections empty for all collections.
 //
 // Manual send (optional — for custom messages):
 await fetch('${window.location.origin}/api/v1/integrations/${def.id}/action', {
@@ -160,6 +174,24 @@ await fetch('${window.location.origin}/api/v1/integrations/${def.id}/action', {
   body: JSON.stringify({ action: '${def.id === 'sendgrid' ? 'send_email' : 'send_sms'}', data: { ... } })
 });
 `;
+    }
+    if (def.id === 'algolia') {
+      return `// Index a document
+await fetch('${window.location.origin}/api/v1/integrations/algolia/action', {
+  method: 'POST',
+  headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ action: 'save_object', data: { index: 'products', object: { objectID: '1', name: 'Widget', price: 9.99 } } })
+});
+
+// Search
+const results = await fetch('${window.location.origin}/api/v1/integrations/algolia/action', {
+  method: 'POST',
+  headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ action: 'search', data: { index: 'products', query: 'widget' } })
+}).then(r => r.json());
+
+// Available actions: save_object, save_objects, search,
+//   delete_object, set_settings, list_indexes`;
     }
     return `// Server-side action
 await fetch('${window.location.origin}/api/v1/integrations/${def.id}/action', {
@@ -264,6 +296,44 @@ await fetch('${window.location.origin}/api/v1/integrations/${def.id}/action', {
                 {field.help_text && <p className="text-text-muted text-xs mt-1">{field.help_text}</p>}
               </div>
             ))}
+            {editing.supports_triggers && (
+              <>
+                <div className="border-t border-border pt-3">
+                  <label className="block text-text-secondary text-sm mb-2">Trigger Events</label>
+                  <div className="space-y-1.5">
+                    {([
+                      ['record:create', 'Document Created'],
+                      ['record:update', 'Document Updated'],
+                      ['record:delete', 'Document Deleted'],
+                      ['auth:signup', 'User Signed Up'],
+                      ['auth:signin', 'User Signed In'],
+                    ] as const).map(([evt, label]) => (
+                      <label key={evt} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editEvents.includes(evt)}
+                          onChange={(e) => setEditEvents((cur) => e.target.checked ? [...cur, evt] : cur.filter((x) => x !== evt))}
+                          className="w-4 h-4 rounded border-border bg-bg-input accent-accent"
+                        />
+                        <span className="text-text-muted text-xs">{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-text-muted text-xs mt-1.5">Select which events trigger this integration. Leave all unchecked to fire on everything.</p>
+                </div>
+                <div>
+                  <label className="block text-text-secondary text-sm mb-1">Collections Filter</label>
+                  <input
+                    type="text"
+                    value={editCollections}
+                    onChange={(e) => setEditCollections(e.target.value)}
+                    placeholder="orders, users"
+                    className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent font-mono"
+                  />
+                  <p className="text-text-muted text-xs mt-1">Only fire for these collections (leave empty for all). Only applies to document events.</p>
+                </div>
+              </>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setEditing(null)} className="px-4 py-2 border border-border rounded-lg text-text-secondary text-sm hover:text-text-primary">Cancel</button>
               <button onClick={saveIntegration} disabled={saving} className="flex items-center gap-1 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50">

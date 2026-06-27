@@ -12,13 +12,14 @@ type ConfigFieldDef struct {
 
 // IntegrationDef describes a concrete integration available to projects.
 type IntegrationDef struct {
-	ID           string           `json:"id"`
-	Name         string           `json:"name"`
-	Description  string           `json:"description"`
-	Category     string           `json:"category"` // payments, email, sms, notifications, search, analytics
-	Icon         string           `json:"icon"`     // emoji or single char for badge
-	Color        string           `json:"color"`    // hex color for badge
-	ConfigFields []ConfigFieldDef `json:"config_fields"`
+	ID               string           `json:"id"`
+	Name             string           `json:"name"`
+	Description      string           `json:"description"`
+	Category         string           `json:"category"`          // payments, email, sms, notifications, search, analytics
+	Icon             string           `json:"icon"`              // emoji or single char for badge
+	Color            string           `json:"color"`             // hex color for badge
+	ConfigFields     []ConfigFieldDef `json:"config_fields"`
+	SupportsTriggers bool             `json:"supports_triggers"` // true = server auto-fires on DB/auth events
 }
 
 // Catalog is the static list of all available integrations.
@@ -77,24 +78,26 @@ var Catalog = []IntegrationDef{
 		},
 	},
 	{
-		ID:          "discord_webhook",
-		Name:        "Discord Webhooks",
-		Description: "Send notifications to Discord channels via webhooks.",
-		Category:    "notifications",
-		Icon:        "D",
-		Color:       "#5865f2",
+		ID:               "discord_webhook",
+		Name:             "Discord Webhooks",
+		Description:      "Send notifications to Discord channels via webhooks.",
+		Category:         "notifications",
+		Icon:             "D",
+		Color:            "#5865f2",
+		SupportsTriggers: true,
 		ConfigFields: []ConfigFieldDef{
 			{Key: "webhook_url", Label: "Webhook URL", Type: "url", Required: true, Placeholder: "https://discord.com/api/webhooks/..."},
 			{Key: "username", Label: "Bot Username", Type: "text", Placeholder: "Sovrabase Bot"},
 		},
 	},
 	{
-		ID:          "slack_webhook",
-		Name:        "Slack Webhooks",
-		Description: "Send notifications to Slack channels via incoming webhooks.",
-		Category:    "notifications",
-		Icon:        "#",
-		Color:       "#4a154b",
+		ID:               "slack_webhook",
+		Name:             "Slack Webhooks",
+		Description:      "Send notifications to Slack channels via incoming webhooks.",
+		Category:         "notifications",
+		Icon:             "#",
+		Color:            "#4a154b",
+		SupportsTriggers: true,
 		ConfigFields: []ConfigFieldDef{
 			{Key: "webhook_url", Label: "Webhook URL", Type: "url", Required: true, Placeholder: "https://hooks.slack.com/services/..."},
 			{Key: "channel", Label: "Channel", Type: "text", Placeholder: "#general"},
@@ -114,12 +117,13 @@ var Catalog = []IntegrationDef{
 		},
 	},
 	{
-		ID:          "onesignal",
-		Name:        "OneSignal",
-		Description: "Send push notifications to web and mobile via OneSignal.",
-		Category:    "notifications",
-		Icon:        "O",
-		Color:       "#e54b4b",
+		ID:               "onesignal",
+		Name:             "OneSignal",
+		Description:      "Send push notifications to web and mobile via OneSignal.",
+		Category:         "notifications",
+		Icon:             "O",
+		Color:            "#e54b4b",
+		SupportsTriggers: true,
 		ConfigFields: []ConfigFieldDef{
 			{Key: "app_id", Label: "App ID", Type: "text", Required: true},
 			{Key: "rest_api_key", Label: "REST API Key", Type: "password", Required: true},

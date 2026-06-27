@@ -436,3 +436,233 @@ func (s *Server) handleTwilioAction(w http.ResponseWriter, r *http.Request, conf
 		writeError(w, http.StatusBadRequest, "Unknown Twilio action: "+action+". Available: send_sms")
 	}
 }
+
+// ─── OneSignal ───────────────────────────────────────────────────────────────
+
+func (s *Server) handleOneSignalAction(w http.ResponseWriter, r *http.Request, config map[string]interface{}, action string, data map[string]interface{}) {
+	appID := getString(config, "app_id")
+	apiKey := getString(config, "rest_api_key")
+	if appID == "" || apiKey == "" {
+		writeError(w, http.StatusBadRequest, "OneSignal app_id and rest_api_key are required")
+		return
+	}
+
+	switch action {
+	case "send_notification":
+		title := getString(data, "title")
+		message := getString(data, "message")
+		if message == "" {
+			writeError(w, http.StatusBadRequest, "message is required")
+			return
+		}
+
+		payload := map[string]interface{}{
+			"app_id":             appID,
+			"included_segments":  []string{"All"},
+			"contents":           map[string]string{"en": message},
+		}
+		if title != "" {
+			payload["headings"] = map[string]string{"en": title}
+		}
+		if segRaw, ok := data["segments"]; ok {
+			if segs, ok := segRaw.([]interface{}); ok && len(segs) > 0 {
+				clean := make([]string, 0, len(segs))
+				for _, sg := range segs {
+					if s, ok := sg.(string); ok && s != "" {
+						clean = append(clean, s)
+					}
+				}
+				if len(clean) > 0 {
+					payload["included_segments"] = clean
+				}
+			}
+		}
+		if url := getString(data, "url"); url != "" {
+			payload["url"] = url
+		}
+
+		reqBody, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("POST", "https://onesignal.com/api/v1/notifications", bytes.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Basic "+apiKey)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "OneSignal request failed: "+err.Error())
+			return
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode > 299 {
+			writeError(w, resp.StatusCode, "OneSignal error: "+string(body))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(body)
+
+	default:
+		writeError(w, http.StatusBadRequest, "Unknown OneSignal action: "+action+". Available: send_notification")
+	}
+}
+
+// ─── Algolia ─────────────────────────────────────────────────────────────────
+
+func (s *Server) handleAlgoliaAction(w http.ResponseWriter, r *http.Request, config map[string]interface{}, action string, data map[string]interface{}) {
+	appID := getString(config, "app_id")
+	apiKey := getString(config, "api_key")
+	if appID == "" || apiKey == "" {
+		writeError(w, http.StatusBadRequest, "Algolia app_id and api_key are required")
+		return
+	}
+
+	baseURL := fmt.Sprintf("https://%s.algolia.net", appID)
+	indexName := getString(data, "index")
+	if indexName == "" {
+		indexName = getString(data, "collection")
+	}
+	if indexName == "" {
+		writeError(w, http.StatusBadRequest, "index (or collection) is required")
+		return
+	}
+
+	doAlgolia := func(method, path string, body []byte) {
+		url := baseURL + "/1/indexes/" + indexName + path
+		req, err := http.NewRequest(method, url, bytes.NewReader(body))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "request build failed")
+			return
+		}
+		req.Header.Set("X-Algolia-Application-Id", appID)
+		req.Header.Set("X-Algolia-API-Key", apiKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "Algolia request failed: "+err.Error())
+			return
+		}
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode > 299 {
+			writeError(w, resp.StatusCode, "Algolia error: "+string(respBody))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(respBody)
+	}
+
+	switch action {
+	case "save_object":
+		obj, ok := data["object"]
+		if !ok {
+			writeError(w, http.StatusBadRequest, "object is required")
+			return
+		}
+		reqBody, _ := json.Marshal(obj)
+		doAlgolia("POST", "", reqBody)
+
+	case "save_objects":
+		objs, ok := data["objects"].([]interface{})
+		if !ok || len(objs) == 0 {
+			writeError(w, http.StatusBadRequest, "objects (non-empty array) is required")
+			return
+		}
+		wrapper := map[string]interface{}{"requests": objs}
+		reqBody, _ := json.Marshal(wrapper)
+		// Batch endpoint
+		url := fmt.Sprintf("https://%s.algolia.net/1/indexes/%s/batch", appID, indexName)
+		req, _ := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+		req.Header.Set("X-Algolia-Application-Id", appID)
+		req.Header.Set("X-Algolia-API-Key", apiKey)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "Algolia batch failed: "+err.Error())
+			return
+		}
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode > 299 {
+			writeError(w, resp.StatusCode, "Algolia error: "+string(respBody))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(respBody)
+
+	case "search":
+		query := getString(data, "query")
+		if query == "" {
+			writeError(w, http.StatusBadRequest, "query is required")
+			return
+		}
+		params := map[string]interface{}{"query": query}
+		if hits, ok := data["hitsPerPage"].(float64); ok && hits > 0 {
+			params["hitsPerPage"] = int(hits)
+		}
+		if page, ok := data["page"].(float64); ok && page >= 0 {
+			params["page"] = int(page)
+		}
+		if filters := getString(data, "filters"); filters != "" {
+			params["filters"] = filters
+		}
+		reqBody, _ := json.Marshal(params)
+		doAlgolia("POST", "/query", reqBody)
+
+	case "delete_object":
+		objectID := getString(data, "object_id")
+		if objectID == "" {
+			writeError(w, http.StatusBadRequest, "object_id is required")
+			return
+		}
+		doAlgolia("DELETE", "/"+objectID, nil)
+
+	case "set_settings":
+		settings, ok := data["settings"]
+		if !ok {
+			writeError(w, http.StatusBadRequest, "settings is required")
+			return
+		}
+		reqBody, _ := json.Marshal(settings)
+		// Settings uses a different path
+		url := fmt.Sprintf("https://%s.algolia.net/1/indexes/%s/settings", appID, indexName)
+		req, _ := http.NewRequest("PUT", url, bytes.NewReader(reqBody))
+		req.Header.Set("X-Algolia-Application-Id", appID)
+		req.Header.Set("X-Algolia-API-Key", apiKey)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "Algolia settings failed: "+err.Error())
+			return
+		}
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode > 299 {
+			writeError(w, resp.StatusCode, "Algolia error: "+string(respBody))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(respBody)
+
+	case "list_indexes":
+		url := fmt.Sprintf("https://%s.algolia.net/1/indexes/", appID)
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("X-Algolia-Application-Id", appID)
+		req.Header.Set("X-Algolia-API-Key", apiKey)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "Algolia list failed: "+err.Error())
+			return
+		}
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode > 299 {
+			writeError(w, resp.StatusCode, "Algolia error: "+string(respBody))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(respBody)
+
+	default:
+		writeError(w, http.StatusBadRequest, "Unknown Algolia action: "+action+". Available: save_object, save_objects, search, delete_object, set_settings, list_indexes")
+	}
+}

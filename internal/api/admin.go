@@ -3084,8 +3084,10 @@ func (a *AdminServer) handleListProjectIntegrations(w http.ResponseWriter, r *ht
 
 	// Mask secrets in config
 	type safeIntegration struct {
-		ID     string                 `json:"id"`
-		Config map[string]interface{} `json:"config"`
+		ID          string                 `json:"id"`
+		Config      map[string]interface{} `json:"config"`
+		Events      []string               `json:"events,omitempty"`
+		Collections []string               `json:"collections,omitempty"`
 	}
 	result := make([]safeIntegration, 0, len(proj.Integrations))
 	for _, integ := range proj.Integrations {
@@ -3113,7 +3115,15 @@ func (a *AdminServer) handleListProjectIntegrations(w http.ResponseWriter, r *ht
 				safeCfg[k] = v
 			}
 		}
-		result = append(result, safeIntegration{ID: integ.ID, Config: safeCfg})
+		ev := integ.Events
+		if ev == nil {
+			ev = []string{}
+		}
+		cols := integ.Collections
+		if cols == nil {
+			cols = []string{}
+		}
+		result = append(result, safeIntegration{ID: integ.ID, Config: safeCfg, Events: ev, Collections: cols})
 	}
 	if result == nil {
 		result = []safeIntegration{}
