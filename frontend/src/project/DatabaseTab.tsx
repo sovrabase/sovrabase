@@ -29,9 +29,6 @@ export default function DatabaseTab({ projectId }: Props) {
   const [rls, setRls] = useState<RlsRules>({ get: '', list: '', create: '', update: '', delete: '', enabled: false });
   const [savingRules, setSavingRules] = useState(false);
 
-  // Add document modal
-  const [showAddDoc, setShowAddDoc] = useState(false);
-  const [newDocJson, setNewDocJson] = useState('{\n  \n}');
   const [addingDoc, setAddingDoc] = useState(false);
 
   // Import modal
@@ -93,6 +90,20 @@ export default function DatabaseTab({ projectId }: Props) {
     } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
     setSavingRules(false);
   };
+  const [showAddDoc, setShowAddDoc] = useState(false);
+  const [docFields, setDocFields] = useState<{ key: string; value: string }[]>([{ key: '', value: '' }]);
+  const [docJsonMode, setDocJsonMode] = useState(false);
+  const [docJsonRaw, setDocJsonRaw] = useState('{\n  \n}');
+
+  const openAddDoc = () => {
+    setDocFields([{ key: '', value: '' }]);
+    setDocJsonMode(false);
+    setShowAddDoc(true);
+  };
+
+  const addDocField = () => setDocFields((f) => [...f, { key: '', value: '' }]);
+  const removeDocField = (i: number) => setDocFields((f) => f.filter((_, idx) => idx !== i));
+  const updateDocField = (i: number, field: 'key' | 'value', val: string) => setDocFields((f) => f.map((item, idx) => idx === i ? { ...item, [field]: val } : item));
 
   const insertChip = (field: keyof RlsRules, chip: string) => setRls((prev) => ({ ...prev, [field]: (prev[field] || '') + chip }));
 
@@ -100,17 +111,18 @@ export default function DatabaseTab({ projectId }: Props) {
     if (!selectedCol) return;
     setAddingDoc(true);
     try {
-      const doc = JSON.parse(newDocJson);
+      const doc = docJsonMode
+        ? JSON.parse(docJsonRaw)
+        : Object.fromEntries(docFields.filter((f) => f.key.trim()).map((f) => [f.key.trim(), f.value]));
       await api(`/admin/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(selectedCol)}/documents`, {
         method: 'POST',
         body: JSON.stringify(doc),
       });
       showToast('Document created', 'success');
       setShowAddDoc(false);
-      setNewDocJson('{\n  \n}');
       loadDocs(selectedCol);
     } catch (e: unknown) {
-      showToast((e as Error).message || 'Invalid JSON', 'error');
+      showToast((e as Error).message || 'Invalid data', 'error');
     }
     setAddingDoc(false);
   };
@@ -170,7 +182,7 @@ export default function DatabaseTab({ projectId }: Props) {
         <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
           <h3 className="text-text-primary font-semibold text-sm">Documents</h3>
           <div className="flex items-center gap-1">
-            <button onClick={() => selectedCol && setShowAddDoc(true)} className="p-1 rounded hover:bg-bg-input text-text-muted hover:text-text-primary" title="Add"><Plus className="w-3.5 h-3.5" /></button>
+            <button onClick={() => selectedCol && openAddDoc()} className="p-1 rounded hover:bg-bg-input text-text-muted hover:text-text-primary" title="Add"><Plus className="w-3.5 h-3.5" /></button>
             <button onClick={() => selectedCol && setShowImport(true)} className="p-1 rounded hover:bg-bg-input text-text-muted hover:text-text-primary" title="Import"><Upload className="w-3.5 h-3.5" /></button>
           </div>
         </div>
@@ -274,9 +286,28 @@ export default function DatabaseTab({ projectId }: Props) {
         </div>
       </Modal>
 
-      <Modal isOpen={showAddDoc} onClose={() => setShowAddDoc(false)} title="Add Document" size="md">
+      <Modal isOpen={showAddDoc} onClose={() => setShowAddDoc(false)} title={`Add Document to ${selectedCol}`} size="md">
         <div className="space-y-4">
-          <textarea value={newDocJson} onChange={(e) => setNewDocJson(e.target.value)} rows={10} className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm font-mono placeholder:text-text-muted focus:outline-none focus:border-accent resize-y" placeholder='{"field": "value"}' />
+          {!docJsonMode ? (
+            <>
+              {docFields.map((f, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input value={f.key} onChange={(e) => updateDocField(i, 'key', e.target.value)} placeholder="field_name" className="flex-1 bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm font-mono placeholder:text-text-muted focus:outline-none focus:border-accent" />
+                  <input value={f.value} onChange={(e) => updateDocField(i, 'value', e.target.value)} placeholder="value" className="flex-1 bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent" />
+                  {docFields.length > 1 && <button onClick={() => removeDocField(i)} className="shrink-0 p-1 text-text-muted hover:text-danger"><span className="sr-only">Remove</span>×</button>}
+                </div>
+              ))}
+              <button onClick={addDocField} className="flex items-center gap-1 text-accent text-xs hover:underline"><Plus className="w-3 h-3" /> Add field</button>
+            </>
+          ) : (
+            <textarea value={docJsonRaw} onChange={(e) => setDocJsonRaw(e.target.value)} rows={8} className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm font-mono placeholder:text-text-muted focus:outline-none focus:border-accent resize-y" placeholder='{"field": "value"}' />
+          )}
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-text-muted text-xs cursor-pointer">
+              <input type="checkbox" checked={docJsonMode} onChange={(e) => setDocJsonMode(e.target.checked)} className="rounded border-border bg-bg-input accent-accent w-3.5 h-3.5" />
+              JSON mode
+            </label>
+          </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowAddDoc(false)} className="px-4 py-2 border border-border rounded-lg text-text-secondary text-sm hover:text-text-primary">Cancel</button>
             <button onClick={addDocument} disabled={addingDoc} className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50">
