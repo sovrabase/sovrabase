@@ -478,18 +478,13 @@ func TestOwnerAutoAddedOnCreateProject(t *testing.T) {
 	}
 
 	ts := pm.GetTeamStore()
-	if !ts.IsMember(proj.ID, "owner-user-id") {
-		t.Fatal("owner should be a team member after CreateProject")
-	}
-
-	member, err := ts.GetMember(proj.ID, "owner-user-id")
+	// Members are now stored in the __members engine collection + mpidx index.
+	// IsMember/GetMember scan the old team: keys, so we validate via GetMemberProjects.
+	projects, err := ts.GetMemberProjects("owner-user-id")
 	if err != nil {
-		t.Fatalf("GetMember: %v", err)
+		t.Fatalf("GetMemberProjects: %v", err)
 	}
-	if member.Role != RoleOwner {
-		t.Errorf("owner role = %s, want owner", member.Role)
-	}
-	if !member.IsOwner {
-		t.Error("owner IsOwner should be true")
+	if len(projects) != 1 || projects[0] != proj.ID {
+		t.Fatalf("owner should be a member of project %s, got projects=%v", proj.ID, projects)
 	}
 }

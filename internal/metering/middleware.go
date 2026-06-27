@@ -1,6 +1,7 @@
 package metering
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
@@ -23,14 +24,20 @@ func MeteringMiddleware(meterStore *MeterStore, projectManager *tenant.ProjectMa
 					// Track the API request by method
 					_ = meterStore.IncMethod(proj.ID, r.Method, 1)
 
-					// Track upload bandwidth (request body size)
-					if r.ContentLength > 0 {
-						_ = meterStore.Inc(proj.ID, MetricBandwidthUp, r.ContentLength)
-					}
+					// Wrap request body to track upload bandwidth accurately.
+					// r.ContentLength is unreliable (often -1 for chunked/multipart).
+					// We count bytes as the handler reads the body.
+					mrb := &meterRequestBody{ReadCloser: r.Body}
+					r.Body = mrb
 
 					// Wrap response writer to track download bandwidth
 					mw := &MeterResponseWriter{ResponseWriter: w}
 					next.ServeHTTP(mw, r)
+
+					// Track upload bandwidth (actual bytes read from body)
+					if mrb.read > 0 {
+						_ = meterStore.Inc(proj.ID, MetricBandwidthUp, mrb.read)
+					}
 
 					// Track download bandwidth for responses with content
 					if mw.written > 0 {
@@ -44,6 +51,18 @@ func MeteringMiddleware(meterStore *MeterStore, projectManager *tenant.ProjectMa
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// meterRequestBody wraps http.Request.Body to count bytes actually read.
+type meterRequestBody struct {
+	io.ReadCloser
+	read int64
+}
+
+func (mr *meterRequestBody) Read(p []byte) (int, error) {
+	n, err := mr.ReadCloser.Read(p)
+	mr.read += int64(n)
+	return n, err
 }
 
 // MeterResponseWriter wraps http.ResponseWriter to track bytes written.

@@ -17,10 +17,22 @@ interface ProjectDetail {
 }
 
 interface DbAnalysis {
-  collections: { name: string; size: number; doc_count: number }[];
-  metadata_overhead: number;
-  indexes: { name: string; size: number }[];
   total_size: number;
+  metadata_size: number;
+  index_size: number;
+  collections: Record<string, { document_count: number; document_size: number; index_size: number }>;
+}
+
+interface UsageData {
+  enabled: boolean;
+  api_requests?: number;
+  db_reads_total?: number;
+  db_writes_total?: number;
+  bandwidth_up?: number;
+  bandwidth_down?: number;
+  total_storage_bytes?: number;
+  realtime_connections?: number;
+  requests_by_method?: Record<string, number>;
 }
 
 const UNIT_MULTIPLIERS: Record<string, number> = {
@@ -59,6 +71,9 @@ export default function OverviewTab({ projectId }: Props) {
   const [analyzing, setAnalyzing] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
 
+  // Usage stats
+  const [usage, setUsage] = useState<UsageData | null>(null);
+
   const fetchDetail = () => {
     setLoading(true);
     setError(null);
@@ -76,6 +91,7 @@ export default function OverviewTab({ projectId }: Props) {
 
   useEffect(() => {
     fetchDetail();
+    api<UsageData>(`/admin/projects/${encodeURIComponent(projectId)}/usage`).then(setUsage).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -303,6 +319,28 @@ export default function OverviewTab({ projectId }: Props) {
         </div>
       </div>
 
+      {/* CARD 2b - API Usage Stats */}
+      {usage && usage.enabled && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-6">
+          {[
+            { label: 'API Requests', val: usage.api_requests, fmt: 'num' },
+            { label: 'DB Reads', val: usage.db_reads_total, fmt: 'num' },
+            { label: 'DB Writes', val: usage.db_writes_total, fmt: 'num' },
+            { label: 'Storage Used', val: usage.total_storage_bytes, fmt: 'bytes' },
+            { label: 'Upload', val: usage.bandwidth_up, fmt: 'bytes' },
+            { label: 'Download', val: usage.bandwidth_down, fmt: 'bytes' },
+            { label: 'Realtime Conns', val: usage.realtime_connections, fmt: 'num' },
+          ].filter((s) => s.val != null && s.val !== 0).map((s) => (
+            <div key={s.label} className="bg-bg-card border border-border rounded-xl p-4">
+              <p className="text-text-muted text-xs uppercase tracking-wider mb-1">{s.label}</p>
+              <p className="text-text-primary text-xl font-bold font-mono">
+                {s.fmt === 'bytes' ? formatBytes(s.val!) : (s.val! as number).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* CARD 3 - Database Storage Analysis (full width) */}
       <div className="bg-bg-card border border-border rounded-xl p-6 space-y-4">
         <div>
@@ -340,7 +378,7 @@ export default function OverviewTab({ projectId }: Props) {
             </div>
 
             {/* Collections breakdown */}
-            {analysis.collections.length > 0 && (
+            {Object.keys(analysis.collections || {}).length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-text-primary mb-2">Collections</h4>
                 <div className="overflow-x-auto">
@@ -349,15 +387,17 @@ export default function OverviewTab({ projectId }: Props) {
                       <tr className="border-b border-border">
                         <th className="text-left text-text-muted text-xs font-medium py-2 pr-4">Name</th>
                         <th className="text-left text-text-muted text-xs font-medium py-2 pr-4">Documents</th>
-                        <th className="text-left text-text-muted text-xs font-medium py-2">Size</th>
+                        <th className="text-left text-text-muted text-xs font-medium py-2 pr-4">Data Size</th>
+                        <th className="text-left text-text-muted text-xs font-medium py-2">Index Size</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {analysis.collections.map((c) => (
-                        <tr key={c.name} className="border-b border-border/40">
-                          <td className="py-2 pr-4 text-text-primary font-mono text-xs">{c.name}</td>
-                          <td className="py-2 pr-4 text-text-secondary">{c.doc_count.toLocaleString()}</td>
-                          <td className="py-2 text-text-secondary">{formatBytes(c.size)}</td>
+                      {Object.entries(analysis.collections || {}).map(([name, c]) => (
+                        <tr key={name} className="border-b border-border/40">
+                          <td className="py-2 pr-4 text-text-primary font-mono text-xs">{name}</td>
+                          <td className="py-2 pr-4 text-text-secondary">{c.document_count.toLocaleString()}</td>
+                          <td className="py-2 pr-4 text-text-secondary">{formatBytes(c.document_size)}</td>
+                          <td className="py-2 text-text-muted">{formatBytes(c.index_size)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -366,26 +406,17 @@ export default function OverviewTab({ projectId }: Props) {
               </div>
             )}
 
-            {/* Metadata overhead */}
-            <div>
-              <h4 className="text-sm font-medium text-text-primary mb-1">Metadata Overhead</h4>
-              <p className="text-text-secondary text-sm">{formatBytes(analysis.metadata_overhead)}</p>
-            </div>
-
-            {/* Indexes */}
-            {analysis.indexes.length > 0 && (
+            {/* Metadata + Index summary */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <h4 className="text-sm font-medium text-text-primary mb-2">Indexes</h4>
-                <div className="space-y-1">
-                  {analysis.indexes.map((idx) => (
-                    <div key={idx.name} className="flex justify-between text-sm">
-                      <code className="text-text-primary font-mono text-xs">{idx.name}</code>
-                      <span className="text-text-muted">{formatBytes(idx.size)}</span>
-                    </div>
-                  ))}
-                </div>
+                <h4 className="text-sm font-medium text-text-primary mb-1">Metadata</h4>
+                <p className="text-text-secondary text-sm">{formatBytes(analysis.metadata_size)}</p>
               </div>
-            )}
+              <div>
+                <h4 className="text-sm font-medium text-text-primary mb-1">Total Index Size</h4>
+                <p className="text-text-secondary text-sm">{formatBytes(analysis.index_size)}</p>
+              </div>
+            </div>
           </div>
         )}
       </div>

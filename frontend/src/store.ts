@@ -11,28 +11,35 @@ import { api, hasToken, setToken, clearToken } from './api';
 // ===== Auth =====
 interface AuthState {
   isAuthenticated: boolean;
+  role: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => boolean;
 }
 
+const getRole = () => localStorage.getItem('sovrabase_admin_role');
+const setRole = (role: string) => localStorage.setItem('sovrabase_admin_role', role);
+
 export const useAuth = create<AuthState>((set) => ({
   isAuthenticated: hasToken(),
+  role: getRole(),
   login: async (email: string, password: string) => {
-    const data = await api<{ token: string }>('/admin/login', {
+    const data = await api<{ token: string; role?: string }>('/admin/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
     setToken(data.token);
-    set({ isAuthenticated: true });
+    if (data.role) setRole(data.role);
+    set({ isAuthenticated: true, role: data.role || null });
   },
   logout: () => {
     clearToken();
-    set({ isAuthenticated: false });
+    localStorage.removeItem('sovrabase_admin_role');
+    set({ isAuthenticated: false, role: null });
   },
   checkAuth: () => {
     const authed = hasToken();
-    set({ isAuthenticated: authed });
+    set({ isAuthenticated: authed, role: getRole() });
     return authed;
   },
 }));

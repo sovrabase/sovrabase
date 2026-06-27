@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cockroachdb/pebble"
@@ -403,4 +404,85 @@ func (ts *TeamStore) saveInvitation(inv *Invitation) error {
 		return fmt.Errorf("team: save invitation index: %w", err)
 	}
 	return nil
+}
+
+// ─── Member Credentials Store ────────────────────────────────────────────────
+// Simple global store for team member login credentials so they can access
+// the dashboard. Keyed by email (not per-project).
+
+const memberCredPrefix = "mcred:"
+
+func memberCredKey(email string) []byte {
+	return []byte(memberCredPrefix + email)
+}
+
+// StoreMemberCredential saves a password hash and userID for a team member email.
+func (ts *TeamStore) StoreMemberCredential(email, userID, passwordHash string) error {
+	data := userID + "\n" + passwordHash
+	return ts.db.Set(memberCredKey(email), []byte(data), pebble.Sync)
+}
+
+// GetMemberCredential returns the stored password hash and userID for an email,
+// or an error if not found.
+func (ts *TeamStore) GetMemberCredential(email string) (userID, passwordHash string, err error) {
+	val, closer, err := ts.db.Get(memberCredKey(email))
+	if err != nil {
+		return "", "", err
+	}
+	defer closer.Close()
+	parts := strings.SplitN(string(val), "\n", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid credential format")
+	}
+	return parts[0], parts[1], nil
+}
+
+// ─── Member-Project Index ──────────────────────────────────────────────────
+// Lightweight index used by GetMemberProjects to efficiently look up which
+// projects a user is a member of. Indexed in the global master Pebble DB
+// (same as TeamStore), updated whenever membership changes in __members.
+
+const memberProjectIdxPrefix = "mpidx:"
+
+func memberProjectIdxKey(userID, projectID string) []byte {
+	return []byte(memberProjectIdxPrefix + userID + ":" + projectID)
+}
+
+// AddMemberProjectIndex records that a user is a member of a project.
+func (ts *TeamStore) AddMemberProjectIndex(userID, projectID string) error {
+	return ts.db.Set(memberProjectIdxKey(userID, projectID), []byte("1"), pebble.Sync)
+}
+
+// RemoveMemberProjectIndex removes the record that a user is a member of a project.
+func (ts *TeamStore) RemoveMemberProjectIndex(userID, projectID string) error {
+	return ts.db.Delete(memberProjectIdxKey(userID, projectID), pebble.Sync)
+}
+
+// GetMemberProjects returns all project IDs the given user is a member of.
+// Uses the mpidx index (written when membership changes in __members).
+func (ts *TeamStore) GetMemberProjects(userID string) ([]string, error) {
+	prefix := []byte(memberProjectIdxPrefix + userID + ":")
+	iter, err := ts.db.NewIter(&pebble.IterOptions{
+		LowerBound: prefix,
+		UpperBound: keyUpperBound(prefix),
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	var projectIDs []string
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := string(iter.Key())
+		// key format: mpidx:{userID}:{projectID}
+		rest := key[len(memberProjectIdxPrefix):]
+		parts := strings.SplitN(rest, ":", 2)
+		if len(parts) == 2 && parts[0] == userID {
+			projectIDs = append(projectIDs, parts[1])
+		}
+	}
+	if projectIDs == nil {
+		projectIDs = []string{}
+	}
+	return projectIDs, nil
 }

@@ -4,8 +4,12 @@ import { api, formatBytes, formatDate } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
-interface BucketInfo { name: string; file_count?: number; total_size?: number; }
-interface StorageFile { name: string; path: string; size?: number; content_type?: string; updated_at?: string; url?: string; }
+// Backend ListBuckets returns []string (just bucket names, no metadata)
+interface BucketInfo { name: string; }
+// Backend FileInfo: {bucket, path, size, content_type, created_at, updated_at, url} — no "name" field
+interface StorageFile { path: string; bucket?: string; size?: number; content_type?: string; created_at?: string; updated_at?: string; url?: string; }
+// Derive display name from path (last segment after /)
+const fileName = (p: string) => { const i = p.lastIndexOf('/'); return i >= 0 ? p.slice(i + 1) : p; };
 interface Props { projectId: string; }
 
 export default function StorageTab({ projectId }: Props) {
@@ -24,12 +28,12 @@ export default function StorageTab({ projectId }: Props) {
 
   useEffect(() => {
     setLoadingBuckets(true);
-    api<{ buckets: BucketInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`).then((d) => setBuckets(d.buckets || [])).catch(() => {}).finally(() => setLoadingBuckets(false));
+    api<{ buckets: string[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`).then((d) => setBuckets((d.buckets || []).map((s) => ({ name: s })))).catch(() => {}).finally(() => setLoadingBuckets(false));
   }, [projectId]);
 
   const loadFiles = useCallback(async (bucketName: string) => {
     setLoadingFiles(true);
-    try { const d = await api<{ files: StorageFile[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets/${encodeURIComponent(bucketName)}/files`); setFiles(d.files || []); } catch { setFiles([]); }
+    try { const d = await api<StorageFile[]>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets/${encodeURIComponent(bucketName)}/files`); setFiles(d || []); } catch { setFiles([]); }
     setLoadingFiles(false);
   }, [projectId]);
 
@@ -42,8 +46,8 @@ export default function StorageTab({ projectId }: Props) {
       await api(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`, { method: 'POST', body: JSON.stringify({ name: newBucketName.trim() }) });
       showToast(`Bucket "${newBucketName.trim()}" created`, 'success');
       setShowNewBucket(false); setNewBucketName('');
-      const d = await api<{ buckets: BucketInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`);
-      setBuckets(d.buckets || []);
+      const d = await api<{ buckets: string[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`);
+      setBuckets((d.buckets || []).map((s) => ({ name: s })));
     } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
     setCreatingBucket(false);
   };
@@ -102,7 +106,6 @@ export default function StorageTab({ projectId }: Props) {
           ) : buckets.map((b) => (
             <button key={b.name} onClick={() => selectBucket(b.name)} className={`w-full text-left px-4 py-2.5 flex items-center justify-between transition-colors ${selectedBucket === b.name ? 'bg-accent/10 border-r-2 border-accent' : 'hover:bg-bg-input/50'}`}>
               <span className="text-text-primary text-sm truncate">{b.name}</span>
-              <span className="text-text-muted text-xs ml-2 shrink-0">{b.file_count ?? 0}</span>
             </button>
           ))}
         </div>
@@ -133,7 +136,7 @@ export default function StorageTab({ projectId }: Props) {
                   <tbody className="divide-y divide-border">
                     {files.map((f) => (
                       <tr key={f.path} className="hover:bg-bg-input/50 transition-colors">
-                        <td className="px-4 py-2.5 text-text-primary text-xs font-mono truncate max-w-[200px]">{f.name}</td>
+                        <td className="px-4 py-2.5 text-text-primary text-xs font-mono truncate max-w-[200px]">{fileName(f.path)}</td>
                         <td className="px-4 py-2.5 text-text-secondary text-xs">{f.size != null ? formatBytes(f.size) : '—'}</td>
                         <td className="px-4 py-2.5 text-text-muted text-xs truncate max-w-[120px]">{f.content_type || '—'}</td>
                         <td className="px-4 py-2.5 text-text-secondary text-xs whitespace-nowrap">{formatDate(f.updated_at)}</td>
@@ -163,9 +166,9 @@ export default function StorageTab({ projectId }: Props) {
       </Modal>
 
       {/* Preview Modal */}
-      <Modal isOpen={!!previewFile} onClose={() => { setPreviewFile(null); setPreviewContent(null); }} title={previewFile?.name || 'Preview'} size="lg">
+      <Modal isOpen={!!previewFile} onClose={() => { setPreviewFile(null); setPreviewContent(null); }} title={previewFile ? fileName(previewFile.path) : 'Preview'} size="lg">
         {previewFile && isImage(previewFile.content_type) && previewContent ? (
-          <img src={previewContent} alt={previewFile.name} className="max-w-full max-h-[70vh] rounded-lg mx-auto" />
+          <img src={previewContent} alt={fileName(previewFile.path)} className="max-w-full max-h-[70vh] rounded-lg mx-auto" />
         ) : previewFile && isText(previewFile.content_type) && previewContent ? (
           <pre className="bg-bg-input border border-border rounded-lg p-4 text-text-primary text-xs font-mono overflow-auto max-h-[70vh] whitespace-pre-wrap">{previewContent}</pre>
         ) : (

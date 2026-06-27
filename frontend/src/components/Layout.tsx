@@ -6,14 +6,18 @@ import { useEffect } from 'react';
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/projects', label: 'Projects', icon: FolderKanban },
+];
+
+const adminNavItems = [
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/plugins', label: 'Plugins', icon: Puzzle },
 ];
 
 export function Layout() {
-  const { logout } = useAuth();
+  const { logout, role } = useAuth();
   const { stats, loadDashboard } = useDashboard();
   const navigate = useNavigate();
+  const isAdmin = role === 'admin' || !role; // default to admin for backward compat
 
   useEffect(() => {
     loadDashboard();
@@ -50,6 +54,12 @@ export function Layout() {
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
           {navItems.map((item) => (
+            <NavLink key={item.to} to={item.to} className={linkClass}>
+              <item.icon className="w-5 h-5" />
+              {item.label}
+            </NavLink>
+          ))}
+          {isAdmin && adminNavItems.map((item) => (
             <NavLink key={item.to} to={item.to} className={linkClass}>
               <item.icon className="w-5 h-5" />
               {item.label}

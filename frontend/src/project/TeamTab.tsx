@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Trash2, Loader2, Users } from 'lucide-react';
+import { UserPlus, Trash2, Loader2, Users, Copy, Check, Link2 } from 'lucide-react';
 import { api, formatDate } from '../api';
 import type { TeamMember } from '../types';
 import Modal from '../components/Modal';
@@ -21,6 +21,8 @@ export default function TeamTab({ projectId }: Props) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const loadMembers = () => {
     setLoading(true);
@@ -66,17 +68,28 @@ export default function TeamTab({ projectId }: Props) {
     if (!email) return;
     setSubmitting(true);
     try {
-      await api(`/admin/projects/${encodeURIComponent(projectId)}/invite`, {
+      const res = await api<{ invitation: unknown; invite_link: string }>(`/admin/projects/${encodeURIComponent(projectId)}/invite`, {
         method: 'POST',
         body: JSON.stringify({ email, role }),
       });
-      showToast('Invitation sent', 'success');
-      setInviteOpen(false);
+      setInviteLink(res.invite_link);
+      showToast('Invitation created', 'success');
       loadMembers();
     } catch (e) {
       showToast((e as Error).message, 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showToast('Failed to copy', 'error');
     }
   };
 
@@ -103,7 +116,7 @@ export default function TeamTab({ projectId }: Props) {
           <table className="w-full text-sm">
             <thead className="bg-bg-input text-text-muted text-xs uppercase">
               <tr>
-                <th className="text-left px-4 py-3 font-medium">User ID</th>
+                <th className="text-left px-4 py-3 font-medium">User</th>
                 <th className="text-left px-4 py-3 font-medium">Role</th>
                 <th className="text-left px-4 py-3 font-medium">Joined</th>
                 <th className="text-right px-4 py-3 font-medium">Actions</th>
@@ -112,7 +125,7 @@ export default function TeamTab({ projectId }: Props) {
             <tbody className="divide-y divide-border">
               {members.map((m) => (
                 <tr key={m.user_id} className="hover:bg-bg-input/50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-text-primary text-xs">{m.user_id.slice(0, 12)}...</td>
+                  <td className="px-4 py-3 text-text-primary text-sm">{m.email || m.user_id.slice(0, 12) + '…'}</td>
                   <td className="px-4 py-3">
                     <select
                       value={m.role}
@@ -138,25 +151,41 @@ export default function TeamTab({ projectId }: Props) {
       )}
 
       {/* Invite Modal */}
-      <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite Team Member">
-        <form onSubmit={handleInvite} className="space-y-4">
-          <div>
-            <label className="block text-sm text-text-secondary mb-1">Email</label>
-            <input name="email" type="email" required placeholder="user@example.com" className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent" />
+      <Modal isOpen={inviteOpen} onClose={() => { setInviteOpen(false); setInviteLink(null); }} title={inviteLink ? 'Invite Created' : 'Invite Team Member'}>
+        {inviteLink ? (
+          <div className="space-y-4">
+            <p className="text-text-muted text-sm">Share this link with the invitee. They must be logged in to accept the invitation.</p>
+            <div className="flex items-center gap-2 bg-bg-input border border-border rounded-lg px-3 py-2.5">
+              <Link2 className="w-4 h-4 text-text-muted shrink-0" />
+              <code className="flex-1 text-text-primary text-xs font-mono break-all">{inviteLink}</code>
+              <button onClick={copyLink} className="shrink-0 p-1.5 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors" title="Copy link">
+                {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="flex justify-end">
+              <button onClick={() => { setInviteOpen(false); setInviteLink(null); }} className="px-4 py-2 bg-accent text-white rounded-md text-sm font-medium hover:bg-accent-hover">Done</button>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm text-text-secondary mb-1">Role</label>
-            <select name="role" defaultValue="developer" className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent">
-              {ROLES.map((r) => (<option key={r} value={r}>{r}</option>))}
-            </select>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setInviteOpen(false)} className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors">Cancel</button>
-            <button type="submit" disabled={submitting} className="px-4 py-2 bg-accent text-white rounded-md text-sm font-medium hover:bg-accent-hover transition-colors disabled:opacity-50">
-              {submitting ? 'Sending...' : 'Send Invite'}
-            </button>
-          </div>
-        </form>
+        ) : (
+          <form onSubmit={handleInvite} className="space-y-4">
+            <div>
+              <label className="block text-sm text-text-secondary mb-1">Email</label>
+              <input name="email" type="email" required placeholder="user@example.com" className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent" />
+            </div>
+            <div>
+              <label className="block text-sm text-text-secondary mb-1">Role</label>
+              <select name="role" defaultValue="developer" className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent">
+                {ROLES.map((r) => (<option key={r} value={r}>{r}</option>))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setInviteOpen(false)} className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors">Cancel</button>
+              <button type="submit" disabled={submitting} className="px-4 py-2 bg-accent text-white rounded-md text-sm font-medium hover:bg-accent-hover transition-colors disabled:opacity-50">
+                {submitting ? 'Sending...' : 'Create Invite'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <ConfirmDialog

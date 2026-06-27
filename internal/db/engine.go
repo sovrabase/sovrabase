@@ -131,7 +131,33 @@ func (e *Engine) ListCollections() ([]string, error) {
 	return collections, nil
 }
 
+// ClearCollection deletes all documents and index entries from a collection
+// but preserves the collection metadata, RLS rules, and index definitions.
+// Use this to empty a collection without dropping it.
+func (e *Engine) ClearCollection(name string) error {
+	// Verify the collection exists.
+	metaKey := collectionMetaKey(name)
+	if _, closer, err := e.db.Get(metaKey); err != nil {
+		return fmt.Errorf("db: collection %q not found", name)
+	} else {
+		closer.Close()
+	}
+
+	// Delete all documents belonging to this collection.
+	prefix := []byte(name + ":")
+	if err := e.deleteByPrefix(prefix); err != nil {
+		return fmt.Errorf("db: clear docs from %q: %w", name, err)
+	}
+
+	// Delete index entries (actual indexed values) but keep index metadata.
+	idxPrefix := []byte(fmt.Sprintf("%s%s:", idxEntryPrefx, name))
+	_ = e.deleteByPrefix(idxPrefix)
+
+	return nil
+}
+
 // DropCollection removes a collection and all its documents.
+// DropCollection deletes all documents, indexes, RLS rules, and the collection itself.
 func (e *Engine) DropCollection(name string) error {
 	metaKey := collectionMetaKey(name)
 

@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Shield, Users, Cloud, Mail, GitBranch, ScrollText, Database, Loader2, Plus, RefreshCw, Save, Zap } from 'lucide-react';
+import { Shield, Users, Cloud, Mail, GitBranch, ScrollText, Database, Loader2, Plus, RefreshCw, Save, Zap, Trash2 } from 'lucide-react';
 import { api, formatBytes, formatDate } from '../api';
 import { useToast } from '../components/Toast';
 import Modal from '../components/Modal';
 import type { AdminUser, Backup } from '../types';
 
-type TabKey = 'account' | 'admins' | 'security' | 's3' | 'smtp' | 'replication' | 'audit' | 'backups';
+type TabKey = 'account' | 'admins' | 'security' | 'captcha' | 's3' | 'smtp' | 'replication' | 'audit' | 'backups';
 
 interface TabDef { key: TabKey; label: string; icon: typeof Shield; }
 
@@ -14,7 +14,8 @@ interface AuditEntry { timestamp: string; admin: string; action: string; target:
 const tabs: TabDef[] = [
   { key: 'account', label: 'Admin Account', icon: Shield },
   { key: 'admins', label: 'Admins', icon: Users },
-  { key: 'security', label: 'Security & HTTPS', icon: Shield },
+  { key: 'security', label: 'Security & Rate Limits', icon: Shield },
+  { key: 'captcha', label: 'Captcha', icon: Shield },
   { key: 's3', label: 'S3 Storage', icon: Cloud },
   { key: 'smtp', label: 'SMTP', icon: Mail },
   { key: 'replication', label: 'Replication', icon: GitBranch },
@@ -58,6 +59,7 @@ export default function Settings() {
       const flat: Record<string, string | boolean> = {};
       for (const [k, v] of Object.entries(data)) {
         if (typeof v === 'boolean' || typeof v === 'string') flat[k] = v;
+        else if (typeof v === 'number') flat[k] = String(v);
         else if (Array.isArray(v)) flat[k] = v.join('\n');
       }
       setForm(flat);
@@ -117,6 +119,12 @@ export default function Settings() {
       const body: Record<string, unknown> = { ...form };
       if (body.peers && typeof body.peers === 'string') {
         body.peers = (body.peers as string).split('\n').map((s: string) => s.trim()).filter(Boolean);
+      }
+      // Convert numeric fields from string to number for the backend
+      for (const numKey of ['rate_limit_per_minute', 'rate_limit_burst', 'smtp_port']) {
+        if (body[numKey] != null && body[numKey] !== '') {
+          body[numKey] = Number(body[numKey]);
+        }
       }
       if (body.admin_password === '') delete body.admin_password;
       await api('/admin/config', { method: 'POST', body: JSON.stringify(body) });
@@ -277,6 +285,23 @@ export default function Settings() {
             {f('jwt_secret', 'JWT Secret', { type: 'password', ph: 'Leave blank to use current' })}
             {f('cert_file', 'TLS Cert File Path')}
             {f('key_file', 'TLS Key File Path')}
+            {f('allow_origins', 'Allowed Origins (CORS)', { ph: '*' })}
+            <div className="border-t border-border pt-4">
+              <h4 className="text-text-primary text-sm font-semibold mb-3">Rate Limiting</h4>
+              {f('rate_limit_per_minute', 'Requests per Minute', { type: 'number', ph: '100' })}
+              {f('rate_limit_burst', 'Burst Size', { type: 'number', ph: '20' })}
+            </div>
+          </div>
+        );
+
+      case 'captcha':
+        return (
+          <div className="space-y-4 max-w-md">
+            <p className="text-text-muted text-sm">Protect sign-up and sign-in endpoints with a CAPTCHA challenge.</p>
+            {f('captcha_enabled', 'Enable Captcha', { toggle: true })}
+            {sel('captcha_provider', 'Provider', ['', 'hcaptcha', 'turnstile'])}
+            {f('captcha_site_key', 'Site Key', { ph: 'your-site-key' })}
+            {f('captcha_secret', 'Secret Key', { type: 'password', ph: 'Leave blank to keep current' })}
           </div>
         );
 
@@ -295,7 +320,7 @@ export default function Settings() {
       case 'smtp':
         return (
           <div className="space-y-4 max-w-md">
-            {f('smtp_enable_verification', 'Enable Email Verification', { toggle: true })}
+            {f('email_verification', 'Enable Email Verification', { toggle: true })}
             {f('smtp_host', 'SMTP Host')}
             {f('smtp_port', 'Port', { type: 'number' })}
             {f('smtp_sender', 'Sender Email', { type: 'email' })}
@@ -393,14 +418,23 @@ export default function Settings() {
             ) : (
               <div className="grid gap-3">
                 {backups.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between bg-bg-input border border-border rounded-lg px-5 py-3">
+                  <div key={b.name} className="flex items-center justify-between bg-bg-input border border-border rounded-lg px-5 py-3">
                     <div>
-                      <p className="text-text-primary text-sm font-mono">{b.id}</p>
+                      <p className="text-text-primary text-sm font-mono">{b.name}</p>
                       <p className="text-text-muted text-xs mt-0.5">
-                        {formatDate(b.created_at)}{b.size != null ? ` · ${formatBytes(b.size)}` : ''}
+                        {formatDate(b.modified)}{b.size != null ? ` · ${formatBytes(b.size)}` : ''}
                       </p>
                     </div>
-                      <span className="text-text-muted text-xs ml-auto">(restore not yet available)</span>
+                    <div className="flex items-center gap-2 ml-auto">
+                      <button
+                        onClick={() => { window.open(`/admin/backups/${encodeURIComponent(b.name)}/download`, '_blank'); }}
+                        className="px-3 py-1.5 rounded-lg border border-border text-text-secondary text-xs hover:text-text-primary hover:bg-bg-card transition-colors"
+                      >Download</button>
+                      <button
+                        onClick={async () => { if (!confirm(`Delete backup "${b.name}"?`)) return; try { await api(`/admin/backups/${encodeURIComponent(b.name)}`, { method: 'DELETE' }); showToast('Backup deleted', 'success'); loadBackups(); } catch (e) { showToast((e as Error).message, 'error'); } }}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-danger text-xs hover:bg-danger/10 transition-colors"
+                      ><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -439,7 +473,7 @@ export default function Settings() {
       )}
 
       {/* Tab bar */}
-      <div className="flex gap-1 overflow-x-auto pb-1">
+      <div className="flex gap-1 overflow-x-auto overflow-y-hidden pb-1 tabbar-scroll">
         {tabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.key;

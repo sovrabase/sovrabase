@@ -16,6 +16,7 @@ import QueuesTab from './QueuesTab';
 import AnalyticsTab from './AnalyticsTab';
 import ApiTab from './ApiTab';
 import LogsTab from './LogsTab';
+import IntegrationsTab from './IntegrationsTab';
 
 const TABS = [
   { id: 'Overview', label: 'Overview' },
@@ -27,6 +28,7 @@ const TABS = [
   { id: 'Cron', label: 'Cron' },
   { id: 'Webhooks', label: 'Webhooks' },
   { id: 'Queues', label: 'Queues' },
+  { id: 'Integrations', label: 'Integrations' },
   { id: 'Analytics', label: 'Analytics' },
   { id: 'API', label: 'API' },
   { id: 'Logs', label: 'Logs' },
@@ -85,6 +87,7 @@ export default function ProjectDetail() {
       case 'Cron': return <CronTab {...props} />;
       case 'Webhooks': return <WebhooksTab {...props} />;
       case 'Queues': return <QueuesTab {...props} />;
+      case 'Integrations': return <IntegrationsTab {...props} />;
       case 'Analytics': return <AnalyticsTab {...props} />;
       case 'API': return <ApiTab {...props} />;
       case 'Logs': return <LogsTab {...props} />;

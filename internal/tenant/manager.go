@@ -44,6 +44,13 @@ type Project struct {
 	StorageQuota int64  `json:"storage_quota"`   // in bytes
 	AllowOrigins string `json:"allow_origins"` // comma-separated allowed origins for CORS
 	OAuthProviders []auth.OAuthProviderConfig `json:"oauth_providers"`
+	Integrations []ProjectIntegration `json:"integrations"`
+}
+
+// ProjectIntegration holds the configuration for a single integration enabled on a project.
+type ProjectIntegration struct {
+	ID     string                 `json:"id"`
+	Config map[string]interface{} `json:"config"`
 }
 
 // ProjectEnv holds project-specific database, auth service, and storage driver.
@@ -160,10 +167,12 @@ func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) 
 		return nil, err
 	}
 
-	// Auto-add the project owner as a team member with RoleOwner
+	// Auto-add the project owner to global member-project index.
+	// The actual __members insertion happens in handleCreateProject (admin.go)
+	// since the engine is lazily created.
 	ts := NewTeamStore(pm.db)
-	if err := ts.AddMember(id, ownerID, RoleOwner); err != nil {
-		return nil, fmt.Errorf("tenant: add owner to team: %w", err)
+	if err := ts.AddMemberProjectIndex(ownerID, id); err != nil {
+		return nil, fmt.Errorf("tenant: add owner to index: %w", err)
 	}
 
 	pm.projects[id] = proj

@@ -13,8 +13,8 @@ export default function QueuesTab({ projectId }: Props) {
 
   const load = () => {
     setLoading(true);
-    api<QueueInfo[]>(`/admin/projects/${encodeURIComponent(projectId)}/queues`)
-      .then((d) => setQueues(Array.isArray(d) ? d : (d as unknown as { data: QueueInfo[] }).data || []))
+    api<{ data: QueueInfo[]; count: number }>(`/admin/projects/${encodeURIComponent(projectId)}/queues`)
+      .then((d) => setQueues(d.data || []))
       .catch(() => setQueues([]))
       .finally(() => setLoading(false));
   };

@@ -21,6 +21,25 @@
   --radius-xl: 16px;
 }
 
+/* Discreet horizontal scrollbar for tab bars */
+.tabbar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.tabbar-scroll::-webkit-scrollbar {
+  height: 3px;
+}
+.tabbar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tabbar-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+.tabbar-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
 /* Base */
 body {
   background: var(--color-bg-app);

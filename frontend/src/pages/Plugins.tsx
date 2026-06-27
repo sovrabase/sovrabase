@@ -1,6 +1,14 @@
-import { useEffect } from 'react';
-import { Loader2, Puzzle, Zap, Route } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Loader2, Puzzle, Zap, Route, Check } from 'lucide-react';
+import { api } from '../api';
 import { usePlugins } from '../store';
+
+interface ConfigField { key: string; label: string; type: string; required: boolean; }
+interface IntegrationDef { id: string; name: string; description: string; category: string; icon: string; color: string; config_fields: ConfigField[]; }
+
+const CATEGORY_LABELS: Record<string, string> = {
+  payments: 'Payments', email: 'Email', sms: 'SMS', notifications: 'Notifications', search: 'Search', analytics: 'Analytics',
+};
 
 const hookColors: Record<string, string> = {
   record: 'bg-[#5b5bff]/15 text-[#5b5bff]',
@@ -9,144 +17,117 @@ const hookColors: Record<string, string> = {
   realtime: 'bg-[#ef4444]/15 text-[#ef4444]',
   email: 'bg-[#8b5cf6]/15 text-[#8b5cf6]',
 };
-
 const methodColors: Record<string, string> = {
-  GET: 'bg-[#22c55e]/15 text-[#22c55e]',
-  POST: 'bg-[#5b5bff]/15 text-[#5b5bff]',
-  PUT: 'bg-[#f59e0b]/15 text-[#f59e0b]',
-  DELETE: 'bg-[#ef4444]/15 text-[#ef4444]',
-  PATCH: 'bg-[#8b5cf6]/15 text-[#8b5cf6]',
+  GET: 'bg-[#22c55e]/15 text-[#22c55e]', POST: 'bg-[#5b5bff]/15 text-[#5b5bff]',
+  PUT: 'bg-[#f59e0b]/15 text-[#f59e0b]', DELETE: 'bg-[#ef4444]/15 text-[#ef4444]',
 };
-
 const otherHookColor = 'bg-[#6b7280]/15 text-[#6b7280]';
 const otherMethodColor = 'bg-[#6b7280]/15 text-[#6b7280]';
 
 export default function Plugins() {
   const { plugins, loading, loadPlugins } = usePlugins();
+  const [catalog, setCatalog] = useState<IntegrationDef[]>([]);
+  const [catLoading, setCatLoading] = useState(true);
 
   useEffect(() => {
     loadPlugins();
+    api<{ integrations: IntegrationDef[] }>('/admin/integrations/catalog')
+      .then((d) => setCatalog(d.integrations || []))
+      .catch(() => {})
+      .finally(() => setCatLoading(false));
   }, [loadPlugins]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-8 h-8 text-accent animate-spin" />
-      </div>
-    );
-  }
-
-  if (!plugins) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-text-muted gap-3">
-        <Puzzle className="w-12 h-12 text-text-muted/40" />
-        <p className="text-text-secondary text-lg">No plugin data available</p>
-        <button onClick={loadPlugins} className="mt-2 px-4 py-2 rounded-lg bg-accent text-white text-sm hover:bg-accent-hover transition-colors">
-          Retry
-        </button>
-      </div>
-    );
-  }
+  const categories = [...new Set(catalog.map((c) => c.category))].sort();
+  const hasSystemPlugins = plugins && (plugins.plugins.length > 0 || plugins.hooks.length > 0 || plugins.routes.length > 0);
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-text-primary">Plugins</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary">Integrations</h1>
+        <p className="text-text-muted text-sm mt-1">Enable third-party services for your projects. Configure per-project in each project's Integrations tab.</p>
+      </div>
 
-      {/* Registered Plugins */}
-      <section>
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4">
-          <Puzzle className="w-5 h-5 text-accent" />
-          Registered Plugins
-        </h2>
-        {plugins.plugins.length === 0 ? (
-          <p className="text-text-muted text-sm py-4">No plugins registered</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {plugins.plugins.map((name) => (
-              <div key={name} className="flex items-center gap-3 bg-bg-card border border-border rounded-lg px-4 py-3">
-                <span className="w-2 h-2 rounded-full bg-success shrink-0" />
-                <span className="text-text-primary text-sm font-medium">{name}</span>
-                <span className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-accent/15 text-accent">
-                  Active
-                </span>
+      {/* Integration Catalog */}
+      {catLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-accent animate-spin" /></div>
+      ) : (
+        categories.map((cat) => (
+          <section key={cat}>
+            <h2 className="text-text-muted text-xs uppercase tracking-wider mb-3 font-medium">{CATEGORY_LABELS[cat] || cat}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {catalog.filter((c) => c.category === cat).map((def) => (
+                <div key={def.id} className="bg-bg-card border border-border rounded-lg p-4 flex items-start gap-3">
+                  <span className="w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold text-white shrink-0" style={{ backgroundColor: def.color }}>{def.icon}</span>
+                  <div className="min-w-0">
+                    <h4 className="text-text-primary text-sm font-semibold">{def.name}</h4>
+                    <p className="text-text-muted text-xs mt-0.5 line-clamp-2">{def.description}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {def.config_fields.slice(0, 3).map((f) => (
+                        <span key={f.key} className="px-1.5 py-0.5 bg-bg-input text-text-muted rounded text-[10px] font-mono">{f.key}</span>
+                      ))}
+                      {def.config_fields.length > 3 && <span className="px-1.5 py-0.5 bg-bg-input text-text-muted rounded text-[10px]">+{def.config_fields.length - 3}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))
+      )}
+
+      {/* System Hooks (developer section — only shows if Go plugins are registered) */}
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 text-accent animate-spin" /></div>
+      ) : hasSystemPlugins && plugins ? (
+        <>
+          <div className="border-t border-border pt-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Puzzle className="w-5 h-5 text-text-muted" />
+              <h2 className="text-lg font-semibold text-text-primary">System Hooks</h2>
+            </div>
+            <p className="text-text-muted text-sm mb-4">Internal Go plugins registered on the server. These are developer-facing and require code changes to configure.</p>
+          </div>
+
+          {plugins.plugins.length > 0 && (
+            <section>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Check className="w-4 h-4 text-success" /> Registered Plugins ({plugins.plugins.length})</h3>
+              <div className="flex flex-wrap gap-2">
+                {plugins.plugins.map((name) => (
+                  <span key={name} className="inline-flex items-center gap-2 px-3 py-1.5 bg-bg-card border border-border rounded-lg text-text-primary text-sm">
+                    <span className="w-2 h-2 rounded-full bg-success" /> {name}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            </section>
+          )}
 
-      {/* Active Hooks */}
-      <section>
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4">
-          <Zap className="w-5 h-5 text-accent" />
-          Active Hooks
-        </h2>
-        {plugins.hooks.length === 0 ? (
-          <p className="text-text-muted text-sm py-4">No active hooks</p>
-        ) : (
-          <div className="bg-bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  {['Type', 'Action', 'Collection', 'Count'].map((h) => (
-                    <th key={h} className="text-left text-text-muted text-xs font-medium uppercase tracking-wider px-6 py-3">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {plugins.hooks.map((hook, i) => (
-                  <tr key={i} className="border-b border-border/50">
-                    <td className="px-6 py-3">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${hookColors[hook.type] || otherHookColor}`}>
-                        {hook.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-text-primary text-sm">{hook.action}</td>
-                    <td className="px-6 py-3 text-text-secondary text-sm font-mono">{hook.collection}</td>
-                    <td className="px-6 py-3 text-text-secondary text-sm">{hook.count}</td>
-                  </tr>
+          {plugins.hooks.length > 0 && (
+            <section>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Zap className="w-4 h-4 text-accent" /> Active Hooks ({plugins.hooks.length})</h3>
+              <div className="flex flex-wrap gap-2">
+                {plugins.hooks.map((h, i) => (
+                  <span key={i} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono ${hookColors[h.type] || otherHookColor}`}>
+                    {h.type}{h.action && `:${h.action}`}{h.collection && ` (${h.collection})`} {h.count > 1 && <span className="opacity-60">x{h.count}</span>}
+                  </span>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+              </div>
+            </section>
+          )}
 
-      {/* Custom Routes */}
-      <section>
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4">
-          <Route className="w-5 h-5 text-accent" />
-          Custom Routes
-        </h2>
-        {plugins.routes.length === 0 ? (
-          <p className="text-text-muted text-sm py-4">No custom routes registered</p>
-        ) : (
-          <div className="bg-bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left text-text-muted text-xs font-medium uppercase tracking-wider px-6 py-3">Method</th>
-                  <th className="text-left text-text-muted text-xs font-medium uppercase tracking-wider px-6 py-3">Path</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plugins.routes.map((route, i) => (
-                  <tr key={i} className="border-b border-border/50">
-                    <td className="px-6 py-3">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${methodColors[route.method] || otherMethodColor}`}>
-                        {route.method}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-text-primary text-sm font-mono">{route.path}</td>
-                  </tr>
+          {plugins.routes.length > 0 && (
+            <section>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3"><Route className="w-4 h-4 text-accent" /> Custom Routes ({plugins.routes.length})</h3>
+              <div className="flex flex-wrap gap-2">
+                {plugins.routes.map((r, i) => (
+                  <span key={i} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono ${methodColors[r.method] || otherMethodColor}`}>
+                    {r.method} {r.path}
+                  </span>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+              </div>
+            </section>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }

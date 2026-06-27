@@ -41,6 +41,7 @@ type Server struct {
 	hooks        *plugin.HookManager
 	httpServer   *http.Server // reference for graceful shutdown
 	captchaVerifier *captcha.Verifier
+	triggerService *IntegrationTriggerService
 }
 
 // Config holds API-specific configuration.
@@ -278,6 +279,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		rateLimiters: rl,
 		logger:       slog.Default(),
 		hooks:        hookManager,
+		triggerService: NewIntegrationTriggerService(pm),
 	}
 
 	r := chi.NewRouter()
@@ -362,6 +364,10 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	// signed token in the query string carries all authorisation.
 	r.With(s.rateLimitMiddleware).Get("/api/v1/storage/signed/{bucket}/{path:.*}", s.handleSignedDownload)
 
+	// Integration webhook receivers — no auth (providers can't send our JWT),
+	// only project_key is needed. Must be outside the /api/v1 auth group.
+	r.With(s.rateLimitMiddleware, s.projectMiddleware).Post("/api/v1/integrations/{provider}/webhook", s.handleIntegrationWebhook)
+
 	// API routes (rate limited + auth)
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(s.rateLimitMiddleware)
@@ -401,13 +407,17 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 			// Analytics events ingestion
 			r.Post("/events", s.handleIngestEvents)
 
-			// Queues
-			r.Route("/queues", func(r chi.Router) {
-				r.Post("/send", s.handleQueueSend)
-				r.Post("/receive", s.handleQueueReceive)
-				r.Post("/delete", s.handleQueueDelete)
-			})
-			})
+		// Queues
+		r.Route("/queues", func(r chi.Router) {
+			r.Post("/send", s.handleQueueSend)
+			r.Post("/receive", s.handleQueueReceive)
+			r.Post("/delete", s.handleQueueDelete)
+		})
+
+		// Integrations — read public config + server-side actions
+		r.Get("/integrations", s.handleGetIntegrations)
+		r.Post("/integrations/{provider}/action", s.handleIntegrationAction)
+		})
 
 	// Remote config routes — registered on the chi router.
 	s.router = r

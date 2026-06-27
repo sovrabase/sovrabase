@@ -134,8 +134,6 @@ func userToMap(u *User) map[string]interface{} {
 		"email":        u.Email,
 		"password_hash": u.PasswordHash,
 		"role":         string(u.Role),
-		"created_at":   u.CreatedAt.Format(time.RFC3339Nano),
-		"updated_at":   u.UpdatedAt.Format(time.RFC3339Nano),
 		"is_verified":  u.IsVerified,
 	}
 	if u.Username != "" {
@@ -218,10 +216,14 @@ func mapToUser(m map[string]interface{}) (*User, error) {
 	}
 
 	var createdAt, updatedAt time.Time
-	if caStr, ok := m["created_at"].(string); ok {
+	if caStr, ok := m["_createdAt"].(string); ok {
+		createdAt, _ = time.Parse(time.RFC3339Nano, caStr)
+	} else if caStr, ok := m["created_at"].(string); ok {
 		createdAt, _ = time.Parse(time.RFC3339Nano, caStr)
 	}
-	if uaStr, ok := m["updated_at"].(string); ok {
+	if uaStr, ok := m["_updatedAt"].(string); ok {
+		updatedAt, _ = time.Parse(time.RFC3339Nano, uaStr)
+	} else if uaStr, ok := m["updated_at"].(string); ok {
 		updatedAt, _ = time.Parse(time.RFC3339Nano, uaStr)
 	}
 

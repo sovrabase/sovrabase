@@ -89,6 +89,9 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fire integration triggers (notifications) for signup
+	s.fireIntegrationTriggers("auth:signup", "", "", map[string]interface{}{"email": req.Email, "user_id": user.ID}, r)
+
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"user":  user,
 		"token": tokens,
@@ -153,6 +156,9 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
+
+	// Fire integration triggers (notifications) for signin
+	s.fireIntegrationTriggers("auth:signin", "", "", map[string]interface{}{"email": req.Email}, r)
 
 	writeJSON(w, http.StatusOK, tokens)
 }
@@ -721,6 +727,25 @@ type updateMeRequest struct {
 // @Failure 401 {object} map[string]string "Not authenticated"
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
 // @Router /api/v1/me [patch]
+func (s *Server) fireIntegrationTriggers(eventType, collection, docID string, data map[string]interface{}, r *http.Request) {
+	if s.triggerService == nil {
+		return
+	}
+	email := ""
+	if claims, ok := r.Context().Value(claimsKey).(*UserClaims); ok {
+		email = claims.Email
+	}
+	go s.triggerService.Fire(TriggerEvent{
+		ProjectID:  getProjectID(r),
+		Type:       eventType,
+		Collection: collection,
+		DocID:      docID,
+		UserID:     getUserID(r),
+		UserEmail:  email,
+		Data:       data,
+	})
+}
+
 func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	if claims == nil {
@@ -941,6 +966,9 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 		s.publishRealtime(realtime.EventInsert, projectID, collection, id, created)
 	}
 
+	// Fire integration triggers (notifications)
+	s.fireIntegrationTriggers("record:create", collection, id, created, r)
+
 	// Webhook trigger
 	s.fireWebhooks(r, collection, "insert", id, created)
 
@@ -1062,6 +1090,9 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		s.publishRealtime(realtime.EventUpdate, projectID, collection, id, updated)
 	}
 
+	// Fire integration triggers (notifications)
+	s.fireIntegrationTriggers("record:update", collection, id, updated, r)
+
 	// Webhook trigger
 	s.fireWebhooks(r, collection, "update", id, updated)
 
@@ -1130,6 +1161,9 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if s.realtimeHub != nil && existing != nil {
 		s.publishRealtime(realtime.EventDelete, projectID, collection, id, existing)
 	}
+
+	// Fire integration triggers (notifications)
+	s.fireIntegrationTriggers("record:delete", collection, id, existing, r)
 
 	// Webhook trigger
 	s.fireWebhooks(r, collection, "delete", id, existing)

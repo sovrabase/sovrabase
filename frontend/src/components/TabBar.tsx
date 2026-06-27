@@ -14,12 +14,12 @@ interface TabBarProps {
 
 export function TabBar({ tabs, activeTab, onClick }: TabBarProps) {
   return (
-    <div className="flex gap-1 border-b border-border">
+    <div className="flex gap-1 border-b border-border overflow-x-auto overflow-y-hidden tabbar-scroll">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onClick(tab.id)}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
             activeTab === tab.id
               ? 'border-accent text-accent'
               : 'border-transparent text-text-muted hover:text-text-secondary'

@@ -41,7 +41,7 @@ export function Login() {
             <Flag className="w-12 h-12" style={{ color: '#003399' }} />
           </div>
           <h1 className="text-gradient text-3xl font-bold mb-1">Sovrabase</h1>
-          <p className="text-text-muted text-sm">Sign in to sovereign control plane</p>
+          <p className="text-text-muted text-sm">Sign in to your workspace</p>
         </div>
 
         {/* Form */}
@@ -57,7 +57,7 @@ export function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
-              placeholder="admin@sovrabase.local"
+              placeholder="you@example.com"
               className="w-full px-4 py-2.5 rounded-lg bg-bg-input border border-border text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-colors"
             />
           </div>

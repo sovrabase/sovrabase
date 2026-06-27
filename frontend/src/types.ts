@@ -57,9 +57,17 @@ export interface ProviderMeta {
 
 export interface OAuthProvider {
   name: string;
-  enabled: boolean;
-  client_id?: string;
-  redirect_url?: string;
+  client_id: string;
+  client_secret: string;
+  redirect_url: string;
+  auth_url: string;
+  token_url: string;
+  userinfo_url: string;
+  scopes: string[];
+  email_field: string;
+  name_field: string;
+  avatar_field: string;
+  id_field: string;
 }
 
 export interface Bucket {
@@ -216,8 +224,8 @@ export interface ReplicationSettings {
 }
 
 export interface Backup {
-  id: string;
-  created_at: string;
+  name: string;
   size?: number;
-  status?: string;
+  modified?: string;
+  is_dir?: boolean;
 }

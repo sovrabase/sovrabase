@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/integrations"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
@@ -191,10 +193,17 @@ func (a *AdminServer) adminAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if claims.AdminRole == "" {
-			writeError(w, http.StatusUnauthorized, "admin token required — please log in again")
-			return
-		}
+	if claims.AdminRole == "" && claims.Role != "member" {
+		writeError(w, http.StatusUnauthorized, "admin token required — please log in again")
+		return
+	}
+
+	// For member tokens, skip AdminStore / RBAC checks.
+	if claims.Role == "member" {
+		ctx := context.WithValue(r.Context(), claimsKey, claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
+		return
+	}
 
 		// Verify the admin still exists and get latest role
 		admin, err := a.adminStore.GetByID(claims.UserID)
@@ -236,36 +245,106 @@ func (a *AdminServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if a.adminStore != nil {
 		// Authenticate via AdminStore (bcrypt)
 		adminUser, err = a.adminStore.Authenticate(req.Email, req.Password)
-		if err != nil {
-			writeError(w, http.StatusUnauthorized, "invalid email or password")
+		if err == nil {
+			_ = a.adminStore.UpdateLastLogin(adminUser.ID)
+
+			// Generate JWT with AdminRole embedded in claims
+			token, err := a.generateAdminToken(adminUser)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to generate token")
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]string{"token": token, "role": "admin"})
 			return
 		}
-
-		// Update last login
-		_ = a.adminStore.UpdateLastLogin(adminUser.ID)
 	} else {
 		// Fallback: hardcoded credential check (legacy)
-		if req.Email != a.adminEmail || req.Password != a.adminPassword {
-			writeError(w, http.StatusUnauthorized, "invalid email or password")
+		if req.Email == a.adminEmail && req.Password == a.adminPassword {
+			adminUser := &auth.AdminUser{ID: "admin", Email: a.adminEmail, Role: auth.AdminRoleSuper}
+			token, err := a.generateAdminToken(adminUser)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to generate token")
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]string{"token": token, "role": "admin"})
 			return
 		}
-		adminUser = &auth.AdminUser{
-			ID:    "admin",
-			Email: a.adminEmail,
-			Role:  auth.AdminRoleSuper,
+	}
+
+	// Admin auth failed — try team member authentication.
+	if a.teamStore != nil {
+		memberUserID, storedHash, credErr := a.teamStore.GetMemberCredential(req.Email)
+		if credErr == nil && auth.CheckPassword(storedHash, req.Password) == nil {
+			// Issue a member dashboard token
+			now := time.Now().UTC()
+			expiry := a.cfg.SessionDuration
+			if expiry <= 0 {
+				expiry = auth.DefaultAccessTokenTTL
+			}
+			claims := &auth.Claims{
+				RegisteredClaims: jwt.RegisteredClaims{
+					Issuer:    "sovrabase-member",
+					Subject:   memberUserID,
+					IssuedAt:  jwt.NewNumericDate(now),
+					ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
+					ID:        fmt.Sprintf("%d", now.UnixNano()),
+				},
+				UserID:    memberUserID,
+				Email:     req.Email,
+				Role:      "member",
+				AdminRole: "",
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			signed, err := token.SignedString([]byte(a.jwtSecret))
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to generate token")
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]string{"token": signed, "role": "member"})
+			return
+		}
+		// Fallback: try authenticating directly against all projects.
+		// Needed for members created before the credential store was introduced,
+		// or when team membership userID doesn't match the email.
+		allProjects := a.projects.ListProjects()
+		for _, proj := range allProjects {
+			env, envErr := a.projects.GetProjectEnv(proj.ID)
+			if envErr != nil || env.Auth == nil {
+				continue
+			}
+			tokens, signInErr := env.Auth.SignIn(req.Email, req.Password)
+			if signInErr == nil && tokens != nil {
+				// Store credential for future logins
+				hash, _ := auth.HashPassword(req.Password)
+				_ = a.teamStore.StoreMemberCredential(req.Email, req.Email, hash)
+				// Issue member token
+				now := time.Now().UTC()
+				expiry := a.cfg.SessionDuration
+				if expiry <= 0 {
+					expiry = auth.DefaultAccessTokenTTL
+				}
+				claims := &auth.Claims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						Issuer:    "sovrabase-member",
+						Subject:   req.Email,
+						IssuedAt:  jwt.NewNumericDate(now),
+						ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
+						ID:        fmt.Sprintf("%d", now.UnixNano()),
+					},
+					UserID:    req.Email,
+					Email:     req.Email,
+					Role:      "member",
+					AdminRole: "",
+				}
+				token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+				signed, _ := token.SignedString([]byte(a.jwtSecret))
+				writeJSON(w, http.StatusOK, map[string]string{"token": signed, "role": "member"})
+				return
+			}
 		}
 	}
 
-	// Generate JWT with AdminRole embedded in claims
-	token, err := a.generateAdminToken(adminUser)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to generate token")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{
-		"token": token,
-	})
+	writeError(w, http.StatusUnauthorized, "invalid email or password")
 }
 
 // generateAdminToken creates a JWT for dashboard administrators with RBAC role embedded.
@@ -330,6 +409,7 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /admin/projects/{id}/db-analysis", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleProjectDbAnalysis))))
 	mux.Handle("POST /admin/projects/{id}/collections", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateCollection))))
 	mux.Handle("DELETE /admin/projects/{id}/collections/{name}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDropCollection))))
+	mux.Handle("POST /admin/projects/{id}/collections/{name}/clear", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleClearCollection))))
 	mux.Handle("GET /admin/projects/{id}/collections/{name}/documents", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleListDocuments))))
 	mux.Handle("POST /admin/projects/{id}/collections/{name}/documents", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleInsertDocument))))
 	mux.Handle("POST /admin/projects/{id}/collections/{name}/import", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleImportCollection))))
@@ -348,6 +428,7 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/projects/{id}/users", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateUser))))
 	mux.Handle("DELETE /admin/projects/{id}/users/{userId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteUser))))
 	mux.Handle("PATCH /admin/projects/{id}/users/{userId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUpdateUser))))
+	mux.Handle("POST /admin/projects/{id}/users/{userId}/password", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleResetUserPassword))))
 
 	// OAuth provider management endpoints
 	mux.Handle("GET /admin/projects/{id}/auth/providers", a.adminAuthMiddleware(http.HandlerFunc(a.handleListOAuthProviders)))
@@ -377,8 +458,9 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/projects/{id}/invite", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleCreateInvitation))))
 	mux.Handle("DELETE /admin/projects/{id}/members/{userId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleRemoveMember))))
 	mux.Handle("PUT /admin/projects/{id}/members/{userId}/role", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleUpdateMemberRole))))
-	mux.Handle("GET /admin/invitations/{token}", http.HandlerFunc(a.handleGetInvitation))                   // public — no auth required
-	mux.Handle("POST /admin/invitations/{token}/accept", http.HandlerFunc(a.handleAcceptInvitation))         // auth validated inside handler
+	mux.Handle("GET /admin/invitations/{token}", http.HandlerFunc(a.handleGetInvitation))               // public — no auth required
+	mux.Handle("POST /admin/invitations/{token}/accept", http.HandlerFunc(a.handleAcceptInvitation))     // auth in handler
+	mux.Handle("POST /admin/invitations/{token}/register", http.HandlerFunc(a.handleRegisterAndAccept))  // creates account + accepts
 
 	// Remote config management endpoints
 	mux.Handle("GET /admin/projects/{id}/config", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListConfig))))
@@ -414,6 +496,11 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	// Queue management endpoints
 	mux.Handle("GET /admin/projects/{id}/queues", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListQueues))))
 	mux.Handle("POST /admin/projects/{id}/queues/purge", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminPurgeQueue))))
+
+	// Integrations
+	mux.Handle("GET /admin/integrations/catalog", a.adminAuthMiddleware(http.HandlerFunc(a.handleIntegrationCatalog)))
+	mux.Handle("GET /admin/projects/{id}/integrations", a.adminAuthMiddleware(http.HandlerFunc(a.handleListProjectIntegrations)))
+	mux.Handle("PUT /admin/projects/{id}/integrations", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleSetProjectIntegrations))))
 	mux.Handle("POST /admin/projects/{id}/queues/{queueName}/make-visible", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminMakeVisible))))
 }
 
@@ -750,6 +837,27 @@ func (a *AdminServer) adminLogger(next http.Handler) http.Handler {
 		sw := &statusWriter{ResponseWriter: w}
 		next.ServeHTTP(sw, r)
 
+		// Meter: count admin operations as project usage (same as projectLogger).
+		projID := r.PathValue("id")
+		if projID != "" && a.meterStore != nil {
+			_ = a.meterStore.IncMethod(projID, r.Method, 1)
+			// Bandwidth: uploads tracked via ContentLength + downloads via response bytes
+			if r.ContentLength > 0 {
+				_ = a.meterStore.Inc(projID, metering.MetricBandwidthUp, r.ContentLength)
+			}
+			if sw.length > 0 {
+				_ = a.meterStore.Inc(projID, metering.MetricBandwidthDown, int64(sw.length))
+			}
+			path := r.URL.Path
+			if strings.Contains(path, "/collections/") && strings.Contains(path, "/documents") {
+				if r.Method == http.MethodPost || r.Method == http.MethodPut {
+					_ = a.meterStore.Inc(projID, metering.MetricDBWrites, 1)
+				} else if r.Method == http.MethodGet {
+					_ = a.meterStore.Inc(projID, metering.MetricDBReads, 1)
+				}
+			}
+		}
+
 		// Only audit log successful mutations (2xx/3xx)
 		if sw.status >= 200 && sw.status < 400 && a.auditStore != nil {
 			claims, _ := r.Context().Value(claimsKey).(*auth.Claims)
@@ -831,6 +939,23 @@ func (a *AdminServer) handleCreateProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Insert owner into __members collection.
+	env, envErr := a.projects.GetProjectEnv(proj.ID)
+	if envErr == nil {
+		now := time.Now().UTC()
+		memberDoc := map[string]interface{}{
+			"_id":        req.OwnerID,
+			"user_id":    req.OwnerID,
+			"project_id": proj.ID,
+			"role":       "owner",
+			"joined_at":  now.Format(time.RFC3339Nano),
+			"is_owner":   true,
+		}
+		_ = env.Engine.CreateCollection("__members")
+		_ = env.Engine.Insert("__members", req.OwnerID, memberDoc)
+		// mpidx index already written by CreateProject in manager.go.
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"project":    proj,
 		"api_key":    proj.JWTSecret,
@@ -904,6 +1029,26 @@ func (a *AdminServer) handleListProjects(w http.ResponseWriter, r *http.Request)
 	if projects == nil {
 		projects = []*tenant.Project{}
 	}
+
+	// For member users, filter to only projects they're members of.
+	if a.teamStore != nil {
+		if claims, ok := r.Context().Value(claimsKey).(*auth.Claims); ok && claims.Role == "member" {
+			memberProjects, err := a.teamStore.GetMemberProjects(claims.UserID)
+			if err == nil && len(memberProjects) > 0 {
+				filtered := make([]*tenant.Project, 0, len(memberProjects))
+				for _, p := range projects {
+					for _, mp := range memberProjects {
+						if p.ID == mp {
+							filtered = append(filtered, p)
+							break
+						}
+					}
+				}
+				projects = filtered
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"projects": projects,
 		"count":    len(projects),
@@ -1167,9 +1312,24 @@ func (a *AdminServer) handleCreateCollection(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
 }
 
+// reservedCollections cannot be dropped or cleared via the admin API because
+// auth and other internal services depend on them.
+var reservedCollections = map[string]bool{
+	"_users":    true,
+	"__members": true,
+}
+
+func isReservedCollection(name string) bool {
+	return reservedCollections[name] || strings.HasPrefix(name, "__")
+}
+
 func (a *AdminServer) handleDropCollection(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	name := r.PathValue("name")
+	if isReservedCollection(name) {
+		writeError(w, http.StatusForbidden, fmt.Sprintf("collection %q is reserved and cannot be dropped", name))
+		return
+	}
 	env, err := a.projects.GetProjectEnv(id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
@@ -1180,6 +1340,25 @@ func (a *AdminServer) handleDropCollection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (a *AdminServer) handleClearCollection(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	name := r.PathValue("name")
+	if isReservedCollection(name) {
+		writeError(w, http.StatusForbidden, fmt.Sprintf("collection %q is reserved and cannot be cleared", name))
+		return
+	}
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err := env.Engine.ClearCollection(name); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
 }
 
 func (a *AdminServer) handleListDocuments(w http.ResponseWriter, r *http.Request) {
@@ -1213,6 +1392,17 @@ func (a *AdminServer) handleListDocuments(w http.ResponseWriter, r *http.Request
 	if docs == nil {
 		docs = []map[string]interface{}{}
 	}
+
+	// Sanitize _users documents: strip sensitive fields from the admin DB view.
+	if name == "_users" {
+		sensitiveKeys := []string{"password_hash", "verification_token", "reset_token", "magic_link_token"}
+		for i := range docs {
+			for _, key := range sensitiveKeys {
+				delete(docs[i], key)
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, docs)
 }
 
@@ -1472,7 +1662,50 @@ func (a *AdminServer) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-// === Storage Handlers ===
+func (a *AdminServer) handleResetUserPassword(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	userId := r.PathValue("userId")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(req.Password) < 8 {
+		writeError(w, http.StatusBadRequest, "password must be at least 8 characters")
+		return
+	}
+
+	user, err := env.Auth.GetUser(userId)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	hash, hashErr := auth.HashPassword(req.Password)
+	if hashErr != nil {
+		writeError(w, http.StatusInternalServerError, "failed to hash password")
+		return
+	}
+
+	user.PasswordHash = hash
+	user.UpdatedAt = time.Now().UTC()
+	if err := env.Auth.UpdateUser(user); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password_updated"})
+}
+
+// ─── Buckets ─────────────────────────────────────────────────────────────────
 
 func (a *AdminServer) handleListBuckets(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -1704,6 +1937,27 @@ func (a *AdminServer) projectLogger(next http.Handler) http.Handler {
 		
 		projID := r.PathValue("id")
 		if projID != "" {
+			// Meter: count admin operations as project usage.
+			if a.meterStore != nil {
+				_ = a.meterStore.IncMethod(projID, r.Method, 1)
+				// Bandwidth: uploads via ContentLength, downloads via response bytes
+				if r.ContentLength > 0 {
+					_ = a.meterStore.Inc(projID, metering.MetricBandwidthUp, r.ContentLength)
+				}
+				if sw.length > 0 {
+					_ = a.meterStore.Inc(projID, metering.MetricBandwidthDown, int64(sw.length))
+				}
+				// Track DB operations for collection/document endpoints
+				path := r.URL.Path
+				if strings.Contains(path, "/collections/") && strings.Contains(path, "/documents") {
+					if r.Method == http.MethodPost || r.Method == http.MethodPut {
+						_ = a.meterStore.Inc(projID, metering.MetricDBWrites, 1)
+					} else if r.Method == http.MethodGet {
+						_ = a.meterStore.Inc(projID, metering.MetricDBReads, 1)
+					}
+				}
+			}
+
 			logFile := filepath.Join(a.dataDir, "projects", projID, "requests.log")
 			_ = os.MkdirAll(filepath.Dir(logFile), 0755)
 			f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -1770,6 +2024,17 @@ func (a *AdminServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		"smtp_sender":        a.cfg.SMTPSender,
 		"smtp_user":          a.cfg.SMTPUser,
 		"smtp_password":      masked(a.cfg.SMTPPassword),
+		// Captcha
+		"captcha_enabled":  a.cfg.CaptchaEnabled,
+		"captcha_provider": a.cfg.CaptchaProvider,
+		"captcha_site_key": a.cfg.CaptchaSiteKey,
+		"captcha_secret":   masked(a.cfg.CaptchaSecret),
+		// Rate Limiting
+		"rate_limit_per_minute": a.cfg.RateLimitPerMinute,
+		"rate_limit_burst":      a.cfg.RateLimitBurst,
+		// Misc
+		"allow_origins": a.cfg.AllowOrigins,
+		"plugins_dir":   a.cfg.PluginsDir,
 		// Replication
 		"role":      a.cfg.Role,
 		"node_id":   a.cfg.NodeID,
@@ -1809,6 +2074,16 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		SMTPSender        *string `json:"smtp_sender"`
 		SMTPUser          *string `json:"smtp_user"`
 		SMTPPassword      *string `json:"smtp_password"` // ignored if == secretMask
+		// Captcha
+		CaptchaEnabled  *bool   `json:"captcha_enabled"`
+		CaptchaProvider *string `json:"captcha_provider"`
+		CaptchaSiteKey  *string `json:"captcha_site_key"`
+		CaptchaSecret   *string `json:"captcha_secret"` // ignored if == secretMask
+		// Rate Limiting
+		RateLimitPerMinute *int `json:"rate_limit_per_minute"`
+		RateLimitBurst     *int `json:"rate_limit_burst"`
+		// Misc
+		AllowOrigins *string `json:"allow_origins"`
 		// Replication
 		Role     *string  `json:"role"`
 		NodeID   *string  `json:"node_id"`
@@ -1888,6 +2163,30 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.SMTPPassword != nil && *req.SMTPPassword != secretMask {
 		a.cfg.SMTPPassword = *req.SMTPPassword
+	}
+	// Captcha
+	if req.CaptchaEnabled != nil {
+		a.cfg.CaptchaEnabled = *req.CaptchaEnabled
+	}
+	if req.CaptchaProvider != nil {
+		a.cfg.CaptchaProvider = *req.CaptchaProvider
+	}
+	if req.CaptchaSiteKey != nil {
+		a.cfg.CaptchaSiteKey = *req.CaptchaSiteKey
+	}
+	if req.CaptchaSecret != nil && *req.CaptchaSecret != secretMask {
+		a.cfg.CaptchaSecret = *req.CaptchaSecret
+	}
+	// Rate Limiting
+	if req.RateLimitPerMinute != nil && *req.RateLimitPerMinute > 0 {
+		a.cfg.RateLimitPerMinute = *req.RateLimitPerMinute
+	}
+	if req.RateLimitBurst != nil && *req.RateLimitBurst > 0 {
+		a.cfg.RateLimitBurst = *req.RateLimitBurst
+	}
+	// Misc
+	if req.AllowOrigins != nil {
+		a.cfg.AllowOrigins = *req.AllowOrigins
 	}
 	if req.Role != nil {
 		a.cfg.Role = *req.Role
@@ -2262,18 +2561,45 @@ func (a *AdminServer) handleSetOAuthProviders(w http.ResponseWriter, r *http.Req
 
 func (a *AdminServer) handleListMembers(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if a.teamStore == nil {
-		writeError(w, http.StatusInternalServerError, "team store not available")
-		return
-	}
-	members, err := a.teamStore.ListMembers(id)
+	env, err := a.projects.GetProjectEnv(id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+
+	docs, listErr := env.Engine.List("__members")
+	if listErr != nil || docs == nil {
+		docs = []map[string]interface{}{}
+	}
+
+	type memberResult struct {
+		UserID    string `json:"user_id"`
+		ProjectID string `json:"project_id"`
+		Role      string `json:"role"`
+		JoinedAt  string `json:"joined_at"`
+		IsOwner   bool   `json:"is_owner"`
+		Email     string `json:"email,omitempty"`
+		Name      string `json:"name,omitempty"`
+	}
+	result := make([]memberResult, 0, len(docs))
+	for _, doc := range docs {
+		m := memberResult{}
+		if v, ok := doc["user_id"].(string); ok { m.UserID = v }
+		if v, ok := doc["project_id"].(string); ok { m.ProjectID = v }
+		if v, ok := doc["role"].(string); ok { m.Role = v }
+		if v, ok := doc["joined_at"].(string); ok { m.JoinedAt = v }
+		if v, ok := doc["is_owner"].(bool); ok { m.IsOwner = v }
+		// Enrich with user info from _users
+		if user, uErr := env.Auth.GetUser(m.UserID); uErr == nil {
+			m.Email = user.Email
+			m.Name = user.Name
+		}
+		result = append(result, m)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"members": members,
-		"count":   len(members),
+		"members": result,
+		"count":   len(result),
 	})
 }
 
@@ -2336,13 +2662,18 @@ func (a *AdminServer) handleCreateInvitation(w http.ResponseWriter, r *http.Requ
 func (a *AdminServer) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	userID := r.PathValue("userId")
-	if a.teamStore == nil {
-		writeError(w, http.StatusInternalServerError, "team store not available")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if err := a.teamStore.RemoveMember(id, userID); err != nil {
+	if err := env.Engine.Delete("__members", userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	// Remove from global member-project index.
+	if a.teamStore != nil {
+		_ = a.teamStore.RemoveMemberProjectIndex(userID, id)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
 }
@@ -2350,22 +2681,25 @@ func (a *AdminServer) handleRemoveMember(w http.ResponseWriter, r *http.Request)
 func (a *AdminServer) handleUpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	userID := r.PathValue("userId")
-	if a.teamStore == nil {
-		writeError(w, http.StatusInternalServerError, "team store not available")
+	env, err := a.projects.GetProjectEnv(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
 	var req struct {
-		Role tenant.Role `json:"role"`
+		Role string `json:"role"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Role == "" {
-		writeError(w, http.StatusBadRequest, "role is required")
+	memberDoc, getErr := env.Engine.Get("__members", userID)
+	if getErr != nil {
+		writeError(w, http.StatusNotFound, "member not found")
 		return
 	}
-	if err := a.teamStore.UpdateMemberRole(id, userID, req.Role); err != nil {
+	memberDoc["role"] = req.Role
+	if err := env.Engine.Update("__members", userID, memberDoc); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -2400,10 +2734,138 @@ func (a *AdminServer) handleGetInvitation(w http.ResponseWriter, r *http.Request
 	if proj, err := a.projects.GetProject(inv.ProjectID); err == nil {
 		projectName = proj.Name
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"invitation":   inv,
-		"project_name": projectName,
-	})
+
+	// Return a friendly HTML page so the invite link works in a browser.
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invitation | Sovrabase</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; background:#0a0a0f; color:#f0f0f5; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
+    .card { background:#141416; border:1px solid #222226; border-radius:16px; padding:32px; max-width:420px; width:90%%; text-align:center; }
+    h1 { font-size:1.25rem; font-weight:600; margin:0 0 8px 0; }
+    h2 { font-size:0.875rem; font-weight:400; color:#8b8b96; margin:0 0 24px 0; }
+    .badge { display:inline-flex; align-items:center; gap:6px; background:#5b5bff22; color:#5b5bff; padding:6px 14px; border-radius:20px; font-size:0.8rem; font-weight:500; margin-bottom:20px; }
+    .info { font-size:0.85rem; color:#8b8b96; margin:0 0 20px 0; line-height:1.5; }
+    button, .login-link { display:block; width:100%%; padding:12px; border-radius:10px; font-size:0.95rem; font-weight:600; cursor:pointer; text-decoration:none; box-sizing:border-box; margin-bottom:8px; }
+    button { background:#5b5bff; color:white; border:none; }
+    button:hover { background:#4a4aee; }
+    button:disabled { opacity:0.5; cursor:default; }
+    .login-link { background:transparent; color:#5b5bff; border:1px solid #5b5bff; text-align:center; display:block; }
+    .login-link:hover { background:#5b5bff11; }
+    .error { color:#ef4444; font-size:0.8rem; margin-top:12px; display:none; }
+    .success { color:#22c55e; font-size:0.8rem; margin-top:12px; display:none; }
+    input { width:100%%; padding:11px; background:#1a1a20; border:1px solid #222226; border-radius:8px; color:#f0f0f5; font-size:0.9rem; box-sizing:border-box; margin-bottom:10px; }
+    input:focus { outline:none; border-color:#5b5bff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Join %s</h1>
+    <h2>You've been invited as a team member</h2>
+    <div class="badge">📧 %s — %s</div>
+    <div id="logged-out">
+      <p class="info">Create an account to accept this invitation.</p>
+      <form id="register-form">
+        <input type="password" id="password" placeholder="Choose a password (min 8 chars)" required minlength="8" autocomplete="new-password">
+        <input type="password" id="confirm" placeholder="Confirm password" required minlength="8" autocomplete="new-password">
+        <button type="submit">Create Account &amp; Join</button>
+      </form>
+      <p class="error" id="error"></p>
+      <p class="info" style="margin-top:16px;font-size:0.75rem;">Already have an account?</p>
+      <a href="/login?next=%s" class="login-link">Sign In First, Then Accept</a>
+    </div>
+    <div id="logged-in" style="display:none">
+      <p class="info">Click below to accept this invitation and join the project.</p>
+      <button id="accept">Accept Invitation</button>
+      <p class="error" id="error-li"></p>
+      <p class="success" id="success"></p>
+    </div>
+  </div>
+  <script>
+    const token = localStorage.getItem('sb_access_token') || '';
+    const inviteLink = window.location.href;
+    if (token) {
+      document.getElementById('logged-out').style.display = 'none';
+      document.getElementById('logged-in').style.display = 'block';
+      document.getElementById('accept').addEventListener('click', async () => {
+        const btn = document.getElementById('accept');
+        const errEl = document.getElementById('error-li');
+        const okEl = document.getElementById('success');
+        btn.disabled = true; btn.textContent = 'Accepting...';
+        try {
+          const url = '/admin/invitations/%s/accept?auth_token=' + encodeURIComponent(token);
+          const res = await fetch(url, { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) { errEl.textContent = data.error || 'Invitation could not be accepted'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Accept Invitation'; return; }
+          okEl.textContent = '✓ Accepted!' ; okEl.style.display = 'block';
+          btn.style.display = 'none';
+          // Show project credentials
+          if (data.api_url) {
+            const creds = document.createElement('div');
+            creds.className = 'info';
+            creds.style.cssText = 'text-align:left;font-size:0.8rem;background:#1a1a20;border:1px solid #222226;border-radius:8px;padding:14px;margin-top:16px;';
+            creds.innerHTML = '<p style="margin:0 0 4px"><strong>API URL:</strong> <code style="background:#0a0a0f;padding:2px 6px;border-radius:4px">' + (data.api_url || '') + '</code></p><p style="margin:0 0 4px"><strong>Project Key:</strong> <code style="background:#0a0a0f;padding:2px 6px;border-radius:4px;word-break:break-all">' + (data.api_key || '') + '</code></p><p style="margin:12px 0 0;color:#8b8b96">Use these with the <a href="/docs" style="color:#5b5bff">Sovrabase API</a>. <a href="/login" style="color:#5b5bff">Log in to the dashboard</a> to manage your projects.</p>';
+            btn.parentNode.insertBefore(creds, btn.nextSibling);
+          }
+        } catch (e) {
+          errEl.textContent = 'Network error. Please try again.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Retry';
+        }
+      });
+    } else {
+      // Registration flow
+      document.getElementById('register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        const errEl = document.getElementById('error');
+        const pw = document.getElementById('password').value;
+        const confirm = document.getElementById('confirm').value;
+        if (pw !== confirm) {
+          errEl.textContent = 'Passwords do not match';
+          errEl.style.display = 'block';
+          return;
+        }
+        if (pw.length < 8) {
+          errEl.textContent = 'Password must be at least 8 characters';
+          errEl.style.display = 'block';
+          return;
+        }
+        btn.disabled = true; btn.textContent = 'Creating account...';
+        try {
+          const res = await fetch('/admin/invitations/%s/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw })
+          });
+          const data = await res.json();
+          if (!res.ok) { errEl.textContent = data.error || 'Registration failed'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Create Account & Join'; return; }
+          // Store tokens and redirect
+          if (data.access_token) localStorage.setItem('sb_access_token', data.access_token);
+          if (data.refresh_token) localStorage.setItem('sb_refresh_token', data.refresh_token);
+          // Show success with project credentials
+          document.getElementById('register-form').style.display = 'none';
+          document.querySelector('.info').textContent = 'Your account has been created and you have joined ' + (data.project_name || 'the project') + '.';
+          document.querySelector('.badge').style.display = 'none';
+          const box = document.getElementById('register-form');
+          box.insertAdjacentHTML('afterend', '<div id="credentials" class="info" style="text-align:left;font-size:0.8rem;background:#1a1a20;border:1px solid #222226;border-radius:8px;padding:14px;margin-top:16px;"><p style="margin:0 0 8px;color:#22c55e;font-weight:600;">✓ ' + (data.status === 'accepted' ? 'Invitation accepted!' : 'Done!') + '</p><p style="margin:0 0 4px"><strong>API URL:</strong> <code style="background:#0a0a0f;padding:2px 6px;border-radius:4px">' + (data.api_url || '') + '</code></p><p style="margin:0 0 4px"><strong>Project Key:</strong> <code style="background:#0a0a0f;padding:2px 6px;border-radius:4px;word-break:break-all">' + (data.api_key || '') + '</code></p><p style="margin:0 0 8px"><strong>Your Email:</strong> ' + document.querySelector('.badge').textContent.replace(/.*📧 /, '').split(' —')[0] + '</p><p style="margin:12px 0 0;color:#8b8b96">Use these with the <a href="/docs" style="color:#5b5bff">Sovrabase API</a> or SDKs.</p><p style="margin:8px 0 0;color:#8b8b96">You can also <a href="/login" style="color:#5b5bff">log in to the dashboard</a> to manage your projects.</p></div>');
+          btn.textContent = '✓ Done!';
+        } catch (ex) {
+          errEl.textContent = 'Network error. Please try again.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Retry';
+        }
+      });
+    }
+  </script>
+</html>`, projectName, inv.Email, inv.Role, url.QueryEscape(r.URL.Path), inv.Token, inv.Token)
+	w.Write([]byte(html))
 }
 
 func (a *AdminServer) handleAcceptInvitation(w http.ResponseWriter, r *http.Request) {
@@ -2438,13 +2900,292 @@ func (a *AdminServer) handleAcceptInvitation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	member, err := a.teamStore.AcceptInvitation(invitationToken, claims.UserID)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+	// Validate invitation token to get project info
+	inv, invErr := a.teamStore.GetInvitation(invitationToken)
+	if invErr != nil {
+		writeError(w, http.StatusNotFound, invErr.Error())
 		return
 	}
+	if inv.Status != tenant.InvitationPending {
+		writeError(w, http.StatusGone, "invitation is no longer valid")
+		return
+	}
+
+	// Insert into __members
+	env, envErr := a.projects.GetProjectEnv(inv.ProjectID)
+	if envErr != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load project")
+		return
+	}
+	now := time.Now().UTC()
+	memberDoc := map[string]interface{}{
+		"_id":        claims.UserID,
+		"user_id":    claims.UserID,
+		"project_id": inv.ProjectID,
+		"role":       string(inv.Role),
+		"joined_at":  now.Format(time.RFC3339Nano),
+		"is_owner":   false,
+	}
+	_ = env.Engine.CreateCollection("__members")
+	if insErr := env.Engine.Insert("__members", claims.UserID, memberDoc); insErr != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save membership: "+insErr.Error())
+		return
+	}
+
+	// Keep global member-project index in sync.
+	if a.teamStore != nil {
+		_ = a.teamStore.AddMemberProjectIndex(claims.UserID, inv.ProjectID)
+	}
+
+	// Get project info
+	proj, _ := a.projects.GetProject(inv.ProjectID)
+	apiKey := ""
+	apiURL := r.Host
+	projectName := ""
+	if proj != nil {
+		apiKey = proj.JWTSecret
+		projectName = proj.Name
+	}
+	if r.TLS != nil {
+		apiURL = "https://" + apiURL
+	} else {
+		apiURL = "http://" + apiURL
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"member": member,
-		"status": "accepted",
+		"status":       "accepted",
+		"project_name": projectName,
+		"project_id":   inv.ProjectID,
+		"api_key":      apiKey,
+		"api_url":      apiURL,
+	})
+}
+
+// handleRegisterAndAccept creates a user account (with password) and accepts
+// an invitation in a single step. Designed for invited users who don't have
+// an existing Sovrabase account yet.
+func (a *AdminServer) handleRegisterAndAccept(w http.ResponseWriter, r *http.Request) {
+	invitationToken := r.PathValue("token")
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Password == "" {
+		writeError(w, http.StatusBadRequest, "password is required")
+		return
+	}
+
+	// Validate the invitation and get the project info.
+	inv, err := a.teamStore.GetInvitation(invitationToken)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if inv.Status != tenant.InvitationPending {
+		writeError(w, http.StatusGone, "invitation is no longer valid")
+		return
+	}
+
+	// Create the user account in the project's auth service.
+	env, err := a.projects.GetProjectEnv(inv.ProjectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load project")
+		return
+	}
+
+	user, tokens, err := env.Auth.SignUp(inv.Email, req.Password)
+	if err != nil {
+		writeError(w, http.StatusConflict, "email already registered: "+err.Error())
+		return
+	}
+
+	// Store the member's credential for dashboard login
+	hash, hashErr := auth.HashPassword(req.Password)
+	if hashErr != nil {
+		writeError(w, http.StatusInternalServerError, "failed to hash password")
+		return
+	}
+	if a.teamStore != nil {
+		_ = a.teamStore.StoreMemberCredential(inv.Email, user.ID, hash)
+	}
+
+	// Accept the invitation — insert into __members collection.
+	now := time.Now().UTC()
+	memberDoc := map[string]interface{}{
+		"_id":        user.ID,
+		"user_id":    user.ID,
+		"project_id": inv.ProjectID,
+		"role":       string(inv.Role),
+		"joined_at":  now.Format(time.RFC3339Nano),
+		"is_owner":   false,
+	}
+	// Ensure __members collection exists
+	_ = env.Engine.CreateCollection("__members")
+	if insErr := env.Engine.Insert("__members", user.ID, memberDoc); insErr != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save membership: "+insErr.Error())
+		return
+	}
+
+	// Keep global member-project index in sync.
+	if a.teamStore != nil {
+		_ = a.teamStore.AddMemberProjectIndex(user.ID, inv.ProjectID)
+	}
+
+	// Get project info to return to the user
+	proj, err := a.projects.GetProject(inv.ProjectID)
+	apiKey := ""
+	apiURL := r.Host
+	projectName := inv.ProjectID
+	if proj != nil {
+		apiKey = proj.JWTSecret
+		projectName = proj.Name
+	}
+	if r.TLS != nil {
+		apiURL = "https://" + apiURL
+	} else {
+		apiURL = "http://" + apiURL
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"status":        "accepted",
+		"access_token":  tokens.AccessToken,
+		"refresh_token": tokens.RefreshToken,
+		"user_id":       user.ID,
+		"project_name":  projectName,
+		"project_id":    inv.ProjectID,
+		"api_key":       apiKey,
+		"api_url":       apiURL,
+	})
+}
+
+// ─── Integration Handlers ────────────────────────────────────────────────────
+
+func (a *AdminServer) handleIntegrationCatalog(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"integrations": integrations.Catalog,
+	})
+}
+
+func (a *AdminServer) handleListProjectIntegrations(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	proj, err := a.projects.GetProject(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	// Mask secrets in config
+	type safeIntegration struct {
+		ID     string                 `json:"id"`
+		Config map[string]interface{} `json:"config"`
+	}
+	result := make([]safeIntegration, 0, len(proj.Integrations))
+	for _, integ := range proj.Integrations {
+		safeCfg := make(map[string]interface{})
+		def := integrations.GetByID(integ.ID)
+		for k, v := range integ.Config {
+			isSecret := false
+			if def != nil {
+				for _, cf := range def.ConfigFields {
+					if cf.Key == k && cf.Type == "password" {
+						isSecret = true
+						break
+					}
+				}
+			}
+			if isSecret {
+				if s, ok := v.(string); ok && len(s) > 4 {
+					safeCfg[k] = s[:4] + "••••"
+				} else if s, ok := v.(string); ok && s != "" {
+					safeCfg[k] = "••••"
+				} else {
+					safeCfg[k] = ""
+				}
+			} else {
+				safeCfg[k] = v
+			}
+		}
+		result = append(result, safeIntegration{ID: integ.ID, Config: safeCfg})
+	}
+	if result == nil {
+		result = []safeIntegration{}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"integrations": result,
+	})
+}
+
+func (a *AdminServer) handleSetProjectIntegrations(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	proj, err := a.projects.GetProject(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	var req struct {
+		Integrations []tenant.ProjectIntegration `json:"integrations"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// For each integration, if a secret field is masked, preserve the old value
+	for i := range req.Integrations {
+		def := integrations.GetByID(req.Integrations[i].ID)
+		if def == nil {
+			continue
+		}
+		// Find the old integration config
+		var oldConfig map[string]interface{}
+		for _, old := range proj.Integrations {
+			if old.ID == req.Integrations[i].ID {
+				oldConfig = old.Config
+				break
+			}
+		}
+		if oldConfig == nil {
+			continue
+		}
+		// For each password field, if the new value is masked or empty, preserve old
+		if req.Integrations[i].Config != nil {
+			for _, cf := range def.ConfigFields {
+				if cf.Type != "password" {
+					continue
+				}
+				newVal, hasNew := req.Integrations[i].Config[cf.Key]
+				if !hasNew {
+					continue
+				}
+				if s, ok := newVal.(string); ok && (strings.Contains(s, "••••") || s == "") {
+					if oldVal, hasOld := oldConfig[cf.Key]; hasOld {
+						req.Integrations[i].Config[cf.Key] = oldVal
+					}
+				}
+			}
+		}
+	}
+
+	proj.Integrations = req.Integrations
+	if proj.Integrations == nil {
+		proj.Integrations = []tenant.ProjectIntegration{}
+	}
+
+	if err := a.projects.UpdateProject(proj); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"integrations": len(proj.Integrations),
 	})
 }
