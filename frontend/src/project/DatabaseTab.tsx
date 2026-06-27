@@ -48,10 +48,10 @@ export default function DatabaseTab({ projectId }: Props) {
   const loadDocs = useCallback(async (colName: string) => {
     setLoadingDocs(true);
     try {
-      const data = await api<{ documents: DatabaseDocument[] }>(
+      const data = await api<DatabaseDocument[]>(
         `/admin/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(colName)}/documents`
       );
-      setDocs(data.documents || []);
+      setDocs(Array.isArray(data) ? data : []);
     } catch { setDocs([]); }
     setLoadingDocs(false);
   }, [projectId]);
