@@ -162,12 +162,6 @@ export default function Settings() {
     } catch (err) { showToast((err as Error).message, 'error'); }
   };
 
-  const restoreBackup = async (backupId: string) => {
-    try {
-      await api(`/admin/backups/${encodeURIComponent(backupId)}/restore`, { method: 'POST' });
-      showToast('Restore initiated', 'success');
-    } catch (err) { showToast((err as Error).message, 'error'); }
-  };
 
   const clearAudit = async () => {
     try {
@@ -406,9 +400,7 @@ export default function Settings() {
                         {formatDate(b.created_at)}{b.size != null ? ` · ${formatBytes(b.size)}` : ''}
                       </p>
                     </div>
-                    <button onClick={() => restoreBackup(b.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-accent text-sm font-medium hover:bg-accent/10">
-                      <RefreshCw className="w-3.5 h-3.5" />Restore
-                    </button>
+                      <span className="text-text-muted text-xs ml-auto">(restore not yet available)</span>
                   </div>
                 ))}
               </div>

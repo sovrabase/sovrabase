@@ -88,7 +88,7 @@ export default function DatabaseTab({ projectId }: Props) {
     if (!selectedCol) return;
     setSavingRules(true);
     try {
-      await api(`/admin/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(selectedCol)}/rules`, { method: 'PUT', body: JSON.stringify(rls) });
+      await api(`/admin/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(selectedCol)}/rules`, { method: 'POST', body: JSON.stringify(rls) });
       showToast('RLS rules saved', 'success');
     } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
     setSavingRules(false);
