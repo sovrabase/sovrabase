@@ -441,13 +441,14 @@ func (s *Server) RegisterAdmin(mux *http.ServeMux) {
 	}
 }
 
-// SetDashboard attaches a dashboard UI handler at /.
+// SetDashboard attaches a dashboard UI handler at root, catching all non-API paths.
 func (s *Server) SetDashboard(handler http.Handler) {
 	s.dashboard = handler
-	s.router.Handle("/", handler)
-	s.router.Handle("/assets/*", handler)
-	s.router.Handle("/favicon.svg", handler)
-	s.router.Handle("/icons.svg", handler)
+	// Register as a catch-all on the router — chi will fall through to this
+	// for any path not matched by more specific routes (API, admin, etc.)
+	s.router.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
+		handler.ServeHTTP(w, r)
+	})
 }
 
 // ListenAndServe starts the HTTP server.
