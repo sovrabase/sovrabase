@@ -45,3 +45,6 @@ devenv.local.yaml
 
 # pre-commit
 .pre-commit-config.yaml
+
+# Frontend build artifacts
+internal/dashboard/dist/

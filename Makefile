@@ -3,7 +3,7 @@ SOVRABASE_LISTEN_ADDR ?= :6070
 export SOVRABASE_DATA_DIR
 export SOVRABASE_LISTEN_ADDR
 
-.PHONY: build run test clean deps fmt lint dev swagger
+.PHONY: build run test clean deps fmt lint dev swagger build-frontend
 
 BINARY_NAME=sovrabase
 BUILD_DIR=build
@@ -12,7 +12,10 @@ deps:
 	go mod tidy
 	go mod download
 
-build: deps
+build-frontend:
+	cd frontend && npm install --silent && npm run build && cp -r dist ../internal/dashboard/dist
+
+build: build-frontend deps
 	go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/sovrabase
 
 run: build
