@@ -85,7 +85,7 @@ export default function Settings() {
       const params = new URLSearchParams({ offset: String(offset), limit: String(auditLimit) });
       if (action) params.set('action', action);
       if (target) params.set('target', target);
-      const d = await api<{ entries: AuditEntry[]; total?: number }>(`/admin/audit?${params}`);
+      const d = await api<{ entries: AuditEntry[]; total?: number }>(`/admin/audit-logs?${params}`);
       setAudit(d.entries || []);
       setAuditTotal(d.total ?? 0);
       setAuditOffset(offset);
@@ -171,7 +171,7 @@ export default function Settings() {
 
   const clearAudit = async () => {
     try {
-      await api('/admin/audit', { method: 'DELETE' });
+      await api('/admin/audit-logs', { method: 'DELETE' });
       showToast('Audit log cleared', 'success');
       loadAudit(0, auditAction, auditTarget);
     } catch (err) { showToast((err as Error).message, 'error'); }
