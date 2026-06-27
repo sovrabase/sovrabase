@@ -136,23 +136,15 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tokens, err := s.getAuth(r).SignIn(req.Email, req.Password)
+	// Call SignInWithMFA directly — it handles both MFA and non-MFA users,
+	// avoiding a double bcrypt hash on MFA-enabled accounts.
+	result, err := s.getAuth(r).SignInWithMFA(req.Email, req.Password)
 	if s.meterStore != nil {
 		if projectID := getProjectID(r); projectID != "" {
 			_ = s.meterStore.Inc(projectID, metering.MetricDBReads, 1)
 		}
 	}
 	if err != nil {
-		if strings.Contains(err.Error(), "mfa_required") {
-			// Fallback: try MFA-aware sign-in
-			result, mfaErr := s.getAuth(r).SignInWithMFA(req.Email, req.Password)
-			if mfaErr != nil {
-				writeError(w, http.StatusUnauthorized, "invalid credentials")
-				return
-			}
-			writeJSON(w, http.StatusOK, result)
-			return
-		}
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -160,7 +152,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	// Fire integration triggers (notifications) for signin
 	s.fireIntegrationTriggers("auth:signin", "", "", map[string]interface{}{"email": req.Email}, r)
 
-	writeJSON(w, http.StatusOK, tokens)
+	writeJSON(w, http.StatusOK, result)
 }
 
 type refreshRequest struct {
@@ -1446,7 +1438,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/octet-stream"
 	}
 
-	info, err := s.getStorage(r).Upload(bucket, path, file, contentType)
+	info, err := s.getStorage(r).Upload(r.Context(), bucket, path, file, contentType)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1492,7 +1484,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
 	path := chi.URLParam(r, "path")
 
-	reader, info, err := s.getStorage(r).Download(bucket, path)
+	reader, info, err := s.getStorage(r).Download(r.Context(), bucket, path)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "file not found")
 		return
@@ -1665,7 +1657,7 @@ func (s *Server) handleSignedDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	store := WrapStorageDriver(env.Storage)
 
-	reader, info, err := store.Download(bucket, path)
+	reader, info, err := store.Download(r.Context(), bucket, path)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "file not found")
 		return
@@ -1722,7 +1714,7 @@ func (s *Server) handleStorageDelete(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
 	path := chi.URLParam(r, "path")
 
-	if err := s.getStorage(r).Delete(bucket, path); err != nil {
+	if err := s.getStorage(r).Delete(r.Context(), bucket, path); err != nil {
 		writeError(w, http.StatusNotFound, "file not found")
 		return
 	}
@@ -1746,7 +1738,7 @@ func (s *Server) handleStorageList(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
 	prefix := r.URL.Query().Get("prefix")
 
-	files, err := s.getStorage(r).List(bucket, prefix)
+	files, err := s.getStorage(r).List(r.Context(), bucket, prefix)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

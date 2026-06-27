@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -15,7 +16,7 @@ import (
 type LocalDriver struct {
 	basePath string   // root directory for all buckets
 	baseURL  string   // public URL prefix (e.g. "https://cdn.example.com")
-	mu       sync.RWMutex
+	mu       sync.Mutex // only guards bucket dir creation
 }
 
 // NewLocalDriver creates a LocalDriver that stores files under
@@ -31,7 +32,6 @@ func NewLocalDriver(basePath, baseURL string) (*LocalDriver, error) {
 	if err := os.MkdirAll(abs, 0o755); err != nil {
 		return nil, fmt.Errorf("storage: create base directory: %w", err)
 	}
-	// Strip trailing / to keep URL generation predictable.
 	baseURL = strings.TrimRight(baseURL, "/")
 	return &LocalDriver{
 		basePath: abs,
@@ -39,29 +39,27 @@ func NewLocalDriver(basePath, baseURL string) (*LocalDriver, error) {
 	}, nil
 }
 
-// BasePath returns the absolute local filesystem root.
 func (d *LocalDriver) BasePath() string { return d.basePath }
-
-// BaseURL returns the public URL prefix.
-func (d *LocalDriver) BaseURL() string { return d.baseURL }
+func (d *LocalDriver) BaseURL() string  { return d.baseURL }
 
 // Upload implements Driver.
-func (d *LocalDriver) Upload(bucket, path string, reader io.Reader, contentType string) (*FileInfo, error) {
+func (d *LocalDriver) Upload(ctx context.Context, bucket, path string, reader io.Reader, contentType string) (*FileInfo, error) {
 	if bucket == "" || path == "" {
 		return nil, fmt.Errorf("storage: bucket and path are required")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	diskPath, dir := d.diskPath(bucket, path)
 
 	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	// Ensure the bucket directory exists.
 	if err := os.MkdirAll(dir, 0o755); err != nil {
+		d.mu.Unlock()
 		return nil, fmt.Errorf("storage: create bucket dir %s: %w", dir, err)
 	}
+	d.mu.Unlock()
 
-	// Write the file.
 	f, err := os.Create(diskPath)
 	if err != nil {
 		return nil, fmt.Errorf("storage: open for write %s: %w", diskPath, err)
@@ -70,7 +68,6 @@ func (d *LocalDriver) Upload(bucket, path string, reader io.Reader, contentType 
 
 	size, err := io.Copy(f, reader)
 	if err != nil {
-		// Best-effort cleanup on partial write.
 		os.Remove(diskPath)
 		os.Remove(metaPathFor(diskPath))
 		return nil, fmt.Errorf("storage: write %s: %w", diskPath, err)
@@ -80,7 +77,6 @@ func (d *LocalDriver) Upload(bucket, path string, reader io.Reader, contentType 
 	}
 
 	now := time.Now().UTC()
-
 	info := &FileInfo{
 		Bucket:      bucket,
 		Path:        path,
@@ -94,21 +90,19 @@ func (d *LocalDriver) Upload(bucket, path string, reader io.Reader, contentType 
 	if err := saveMetadata(diskPath, info); err != nil {
 		return nil, fmt.Errorf("storage: save metadata: %w", err)
 	}
-
 	return info, nil
 }
 
 // Download implements Driver.
-func (d *LocalDriver) Download(bucket, path string) (io.ReadCloser, *FileInfo, error) {
+func (d *LocalDriver) Download(ctx context.Context, bucket, path string) (io.ReadCloser, *FileInfo, error) {
 	if bucket == "" || path == "" {
 		return nil, nil, fmt.Errorf("storage: bucket and path are required")
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 
 	diskPath, _ := d.diskPath(bucket, path)
-
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
 	info, err := loadMetadata(diskPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("storage: load metadata for %s/%s: %w", bucket, path, err)
@@ -118,21 +112,19 @@ func (d *LocalDriver) Download(bucket, path string) (io.ReadCloser, *FileInfo, e
 	if err != nil {
 		return nil, nil, fmt.Errorf("storage: open for read %s: %w", diskPath, err)
 	}
-
 	return f, info, nil
 }
 
 // Delete implements Driver.
-func (d *LocalDriver) Delete(bucket, path string) error {
+func (d *LocalDriver) Delete(ctx context.Context, bucket, path string) error {
 	if bucket == "" || path == "" {
 		return fmt.Errorf("storage: bucket and path are required")
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	diskPath, _ := d.diskPath(bucket, path)
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	if err := os.Remove(diskPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("storage: remove file %s: %w", diskPath, err)
 	}
@@ -143,13 +135,13 @@ func (d *LocalDriver) Delete(bucket, path string) error {
 }
 
 // List implements Driver.
-func (d *LocalDriver) List(bucket, prefix string) ([]FileInfo, error) {
+func (d *LocalDriver) List(ctx context.Context, bucket, prefix string) ([]FileInfo, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	bucketDir := filepath.Join(d.basePath, bucket)
-
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	infos, err := listMetadata(bucketDir)
+	infos, err := listMetadata(bucketDir, maxListMetadata)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -161,7 +153,6 @@ func (d *LocalDriver) List(bucket, prefix string) ([]FileInfo, error) {
 		return infos, nil
 	}
 
-	// Filter by prefix.
 	var filtered []FileInfo
 	for _, info := range infos {
 		if strings.HasPrefix(info.Path, prefix) {
@@ -171,14 +162,12 @@ func (d *LocalDriver) List(bucket, prefix string) ([]FileInfo, error) {
 	return filtered, nil
 }
 
-// diskPath computes the absolute filesystem path for a bucket/path pair.
 func (d *LocalDriver) diskPath(bucket, path string) (string, string) {
 	dir := filepath.Join(d.basePath, bucket, filepath.Dir(path))
 	full := filepath.Join(d.basePath, bucket, path)
 	return full, dir
 }
 
-// publicURL builds a public URL from baseURL + bucket + path.
 func (d *LocalDriver) publicURL(bucket, path string) string {
 	if d.baseURL == "" {
 		return ""
@@ -186,16 +175,14 @@ func (d *LocalDriver) publicURL(bucket, path string) string {
 	return fmt.Sprintf("%s/%s/%s", d.baseURL, bucket, path)
 }
 
-// ListBuckets implements Driver.
-func (d *LocalDriver) ListBuckets() ([]string, error) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
+func (d *LocalDriver) ListBuckets(ctx context.Context) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	entries, err := os.ReadDir(d.basePath)
 	if err != nil {
 		return nil, fmt.Errorf("storage: list buckets: %w", err)
 	}
-
 	var buckets []string
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -205,11 +192,10 @@ func (d *LocalDriver) ListBuckets() ([]string, error) {
 	return buckets, nil
 }
 
-// CreateBucket implements Driver.
-func (d *LocalDriver) CreateBucket(bucket string) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
+func (d *LocalDriver) CreateBucket(ctx context.Context, bucket string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	bucketDir := filepath.Join(d.basePath, bucket)
 	if err := os.MkdirAll(bucketDir, 0o755); err != nil {
 		return fmt.Errorf("storage: create bucket: %w", err)
@@ -217,11 +203,10 @@ func (d *LocalDriver) CreateBucket(bucket string) error {
 	return nil
 }
 
-// DeleteBucket implements Driver.
-func (d *LocalDriver) DeleteBucket(bucket string) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
+func (d *LocalDriver) DeleteBucket(ctx context.Context, bucket string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	bucketDir := filepath.Join(d.basePath, bucket)
 	if err := os.RemoveAll(bucketDir); err != nil {
 		return fmt.Errorf("storage: delete bucket: %w", err)

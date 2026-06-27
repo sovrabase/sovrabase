@@ -24,14 +24,19 @@ export default function LogsTab({ projectId }: Props) {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [usage, setUsage] = useState<UsageMetrics>({});
   const [loading, setLoading] = useState(true);
+  const [logTotal, setLogTotal] = useState(0);
+  const LOG_PAGE_SIZE = 200;
 
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
-      api<LogEntry[]>(`/admin/projects/${encodeURIComponent(projectId)}/logs`).catch(() => []),
+      api<{ entries: LogEntry[]; total: number; limit: number; offset: number }>(
+        `/admin/projects/${encodeURIComponent(projectId)}/logs?limit=${LOG_PAGE_SIZE}`
+      ).catch(() => ({ entries: [], total: 0, limit: LOG_PAGE_SIZE, offset: 0 })),
       api<UsageMetrics>(`/admin/projects/${encodeURIComponent(projectId)}/usage`).catch(() => ({})),
-    ]).then(([logs, usageData]) => {
-      setEntries(Array.isArray(logs) ? logs : []);
+    ]).then(([logsResp, usageData]) => {
+      setEntries(logsResp.entries || []);
+      setLogTotal(logsResp.total || 0);
       setUsage(usageData || {});
     }).finally(() => setLoading(false));
   }, [projectId]);
@@ -39,14 +44,15 @@ export default function LogsTab({ projectId }: Props) {
   useEffect(() => { load(); }, [load]);
 
   const clearLogs = async () => {
-    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/logs`, { method: 'DELETE' }); setEntries([]); } catch {}
+    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/logs`, { method: 'DELETE' }); setEntries([]); setLogTotal(0); } catch {}
   };
 
   const methodColor = (m: string) => METHOD_COLORS[m] || 'bg-bg-input text-text-secondary';
   const statusColor = (s: number) => s < 300 ? 'text-success' : s < 400 ? 'text-yellow-500' : 'text-danger';
 
-  const totalRequests = entries.length;
-  const successRate = totalRequests > 0 ? Math.round((entries.filter((e) => e.status < 400).length / totalRequests) * 100) : 100;
+  const totalRequests = logTotal;
+  const displayedRequests = entries.length;
+  const successRate = displayedRequests > 0 ? Math.round((entries.filter((e) => e.status < 400).length / displayedRequests) * 100) : 100;
   const errorRate = 100 - successRate;
 
   if (loading) {
@@ -120,7 +126,13 @@ export default function LogsTab({ projectId }: Props) {
           <p className="text-sm">No request logs recorded yet</p>
         </div>
       ) : (
-        <div className="border border-border rounded-lg overflow-hidden">
+        <div className="space-y-2">
+          {logTotal > entries.length && (
+            <p className="text-text-muted text-xs text-center">
+              Showing latest {entries.length} of {logTotal.toLocaleString()} log entries
+            </p>
+          )}
+          <div className="border border-border rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-bg-input text-text-muted text-xs uppercase">
               <tr>
@@ -143,6 +155,7 @@ export default function LogsTab({ projectId }: Props) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

@@ -28,7 +28,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/ketsuna-org/sovrabase/internal/api"
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/captcha"
@@ -41,7 +40,6 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
-	"github.com/ketsuna-org/sovrabase/plugins"
 )
 
 func main() {
@@ -70,8 +68,8 @@ func main() {
 	}
 	defer engine.Close()
 
-	// Initialize auth service
-	userStore := auth.NewInMemoryUserStore()
+	// Initialize auth service — backed by PebbleDB so accounts survive restarts.
+	userStore := auth.NewDBUserStore(engine)
 	authService := auth.NewService(cfg.JWTSecret, userStore)
 	authService.EmailVerificationEnabled = cfg.EmailVerification
 	authService.SMTPHost = cfg.SMTPHost
@@ -117,12 +115,12 @@ func main() {
 	hookManager := plugin.NewHookManager()
 	app := plugin.NewApp(hookManager)
 
-	// Register plugins.
-	statusPlugin := &statusplugin.StatusPlugin{}
-	if err := statusPlugin.Register(app); err != nil {
-		logger.Error("Failed to register status-plugin", "error", err)
-	}
-	app.RegisterPlugin(statusPlugin.Name())
+	// Note: StatusPlugin is a demo and is NOT registered by default.
+	// To enable it, import "github.com/ketsuna-org/sovrabase/plugins"
+	// and register it manually:
+	//   statusPlugin := &statusplugin.StatusPlugin{}
+	//   statusPlugin.Register(app)
+	//   app.RegisterPlugin(statusPlugin.Name())
 
 	// Create API server
 	server := api.NewServer(
@@ -195,17 +193,7 @@ func main() {
 		info := plugin.PluginInfo{
 			Plugins: app.Plugins(),
 			Hooks:   hookManager.Info(),
-		}
-		// Extract routes from the chi router.
-		if hr, ok := server.Handler().(interface{ Routes() []chi.Route }); ok {
-			for _, rt := range hr.Routes() {
-				for method := range rt.Handlers {
-					info.Routes = append(info.Routes, plugin.RouteInfo{
-						Method: method,
-						Path:   rt.Pattern,
-					})
-				}
-			}
+			Routes:  []plugin.RouteInfo{}, // plugins register routes via app.Router()
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(info)
@@ -330,6 +318,13 @@ func main() {
 	defer shutdownCancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server shutdown error", "error", err)
+	}
+
+	// Flush and close stores in dependency order: metering first (final flush),
+	// then the async log writer, then DBs. The defer chain runs in reverse order
+	// but we close explicitly here to control ordering and log any errors.
+	if err := meterStore.Close(); err != nil {
+		logger.Error("MeterStore close error", "error", err)
 	}
 
 	logger.Info("Sovrabase stopped")

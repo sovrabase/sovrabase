@@ -57,12 +57,18 @@ export default function Settings() {
     try {
       const data = await api<Record<string, unknown>>('/admin/config');
       const flat: Record<string, string | boolean> = {};
+      // Secret fields are write-only — never populate them from the backend response.
+      // They come back as "••••••••" (secretMask) which would break the password
+      // confirmation check in saveConfig if loaded into the form.
+      const secretKeys = new Set(['admin_password', 'jwt_secret', 's3_secret_key', 'smtp_password', 'captcha_secret']);
       for (const [k, v] of Object.entries(data)) {
+        if (secretKeys.has(k)) continue;
         if (typeof v === 'boolean' || typeof v === 'string') flat[k] = v;
         else if (typeof v === 'number') flat[k] = String(v);
         else if (Array.isArray(v)) flat[k] = v.join('\n');
       }
       setForm(flat);
+      setConfirmPw('');
     } catch { /* no config yet */ }
   }, []);
 
@@ -450,7 +456,7 @@ export default function Settings() {
   const infoLabels: Record<string, string> = {
     version: 'Version', go_version: 'Go Version', listen_addr: 'Listen Address',
     data_dir: 'Data Directory', storage_driver: 'Storage Driver',
-    replication_role: 'Replication Role', region: 'Region',
+    replication_role: 'Replication Role', region: 'Region', uptime: 'Uptime',
   };
 
   return (

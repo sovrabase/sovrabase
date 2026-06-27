@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/ketsuna-org/sovrabase/internal/auth"
@@ -62,6 +63,8 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.logger.Warn("websocket upgrade failed", "error", err)
 		return
 	}
+	// Close the connection FIRST on exit, before waiting for writeLoop.
+	// This unblocks any pending write immediately.
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read auth message.
@@ -105,17 +108,18 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = h.meterStore.Inc(projectID, metering.MetricRealtimeConnections, 1)
 	}
 
+	// Start writer goroutine.
+	writeDone := make(chan struct{})
+	go h.writeLoop(client, conn, ctx, writeDone)
+
+	// Cleanup: unregister (closes events channel → writeLoop exits), then wait for writeDone.
 	defer func() {
 		h.hub.Unregister(clientID)
 		if h.meterStore != nil && projectID != "" {
 			_ = h.meterStore.Inc(projectID, metering.MetricRealtimeConnections, -1)
 		}
+		<-writeDone
 	}()
-
-	// Start writer goroutine.
-	writeDone := make(chan struct{})
-	go h.writeLoop(client, conn, writeDone)
-	defer func() { <-writeDone }()
 
 	// Read loop for subscribe/unsubscribe messages.
 	for {
@@ -165,21 +169,30 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// writeLoop reads events from the client's channel and writes them to the WebSocket.
-func (h *WSHandler) writeLoop(client *Client, conn *websocket.Conn, done chan<- struct{}) {
+// writeLoop reads pre-marshaled payloads from the client's channel and writes
+// them to the WebSocket. Uses the request context for cancellation so writes
+// abort immediately when the client disconnects or the server shuts down.
+// A periodic ping detects dead connections.
+func (h *WSHandler) writeLoop(client *Client, conn *websocket.Conn, ctx context.Context, done chan<- struct{}) {
 	defer close(done)
-	for event := range client.events {
-		if client.closed {
-			return
-		}
-		if err := wsjson.Write(context.Background(), conn, map[string]interface{}{
-			"type":       "event",
-			"event_type": event.Type,
-			"collection": event.Collection,
-			"id":         event.DocID,
-			"data":       event.Data,
-			"timestamp":  event.Timestamp,
-		}); err != nil {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case payload, ok := <-client.events:
+			if !ok {
+				// Channel closed by Unregister — clean exit.
+				return
+			}
+			if err := conn.Write(ctx, websocket.MessageText, payload.data); err != nil {
+				return
+			}
+		case <-ticker.C:
+			// Heartbeat ping — detects dead connections.
+			if err := conn.Ping(ctx); err != nil {
+				return
+			}
+		case <-ctx.Done():
 			return
 		}
 	}

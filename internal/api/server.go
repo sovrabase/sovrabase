@@ -103,10 +103,10 @@ type AuthService interface {
 
 // StorageService is the interface expected from the storage package.
 type StorageService interface {
-	Upload(bucket, path string, reader io.Reader, contentType string) (*FileInfo, error)
-	Download(bucket, path string) (io.ReadCloser, *FileInfo, error)
-	Delete(bucket, path string) error
-	List(bucket, prefix string) ([]FileInfo, error)
+	Upload(ctx context.Context, bucket, path string, reader io.Reader, contentType string) (*FileInfo, error)
+	Download(ctx context.Context, bucket, path string) (io.ReadCloser, *FileInfo, error)
+	Delete(ctx context.Context, bucket, path string) error
+	List(ctx context.Context, bucket, prefix string) ([]FileInfo, error)
 }
 
 // ProviderMetaInfo public OAuth provider info (tokens excluded).

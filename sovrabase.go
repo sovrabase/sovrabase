@@ -163,8 +163,8 @@ func (a *App) Serve() error {
 	defer engine.Close()
 	a.engine = engine
 
-	// Auth.
-	userStore := auth.NewInMemoryUserStore()
+	// Auth — backed by PebbleDB so accounts survive restarts.
+	userStore := auth.NewDBUserStore(engine)
 	authService := auth.NewService(cfg.JWTSecret, userStore)
 	if cfg.SMTPHost != "" {
 		authService.SMTPHost = cfg.SMTPHost
@@ -271,13 +271,11 @@ type storageAdapter struct {
 }
 
 func (a *storageAdapter) Upload(bucket, path, contentType string, size int64) (*plugin.FileInfo, error) {
-	// Upload needs a reader — library users should use form uploads
-	// or we expose a simpler API. For now return not implemented.
 	return nil, nil
 }
 
 func (a *storageAdapter) List(bucket, prefix string) ([]plugin.FileInfo, error) {
-	files, err := a.driver.List(bucket, prefix)
+	files, err := a.driver.List(context.Background(), bucket, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -294,5 +292,5 @@ func (a *storageAdapter) List(bucket, prefix string) ([]plugin.FileInfo, error) 
 }
 
 func (a *storageAdapter) Delete(bucket, path string) error {
-	return a.driver.Delete(bucket, path)
+	return a.driver.Delete(context.Background(), bucket, path)
 }

@@ -5,6 +5,7 @@
 package storage
 
 import (
+	"context"
 	"io"
 	"time"
 )
@@ -21,29 +22,30 @@ type FileInfo struct {
 }
 
 // Driver is the interface that all storage backends must implement.
+// All methods accept a context.Context for cancellation and timeout propagation.
 type Driver interface {
 	// Upload stores data read from reader at the given bucket and path.
 	// contentType is a MIME type (e.g. "image/png"). The returned FileInfo
 	// includes the public URL to the stored file.
-	Upload(bucket, path string, reader io.Reader, contentType string) (*FileInfo, error)
+	Upload(ctx context.Context, bucket, path string, reader io.Reader, contentType string) (*FileInfo, error)
 
 	// Download returns a reader for the file at bucket/path together with
 	// its metadata. The caller must close the returned ReadCloser.
-	Download(bucket, path string) (io.ReadCloser, *FileInfo, error)
+	Download(ctx context.Context, bucket, path string) (io.ReadCloser, *FileInfo, error)
 
 	// Delete removes the file at bucket/path and its metadata.
-	Delete(bucket, path string) error
+	Delete(ctx context.Context, bucket, path string) error
 
 	// List returns metadata for all files in the given bucket whose path
 	// starts with prefix. An empty prefix lists everything in the bucket.
-	List(bucket, prefix string) ([]FileInfo, error)
+	List(ctx context.Context, bucket, prefix string) ([]FileInfo, error)
 
 	// ListBuckets returns the names of all buckets.
-	ListBuckets() ([]string, error)
+	ListBuckets(ctx context.Context) ([]string, error)
 
 	// CreateBucket creates a new bucket.
-	CreateBucket(bucket string) error
+	CreateBucket(ctx context.Context, bucket string) error
 
 	// DeleteBucket deletes a bucket and all its contents.
-	DeleteBucket(bucket string) error
+	DeleteBucket(ctx context.Context, bucket string) error
 }

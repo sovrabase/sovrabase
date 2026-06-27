@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -40,13 +41,13 @@ func TestAdminFileDownload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get project env: %v", err)
 	}
-	err = env.Storage.CreateBucket("test-bucket")
+	err = env.Storage.CreateBucket(context.Background(), "test-bucket")
 	if err != nil {
 		t.Fatalf("failed to create bucket: %v", err)
 	}
 
 	fileContent := "hello admin file download"
-	_, err = env.Storage.Upload("test-bucket", "docs/hello.txt", strings.NewReader(fileContent), "text/plain")
+	_, err = env.Storage.Upload(context.Background(), "test-bucket", "docs/hello.txt", strings.NewReader(fileContent), "text/plain")
 	if err != nil {
 		t.Fatalf("failed to upload file: %v", err)
 	}

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -20,7 +21,7 @@ func TestLocalDriver_UploadDownload(t *testing.T) {
 	bucket := "user-content"
 	path := "images/hello.txt"
 
-	info, err := d.Upload(bucket, path, bytes.NewReader(content), "text/plain")
+	info, err := d.Upload(context.Background(), bucket, path, bytes.NewReader(content), "text/plain")
 	if err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
@@ -57,7 +58,7 @@ func TestLocalDriver_UploadDownload(t *testing.T) {
 	}
 
 	// Download and verify.
-	rc, dlInfo, err := d.Download(bucket, path)
+	rc, dlInfo, err := d.Download(context.Background(), bucket, path)
 	if err != nil {
 		t.Fatalf("Download: %v", err)
 	}
@@ -83,12 +84,12 @@ func TestLocalDriver_Delete(t *testing.T) {
 	}
 
 	bucket, path := "data", "records/1.json"
-	_, err = d.Upload(bucket, path, bytes.NewReader([]byte("{}")), "application/json")
+	_, err = d.Upload(context.Background(), bucket, path, bytes.NewReader([]byte("{}")), "application/json")
 	if err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
 
-	if err := d.Delete(bucket, path); err != nil {
+	if err := d.Delete(context.Background(), bucket, path); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 
@@ -101,7 +102,7 @@ func TestLocalDriver_Delete(t *testing.T) {
 	}
 
 	// Deleting again should not error.
-	if err := d.Delete(bucket, path); err != nil {
+	if err := d.Delete(context.Background(), bucket, path); err != nil {
 		t.Errorf("Delete on missing file: %v", err)
 	}
 }
@@ -115,21 +116,21 @@ func TestLocalDriver_List(t *testing.T) {
 
 	bucket := "photos"
 
-	_, err = d.Upload(bucket, "2024/a.jpg", bytes.NewReader([]byte("a")), "image/jpeg")
+	_, err = d.Upload(context.Background(), bucket, "2024/a.jpg", bytes.NewReader([]byte("a")), "image/jpeg")
 	if err != nil {
 		t.Fatalf("Upload a: %v", err)
 	}
-	_, err = d.Upload(bucket, "2024/b.jpg", bytes.NewReader([]byte("bb")), "image/jpeg")
+	_, err = d.Upload(context.Background(), bucket, "2024/b.jpg", bytes.NewReader([]byte("bb")), "image/jpeg")
 	if err != nil {
 		t.Fatalf("Upload b: %v", err)
 	}
-	_, err = d.Upload(bucket, "2025/c.png", bytes.NewReader([]byte("ccc")), "image/png")
+	_, err = d.Upload(context.Background(), bucket, "2025/c.png", bytes.NewReader([]byte("ccc")), "image/png")
 	if err != nil {
 		t.Fatalf("Upload c: %v", err)
 	}
 
 	// List all.
-	all, err := d.List(bucket, "")
+	all, err := d.List(context.Background(), bucket, "")
 	if err != nil {
 		t.Fatalf("List all: %v", err)
 	}
@@ -138,7 +139,7 @@ func TestLocalDriver_List(t *testing.T) {
 	}
 
 	// List with prefix.
-	filtered, err := d.List(bucket, "2024/")
+	filtered, err := d.List(context.Background(), bucket, "2024/")
 	if err != nil {
 		t.Fatalf("List 2024/: %v", err)
 	}
@@ -147,7 +148,7 @@ func TestLocalDriver_List(t *testing.T) {
 	}
 
 	// List empty prefix returns nothing for non-existent bucket.
-	missing, err := d.List("nosuchbucket", "")
+	missing, err := d.List(context.Background(), "nosuchbucket", "")
 	if err != nil {
 		t.Errorf("List non-existent bucket: %v", err)
 	}
@@ -163,7 +164,7 @@ func TestLocalDriver_NoBaseURL(t *testing.T) {
 		t.Fatalf("NewLocalDriver: %v", err)
 	}
 
-	info, err := d.Upload("b", "f.txt", bytes.NewReader([]byte("x")), "text/plain")
+	info, err := d.Upload(context.Background(), "b", "f.txt", bytes.NewReader([]byte("x")), "text/plain")
 	if err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
@@ -179,7 +180,7 @@ func TestLocalDriver_DownloadMissing(t *testing.T) {
 		t.Fatalf("NewLocalDriver: %v", err)
 	}
 
-	_, _, err = d.Download("b", "nope.txt")
+	_, _, err = d.Download(context.Background(), "b", "nope.txt")
 	if err == nil {
 		t.Fatal("Download of missing file should error")
 	}
@@ -192,7 +193,7 @@ func TestLocalDriver_SlashesInBaseURL(t *testing.T) {
 		t.Fatalf("NewLocalDriver: %v", err)
 	}
 
-	info, err := d.Upload("b", "k.txt", bytes.NewReader([]byte("x")), "text/plain")
+	info, err := d.Upload(context.Background(), "b", "k.txt", bytes.NewReader([]byte("x")), "text/plain")
 	if err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
@@ -211,7 +212,7 @@ func TestLocalDriver_LargeFile(t *testing.T) {
 	size := 1 << 20 // 1 MiB
 	content := bytes.Repeat([]byte("x"), size)
 
-	info, err := d.Upload("large", "big.bin", bytes.NewReader(content), "application/octet-stream")
+	info, err := d.Upload(context.Background(), "large", "big.bin", bytes.NewReader(content), "application/octet-stream")
 	if err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
@@ -219,7 +220,7 @@ func TestLocalDriver_LargeFile(t *testing.T) {
 		t.Errorf("Size = %d, want %d", info.Size, size)
 	}
 
-	rc, _, err := d.Download("large", "big.bin")
+	rc, _, err := d.Download(context.Background(), "large", "big.bin")
 	if err != nil {
 		t.Fatalf("Download: %v", err)
 	}
@@ -243,22 +244,22 @@ func TestLocalDriver_EmptyBucketOrPath(t *testing.T) {
 
 	r := bytes.NewReader([]byte("x"))
 
-	if _, err := d.Upload("", "path", r, "text/plain"); err == nil {
+	if _, err := d.Upload(context.Background(), "", "path", r, "text/plain"); err == nil {
 		t.Error("Upload with empty bucket should error")
 	}
-	if _, err := d.Upload("bucket", "", r, "text/plain"); err == nil {
+	if _, err := d.Upload(context.Background(), "bucket", "", r, "text/plain"); err == nil {
 		t.Error("Upload with empty path should error")
 	}
-	if _, _, err := d.Download("", "path"); err == nil {
+	if _, _, err := d.Download(context.Background(), "", "path"); err == nil {
 		t.Error("Download with empty bucket should error")
 	}
-	if _, _, err := d.Download("bucket", ""); err == nil {
+	if _, _, err := d.Download(context.Background(), "bucket", ""); err == nil {
 		t.Error("Download with empty path should error")
 	}
-	if err := d.Delete("", "path"); err == nil {
+	if err := d.Delete(context.Background(), "", "path"); err == nil {
 		t.Error("Delete with empty bucket should error")
 	}
-	if err := d.Delete("bucket", ""); err == nil {
+	if err := d.Delete(context.Background(), "bucket", ""); err == nil {
 		t.Error("Delete with empty path should error")
 	}
 }

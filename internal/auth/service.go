@@ -42,13 +42,17 @@ type OAuthStatePayload struct {
 }
 
 // NewService creates a new AuthService backed by the given UserStore.
+// Starts a background goroutine to periodically clean up expired OAuth states.
 func NewService(jwtSecret string, userStore UserStore) *AuthService {
-	return &AuthService{
+	s := &AuthService{
 		jwtSecret:   jwtSecret,
 		store:       userStore,
 		oauthStates: make(map[string]stateEntry),
 		providers:   make(map[string]OAuthProvider),
 	}
+	// Single periodic cleanup goroutine instead of spawning one per OAuth init.
+	go s.oauthCleanupLoop()
+	return s
 }
 
 // RegisterOAuthProvider adds an OAuth provider that can be used for social login.
@@ -296,9 +300,6 @@ func (s *AuthService) CreateOAuthState(provider, projectID, appRedirect string) 
 	}
 	s.oauthStatesMu.Unlock()
 
-	// Background cleanup of expired states
-	go s.cleanupExpiredStates()
-
 	return state, nil
 }
 
@@ -462,6 +463,16 @@ func (s *AuthService) generateTokenPair(user *User) (*TokenPair, error) {
 		RefreshToken: refreshToken,
 		ExpiresIn:    int64(DefaultAccessTokenTTL.Seconds()),
 	}, nil
+}
+
+// oauthCleanupLoop periodically removes expired OAuth state entries.
+// Runs as a single goroutine started by NewService.
+func (s *AuthService) oauthCleanupLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.cleanupExpiredStates()
+	}
 }
 
 // cleanupExpiredStates removes OAuth state entries that have passed their expiry.

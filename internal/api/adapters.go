@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"io"
 
 	"github.com/ketsuna-org/sovrabase/internal/auth"
@@ -221,28 +222,28 @@ type storageAdapter struct {
 	drv storage.Driver
 }
 
-func (s *storageAdapter) Upload(bucket, path string, reader io.Reader, contentType string) (*FileInfo, error) {
-	info, err := s.drv.Upload(bucket, path, reader, contentType)
+func (s *storageAdapter) Upload(ctx context.Context, bucket, path string, reader io.Reader, contentType string) (*FileInfo, error) {
+	info, err := s.drv.Upload(ctx, bucket, path, reader, contentType)
 	if err != nil {
 		return nil, err
 	}
 	return storageFileInfoToAPI(info), nil
 }
 
-func (s *storageAdapter) Download(bucket, path string) (io.ReadCloser, *FileInfo, error) {
-	rc, info, err := s.drv.Download(bucket, path)
+func (s *storageAdapter) Download(ctx context.Context, bucket, path string) (io.ReadCloser, *FileInfo, error) {
+	rc, info, err := s.drv.Download(ctx, bucket, path)
 	if err != nil {
 		return nil, nil, err
 	}
 	return rc, storageFileInfoToAPI(info), nil
 }
 
-func (s *storageAdapter) Delete(bucket, path string) error {
-	return s.drv.Delete(bucket, path)
+func (s *storageAdapter) Delete(ctx context.Context, bucket, path string) error {
+	return s.drv.Delete(ctx, bucket, path)
 }
 
-func (s *storageAdapter) List(bucket, prefix string) ([]FileInfo, error) {
-	infos, err := s.drv.List(bucket, prefix)
+func (s *storageAdapter) List(ctx context.Context, bucket, prefix string) ([]FileInfo, error) {
+	infos, err := s.drv.List(ctx, bucket, prefix)
 	if err != nil {
 		return nil, err
 	}

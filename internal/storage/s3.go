@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -27,6 +28,7 @@ type S3Driver struct {
 	bucketPrefix string
 	endpoint     string
 	useSSL       bool
+	bucketsKnown sync.Map // cache of known-existing buckets — avoids HEAD per upload
 }
 
 // NewS3Driver creates an S3Driver connected to the given endpoint.
@@ -110,23 +112,25 @@ func (d *S3Driver) publicURL(bucket, path string) string {
 }
 
 // Upload implements Driver.
-func (d *S3Driver) Upload(bucket, path string, reader io.Reader, contentType string) (*FileInfo, error) {
+func (d *S3Driver) Upload(ctx context.Context, bucket, path string, reader io.Reader, contentType string) (*FileInfo, error) {
 	if bucket == "" || path == "" {
 		return nil, fmt.Errorf("storage: bucket and path are required")
 	}
 
 	fullBucket := d.bucketName(bucket)
-	ctx := context.Background()
 
-	// Ensure the bucket exists; create it if not.
-	exists, err := d.client.BucketExists(ctx, fullBucket)
-	if err != nil {
-		return nil, fmt.Errorf("storage: check bucket %s: %w", fullBucket, err)
-	}
-	if !exists {
-		if err := d.client.MakeBucket(ctx, fullBucket, minio.MakeBucketOptions{}); err != nil {
-			return nil, fmt.Errorf("storage: create bucket %s: %w", fullBucket, err)
+	// Ensure the bucket exists — cached to avoid HEAD on every upload.
+	if _, known := d.bucketsKnown.Load(fullBucket); !known {
+		exists, err := d.client.BucketExists(ctx, fullBucket)
+		if err != nil {
+			return nil, fmt.Errorf("storage: check bucket %s: %w", fullBucket, err)
 		}
+		if !exists {
+			if err := d.client.MakeBucket(ctx, fullBucket, minio.MakeBucketOptions{}); err != nil {
+				return nil, fmt.Errorf("storage: create bucket %s: %w", fullBucket, err)
+			}
+		}
+		d.bucketsKnown.Store(fullBucket, true)
 	}
 
 	info, err := d.client.PutObject(ctx, fullBucket, path, reader, -1, minio.PutObjectOptions{
@@ -149,13 +153,12 @@ func (d *S3Driver) Upload(bucket, path string, reader io.Reader, contentType str
 }
 
 // Download implements Driver.
-func (d *S3Driver) Download(bucket, path string) (io.ReadCloser, *FileInfo, error) {
+func (d *S3Driver) Download(ctx context.Context, bucket, path string) (io.ReadCloser, *FileInfo, error) {
 	if bucket == "" || path == "" {
 		return nil, nil, fmt.Errorf("storage: bucket and path are required")
 	}
 
 	fullBucket := d.bucketName(bucket)
-	ctx := context.Background()
 
 	stat, err := d.client.StatObject(ctx, fullBucket, path, minio.StatObjectOptions{})
 	if err != nil {
@@ -181,13 +184,12 @@ func (d *S3Driver) Download(bucket, path string) (io.ReadCloser, *FileInfo, erro
 }
 
 // Delete implements Driver.
-func (d *S3Driver) Delete(bucket, path string) error {
+func (d *S3Driver) Delete(ctx context.Context, bucket, path string) error {
 	if bucket == "" || path == "" {
 		return fmt.Errorf("storage: bucket and path are required")
 	}
 
 	fullBucket := d.bucketName(bucket)
-	ctx := context.Background()
 
 	err := d.client.RemoveObject(ctx, fullBucket, path, minio.RemoveObjectOptions{})
 	if err != nil {
@@ -197,9 +199,8 @@ func (d *S3Driver) Delete(bucket, path string) error {
 }
 
 // List implements Driver.
-func (d *S3Driver) List(bucket, prefix string) ([]FileInfo, error) {
+func (d *S3Driver) List(ctx context.Context, bucket, prefix string) ([]FileInfo, error) {
 	fullBucket := d.bucketName(bucket)
-	ctx := context.Background()
 
 	var results []FileInfo
 	for obj := range d.client.ListObjects(ctx, fullBucket, minio.ListObjectsOptions{
@@ -224,8 +225,7 @@ func (d *S3Driver) List(bucket, prefix string) ([]FileInfo, error) {
 }
 
 // ListBuckets implements Driver.
-func (d *S3Driver) ListBuckets() ([]string, error) {
-	ctx := context.Background()
+func (d *S3Driver) ListBuckets(ctx context.Context) ([]string, error) {
 	bucketsInfo, err := d.client.ListBuckets(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("storage: list buckets: %w", err)
@@ -243,9 +243,8 @@ func (d *S3Driver) ListBuckets() ([]string, error) {
 }
 
 // CreateBucket implements Driver.
-func (d *S3Driver) CreateBucket(bucket string) error {
+func (d *S3Driver) CreateBucket(ctx context.Context, bucket string) error {
 	fullBucket := d.bucketName(bucket)
-	ctx := context.Background()
 	exists, err := d.client.BucketExists(ctx, fullBucket)
 	if err != nil {
 		return fmt.Errorf("storage: check bucket: %w", err)
@@ -260,9 +259,8 @@ func (d *S3Driver) CreateBucket(bucket string) error {
 }
 
 // DeleteBucket implements Driver.
-func (d *S3Driver) DeleteBucket(bucket string) error {
+func (d *S3Driver) DeleteBucket(ctx context.Context, bucket string) error {
 	fullBucket := d.bucketName(bucket)
-	ctx := context.Background()
 	if err := d.client.RemoveBucket(ctx, fullBucket); err != nil {
 		return fmt.Errorf("storage: remove bucket: %w", err)
 	}

@@ -1,9 +1,26 @@
 package realtime
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
+
+// readPayload reads a broadcastPayload from the client channel and unmarshals it.
+func readPayload(t *testing.T, ch <-chan *broadcastPayload) map[string]interface{} {
+	t.Helper()
+	select {
+	case payload := <-ch:
+		var m map[string]interface{}
+		if err := json.Unmarshal(payload.data, &m); err != nil {
+			t.Fatalf("failed to unmarshal payload: %v", err)
+		}
+		return m
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for event")
+		return nil
+	}
+}
 
 func TestHub_PublishSubscribe(t *testing.T) {
 	hub := NewHub()
@@ -31,16 +48,12 @@ func TestHub_PublishSubscribe(t *testing.T) {
 	})
 
 	// Wait for event to be delivered.
-	select {
-	case evt := <-client.events:
-		if evt.DocID != "doc-1" {
-			t.Fatalf("expected doc-1, got %s", evt.DocID)
-		}
-		if evt.Collection != "posts" {
-			t.Fatalf("expected posts, got %s", evt.Collection)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for event")
+	m := readPayload(t, client.events)
+	if m["id"] != "doc-1" {
+		t.Fatalf("expected doc-1, got %v", m["id"])
+	}
+	if m["collection"] != "posts" {
+		t.Fatalf("expected posts, got %v", m["collection"])
 	}
 
 	// Project isolation: event from different project should not reach client.
@@ -85,13 +98,9 @@ func TestHub_Filtering(t *testing.T) {
 		ProjectID:  "project-a",
 	})
 
-	select {
-	case evt := <-client.events:
-		if evt.DocID != "task-1" {
-			t.Fatalf("expected task-1, got %s", evt.DocID)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for matching event")
+	m := readPayload(t, client.events)
+	if m["id"] != "task-1" {
+		t.Fatalf("expected task-1, got %v", m["id"])
 	}
 
 	// Publish non-matching event (should be filtered out).
@@ -126,7 +135,6 @@ func TestHub_Unsubscribe(t *testing.T) {
 
 	// Unsubscribe.
 	hub.Unsubscribe(client.ID, sub.ID)
-
 	// Publish after unsubscribe.
 	hub.Publish(&Event{
 		Type:       EventInsert,
@@ -165,13 +173,9 @@ func TestHub_MultiClientProjectIsolation(t *testing.T) {
 	})
 
 	// Client A should get it.
-	select {
-	case evt := <-clientA.events:
-		if evt.DocID != "only-a" {
-			t.Fatalf("client-a expected only-a, got %s", evt.DocID)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("client-a timeout")
+	m := readPayload(t, clientA.events)
+	if m["id"] != "only-a" {
+		t.Fatalf("client-a expected only-a, got %v", m["id"])
 	}
 
 	// Client B should NOT get it.

@@ -2,9 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -96,7 +94,8 @@ func getUserID(r *http.Request) string {
 	return ""
 }
 
-// clientRequestLoggerMiddleware logs all requests (API and Auth) to the project's requests.log file.
+// clientRequestLoggerMiddleware logs all requests (API and Auth) to the
+// project's requests.log file via the async buffered logger.
 func (s *Server) clientRequestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -116,14 +115,6 @@ func (s *Server) clientRequestLoggerMiddleware(next http.Handler) http.Handler {
 		if claims != nil {
 			email = claims.Email
 		}
-
-		logFile := filepath.Join(s.config.DataDir, "projects", projectID, "requests.log")
-		_ = os.MkdirAll(filepath.Dir(logFile), 0755)
-		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return
-		}
-		defer f.Close()
 
 		logEntry := map[string]interface{}{
 			"timestamp": time.Now().Format(time.RFC3339Nano),
@@ -146,9 +137,7 @@ func (s *Server) clientRequestLoggerMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		bytes, err := json.Marshal(logEntry)
-		if err == nil {
-			_, _ = f.Write(append(bytes, '\n'))
-		}
+		logFile := filepath.Join(s.config.DataDir, "projects", projectID, "requests.log")
+		getRequestLogger().log(logFile, logEntry)
 	})
 }

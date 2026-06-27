@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"strings"
@@ -31,7 +32,7 @@ func TestS3Driver_UploadDownload(t *testing.T) {
 	bucket := "test-upload"
 	path := "data/hello.txt"
 
-	info, err := d.Upload(bucket, path, bytes.NewReader(content), "text/plain")
+	info, err := d.Upload(context.Background(), bucket, path, bytes.NewReader(content), "text/plain")
 	if err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestS3Driver_UploadDownload(t *testing.T) {
 	}
 
 	// Download and verify.
-	rc, dlInfo, err := d.Download(bucket, path)
+	rc, dlInfo, err := d.Download(context.Background(), bucket, path)
 	if err != nil {
 		t.Fatalf("Download: %v", err)
 	}
@@ -76,7 +77,7 @@ func TestS3Driver_UploadDownload(t *testing.T) {
 	}
 
 	// Cleanup.
-	if err := d.Delete(bucket, path); err != nil {
+	if err := d.Delete(context.Background(), bucket, path); err != nil {
 		t.Errorf("cleanup Delete: %v", err)
 	}
 }
@@ -85,17 +86,17 @@ func TestS3Driver_Delete(t *testing.T) {
 	d := s3TestConfig(t)
 
 	bucket, path := "test-delete", "records/entry.json"
-	_, err := d.Upload(bucket, path, bytes.NewReader([]byte("{}")), "application/json")
+	_, err := d.Upload(context.Background(), bucket, path, bytes.NewReader([]byte("{}")), "application/json")
 	if err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
 
-	if err := d.Delete(bucket, path); err != nil {
+	if err := d.Delete(context.Background(), bucket, path); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 
 	// Downloading the deleted file should error.
-	rc, _, err := d.Download(bucket, path)
+	rc, _, err := d.Download(context.Background(), bucket, path)
 	if err == nil {
 		rc.Close()
 		t.Fatal("Download of deleted file should error")
@@ -108,33 +109,33 @@ func TestS3Driver_List(t *testing.T) {
 	bucket := "test-list"
 
 	// Clean up any leftover objects from previous runs.
-	existing, err := d.List(bucket, "")
+	existing, err := d.List(context.Background(), bucket, "")
 	if err == nil {
 		for _, fi := range existing {
-			_ = d.Delete(bucket, fi.Path)
+			_ = d.Delete(context.Background(), bucket, fi.Path)
 		}
 	}
 
-	_, err = d.Upload(bucket, "2024/a.txt", bytes.NewReader([]byte("a")), "text/plain")
+	_, err = d.Upload(context.Background(), bucket, "2024/a.txt", bytes.NewReader([]byte("a")), "text/plain")
 	if err != nil {
 		t.Fatalf("Upload a: %v", err)
 	}
-	_, err = d.Upload(bucket, "2024/b.txt", bytes.NewReader([]byte("bb")), "text/plain")
+	_, err = d.Upload(context.Background(), bucket, "2024/b.txt", bytes.NewReader([]byte("bb")), "text/plain")
 	if err != nil {
 		t.Fatalf("Upload b: %v", err)
 	}
-	_, err = d.Upload(bucket, "2025/c.txt", bytes.NewReader([]byte("ccc")), "text/plain")
+	_, err = d.Upload(context.Background(), bucket, "2025/c.txt", bytes.NewReader([]byte("ccc")), "text/plain")
 	if err != nil {
 		t.Fatalf("Upload c: %v", err)
 	}
 	defer func() {
-		_ = d.Delete(bucket, "2024/a.txt")
-		_ = d.Delete(bucket, "2024/b.txt")
-		_ = d.Delete(bucket, "2025/c.txt")
+		_ = d.Delete(context.Background(), bucket, "2024/a.txt")
+		_ = d.Delete(context.Background(), bucket, "2024/b.txt")
+		_ = d.Delete(context.Background(), bucket, "2025/c.txt")
 	}()
 
 	// List all.
-	all, err := d.List(bucket, "")
+	all, err := d.List(context.Background(), bucket, "")
 	if err != nil {
 		t.Fatalf("List all: %v", err)
 	}
@@ -143,7 +144,7 @@ func TestS3Driver_List(t *testing.T) {
 	}
 
 	// List with prefix.
-	filtered, err := d.List(bucket, "2024/")
+	filtered, err := d.List(context.Background(), bucket, "2024/")
 	if err != nil {
 		t.Fatalf("List 2024/: %v", err)
 	}
@@ -152,7 +153,7 @@ func TestS3Driver_List(t *testing.T) {
 	}
 
 	// List non-existent bucket should return empty, not error.
-	empty, err := d.List("nosuchbucket", "")
+	empty, err := d.List(context.Background(), "nosuchbucket", "")
 	if err != nil {
 		t.Errorf("List non-existent bucket: %v", err)
 	}
@@ -166,22 +167,22 @@ func TestS3Driver_EmptyBucketOrPath(t *testing.T) {
 
 	r := bytes.NewReader([]byte("x"))
 
-	if _, err := d.Upload("", "path", r, "text/plain"); err == nil {
+	if _, err := d.Upload(context.Background(), "", "path", r, "text/plain"); err == nil {
 		t.Error("Upload with empty bucket should error")
 	}
-	if _, err := d.Upload("bucket", "", r, "text/plain"); err == nil {
+	if _, err := d.Upload(context.Background(), "bucket", "", r, "text/plain"); err == nil {
 		t.Error("Upload with empty path should error")
 	}
-	if _, _, err := d.Download("", "path"); err == nil {
+	if _, _, err := d.Download(context.Background(), "", "path"); err == nil {
 		t.Error("Download with empty bucket should error")
 	}
-	if _, _, err := d.Download("bucket", ""); err == nil {
+	if _, _, err := d.Download(context.Background(), "bucket", ""); err == nil {
 		t.Error("Download with empty path should error")
 	}
-	if err := d.Delete("", "path"); err == nil {
+	if err := d.Delete(context.Background(), "", "path"); err == nil {
 		t.Error("Delete with empty bucket should error")
 	}
-	if err := d.Delete("bucket", ""); err == nil {
+	if err := d.Delete(context.Background(), "bucket", ""); err == nil {
 		t.Error("Delete with empty path should error")
 	}
 }

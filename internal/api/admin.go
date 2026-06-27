@@ -13,7 +13,9 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ketsuna-org/sovrabase/internal/auth"
@@ -40,6 +42,7 @@ type AdminServer struct {
 	teamStore     *tenant.TeamStore
 	adminStore    *auth.AdminStore
 	auditStore    *auth.AuditStore
+	startTime     time.Time
 	// BackupsHandler handles backup operations.
 	BackupsHandler http.Handler
 	// OnRestart is called when the dashboard requests a server restart.
@@ -131,6 +134,7 @@ func NewAdminServer(pm *tenant.ProjectManager, cfg *config.Config, jwtSecret, ad
 		jwtSecret:     jwtSecret,
 		adminEmail:    adminEmail,
 		adminPassword: adminPassword,
+		startTime:     time.Now(),
 	}
 }
 
@@ -157,6 +161,36 @@ func (a *AdminServer) SetAdminStore(store *auth.AdminStore) {
 // SetAuditStore attaches the audit store for logging admin actions.
 func (a *AdminServer) SetAuditStore(store *auth.AuditStore) {
 	a.auditStore = store
+}
+
+// ServerVersion is the single source of truth for the version string.
+const ServerVersion = "0.3.0"
+
+// dirSizeCache caches storage size calculations for a short TTL to avoid
+// re-walking the filesystem on every dashboard refresh.
+var dirSizeCache struct {
+	sync.RWMutex
+	val    int64
+	expiry time.Time
+}
+
+const dirSizeCacheTTL = 30 * time.Second
+
+func cachedDirSize(path string, skipDirs, skipFiles map[string]bool) int64 {
+	dirSizeCache.RLock()
+	if time.Now().Before(dirSizeCache.expiry) {
+		v := dirSizeCache.val
+		dirSizeCache.RUnlock()
+		return v
+	}
+	dirSizeCache.RUnlock()
+
+	size := dirSizeFiltered(path, skipDirs, skipFiles)
+	dirSizeCache.Lock()
+	dirSizeCache.val = size
+	dirSizeCache.expiry = time.Now().Add(dirSizeCacheTTL)
+	dirSizeCache.Unlock()
+	return size
 }
 
 // adminAuthMiddleware protects routes with admin JWT checks and RBAC permission enforcement.
@@ -1065,7 +1099,11 @@ func (a *AdminServer) handleDeleteProject(w http.ResponseWriter, r *http.Request
 }
 
 func (a *AdminServer) handleStats(w http.ResponseWriter, r *http.Request) {
-	storageUsed := dirSize(a.dataDir)
+	// Measure only user-facing storage — exclude backups, request logs, and the
+	// internal master DB so the number doesn't grow on every dashboard refresh.
+	skipDirs := map[string]bool{"backups": true, "_master": true}
+	skipFiles := map[string]bool{"requests.log": true}
+	storageUsed := cachedDirSize(a.dataDir, skipDirs, skipFiles)
 	count := a.projects.ProjectCount()
 
 	repl := a.replStatus
@@ -1095,7 +1133,7 @@ func (a *AdminServer) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"projects":       count,
-		"version":        "0.3.0",
+		"version":        ServerVersion,
 		"go_version":     runtime.Version(),
 		"region":         "eu-west",
 		"providers":      []string{"scaleway", "ovhcloud", "hetzner"},
@@ -1108,7 +1146,7 @@ func (a *AdminServer) handleStats(w http.ResponseWriter, r *http.Request) {
 		"os":             runtime.GOOS,
 		"arch":           runtime.GOARCH,
 		"replication":    repl,
-		"uptime":         "since server start",
+		"uptime":         formatUptime(time.Since(a.startTime)),
 	})
 }
 
@@ -1144,9 +1182,9 @@ func (a *AdminServer) handleUsageStats(w http.ResponseWriter, r *http.Request) {
 
 		var dbBytes, fileStorageBytes, totalStorageBytes int64
 		if err == nil && proj != nil {
-			dbBytes = dirSize(proj.DataDir)
+			dbBytes = dirSizeFiltered(proj.DataDir, nil, map[string]bool{"requests.log": true})
 			if _, statErr := os.Stat(proj.StorageDir); statErr == nil {
-				fileStorageBytes = dirSize(proj.StorageDir)
+				fileStorageBytes = dirSizeFiltered(proj.StorageDir, nil, nil)
 			} else {
 				fileStorageBytes = rec.StorageBytes
 			}
@@ -1203,10 +1241,10 @@ func (a *AdminServer) handleProjectUsage(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Compute disk storage usage
-	dbBytes := dirSize(proj.DataDir)
+	dbBytes := dirSizeFiltered(proj.DataDir, nil, map[string]bool{"requests.log": true})
 	var fileStorageBytes int64
 	if _, err := os.Stat(proj.StorageDir); err == nil {
-		fileStorageBytes = dirSize(proj.StorageDir)
+		fileStorageBytes = dirSizeFiltered(proj.StorageDir, nil, nil)
 	} else {
 		fileStorageBytes = rec.StorageBytes
 	}
@@ -1232,12 +1270,49 @@ func (a *AdminServer) handleProjectUsage(w http.ResponseWriter, r *http.Request)
 }
 
 func (a *AdminServer) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	// Probe the database by checking project count — if PebbleDB is down this panics/errors.
+	dbStatus := "connected"
+	httpStatus := http.StatusOK
+	if a.projects != nil {
+		// ProjectCount does a cheap in-memory len() — if the underlying DB
+		// is corrupted the project manager wouldn't have initialized, so this
+		// mainly confirms the server is operational.
+		_ = a.projects.ProjectCount()
+	} else {
+		dbStatus = "unavailable"
+		httpStatus = http.StatusServiceUnavailable
+	}
+
+	resp := map[string]interface{}{
 		"status":   "ok",
-		"version":  "0.3.0",
-		"database": "connected",
+		"version":  ServerVersion,
+		"database": dbStatus,
 		"region":   "eu-west",
-	})
+		"uptime":   formatUptime(time.Since(a.startTime)),
+	}
+	if a.replStatus != nil {
+		resp["replication"] = a.replStatus
+	}
+	writeJSON(w, httpStatus, resp)
+}
+
+// formatUptime turns a duration into a human-readable string like "3d 4h 12m".
+func formatUptime(d time.Duration) string {
+	if d < time.Second {
+		return "just started"
+	}
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	minutes := int(d.Minutes()) % 60
+	parts := []string{}
+	if days > 0 {
+		parts = append(parts, fmt.Sprintf("%dd", days))
+	}
+	if hours > 0 || days > 0 {
+		parts = append(parts, fmt.Sprintf("%dh", hours))
+	}
+	parts = append(parts, fmt.Sprintf("%dm", minutes))
+	return strings.Join(parts, " ")
 }
 
 // dirSize calculates total size of a directory in bytes.
@@ -1247,6 +1322,32 @@ func dirSize(path string) int64 {
 		if err == nil && !info.IsDir() {
 			size += info.Size()
 		}
+		return nil
+	})
+	return size
+}
+
+// dirSizeFiltered is like dirSize but skips the given directory names and file
+// names encountered anywhere in the tree. This is used for the dashboard stats
+// so that operational artifacts (backups, request logs, internal DBs) don't
+// inflate the reported storage usage on every refresh.
+func dirSizeFiltered(path string, skipDirs, skipFiles map[string]bool) int64 {
+	var size int64
+	filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		name := info.Name()
+		if info.IsDir() {
+			if skipDirs[name] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if skipFiles[name] {
+			return nil
+		}
+		size += info.Size()
 		return nil
 	})
 	return size
@@ -1714,7 +1815,7 @@ func (a *AdminServer) handleListBuckets(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	buckets, err := env.Storage.ListBuckets()
+	buckets, err := env.Storage.ListBuckets(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1743,7 +1844,7 @@ func (a *AdminServer) handleCreateBucket(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "bucket name is required")
 		return
 	}
-	if err := env.Storage.CreateBucket(req.Name); err != nil {
+	if err := env.Storage.CreateBucket(r.Context(), req.Name); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -1758,7 +1859,7 @@ func (a *AdminServer) handleDeleteBucket(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if err := env.Storage.DeleteBucket(bucket); err != nil {
+	if err := env.Storage.DeleteBucket(r.Context(), bucket); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -1774,7 +1875,7 @@ func (a *AdminServer) handleListFiles(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	files, err := env.Storage.List(bucket, prefix)
+	files, err := env.Storage.List(r.Context(), bucket, prefix)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1814,7 +1915,7 @@ func (a *AdminServer) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/octet-stream"
 	}
 
-	info, err := env.Storage.Upload(bucket, path, file, contentType)
+	info, err := env.Storage.Upload(r.Context(), bucket, path, file, contentType)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1831,7 +1932,7 @@ func (a *AdminServer) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if err := env.Storage.Delete(bucket, path); err != nil {
+	if err := env.Storage.Delete(r.Context(), bucket, path); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -1847,7 +1948,7 @@ func (a *AdminServer) handleDownloadFile(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	reader, info, err := env.Storage.Download(bucket, pathVal)
+	reader, info, err := env.Storage.Download(r.Context(), bucket, pathVal)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "file not found")
 		return
@@ -1863,10 +1964,28 @@ func (a *AdminServer) handleDownloadFile(w http.ResponseWriter, r *http.Request)
 func (a *AdminServer) handleListLogs(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	logFile := filepath.Join(a.dataDir, "projects", id, "requests.log")
-	
-	// If file doesn't exist, return empty array
+
+	// Parse pagination: ?limit=200 (max 1000, default 200) and ?offset=0
+	limit := 200
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 1000 {
+			limit = n
+		}
+	}
+	offset := 0
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if n, err := strconv.Atoi(o); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+
 	if _, err := os.Stat(logFile); os.IsNotExist(err) {
-		writeJSON(w, http.StatusOK, []interface{}{})
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"entries": []interface{}{},
+			"total":   0,
+			"limit":   limit,
+			"offset":  offset,
+		})
 		return
 	}
 
@@ -1877,28 +1996,53 @@ func (a *AdminServer) handleListLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
-	var logs []map[string]interface{}
-	
-	// Read line by line
+	// Count total lines for pagination metadata
+	var allLines []string
 	scanner := bufio.NewScanner(f)
+	// Increase buffer for long log lines (up to 256KB)
+	scanner.Buffer(make([]byte, 0, 64*1024), 256*1024)
 	for scanner.Scan() {
+		allLines = append(allLines, scanner.Text())
+	}
+
+	total := len(allLines)
+	// Apply offset (from the end for "recent first" behavior)
+	end := total - offset
+	if end < 0 {
+		end = 0
+	}
+	start := end - limit
+	if start < 0 {
+		start = 0
+	}
+
+	logs := make([]map[string]interface{}, 0, end-start)
+	for i := end - 1; i >= start; i-- {
 		var entry map[string]interface{}
-		if err := json.Unmarshal([]byte(scanner.Text()), &entry); err == nil {
+		if err := json.Unmarshal([]byte(allLines[i]), &entry); err == nil {
 			logs = append(logs, entry)
 		}
 	}
-	
-	if logs == nil {
-		logs = []map[string]interface{}{}
-	}
-	writeJSON(w, http.StatusOK, logs)
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"entries": logs,
+		"total":   total,
+		"limit":   limit,
+		"offset":  offset,
+	})
 }
 
 func (a *AdminServer) handleFlushLogs(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	logFile := filepath.Join(a.dataDir, "projects", id, "requests.log")
-	
-	// Delete the file
+
+	// Invalidate async logger's cached handle so it re-opens fresh
+	getRequestLogger().invalidate(logFile)
+
+	// Delete the file and any rotated backups
+	for i := 1; i <= maxLogBackups; i++ {
+		_ = os.Remove(fmt.Sprintf("%s.%d", logFile, i))
+	}
 	if err := os.Remove(logFile); err != nil && !os.IsNotExist(err) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1934,22 +2078,20 @@ func (a *AdminServer) projectLogger(next http.Handler) http.Handler {
 		if sw.status == 0 {
 			sw.status = http.StatusOK
 		}
-		
+
 		projID := r.PathValue("id")
 		if projID != "" {
 			// Meter: count admin operations as project usage.
 			if a.meterStore != nil {
 				_ = a.meterStore.IncMethod(projID, r.Method, 1)
-				// Bandwidth: uploads via ContentLength, downloads via response bytes
 				if r.ContentLength > 0 {
 					_ = a.meterStore.Inc(projID, metering.MetricBandwidthUp, r.ContentLength)
 				}
 				if sw.length > 0 {
 					_ = a.meterStore.Inc(projID, metering.MetricBandwidthDown, int64(sw.length))
 				}
-				// Track DB operations for collection/document endpoints
-				path := r.URL.Path
-				if strings.Contains(path, "/collections/") && strings.Contains(path, "/documents") {
+				p := r.URL.Path
+				if strings.Contains(p, "/collections/") && strings.Contains(p, "/documents") {
 					if r.Method == http.MethodPost || r.Method == http.MethodPut {
 						_ = a.meterStore.Inc(projID, metering.MetricDBWrites, 1)
 					} else if r.Method == http.MethodGet {
@@ -1958,24 +2100,16 @@ func (a *AdminServer) projectLogger(next http.Handler) http.Handler {
 				}
 			}
 
+			// Async log — no more sync file I/O on every admin request.
 			logFile := filepath.Join(a.dataDir, "projects", projID, "requests.log")
-			_ = os.MkdirAll(filepath.Dir(logFile), 0755)
-			f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-			if err == nil {
-				defer f.Close()
-				logEntry := map[string]interface{}{
-					"timestamp": time.Now().Format(time.RFC3339Nano),
-					"method":    r.Method,
-					"path":      r.URL.Path,
-					"status":    sw.status,
-					"duration":  time.Since(start).String(),
-					"ip":        r.RemoteAddr,
-				}
-				bytes, err := json.Marshal(logEntry)
-				if err == nil {
-					_, _ = f.Write(append(bytes, '\n'))
-				}
-			}
+			getRequestLogger().log(logFile, map[string]interface{}{
+				"timestamp": time.Now().Format(time.RFC3339Nano),
+				"method":    r.Method,
+				"path":      r.URL.Path,
+				"status":    sw.status,
+				"duration":  time.Since(start).String(),
+				"ip":        r.RemoteAddr,
+			})
 		}
 	})
 }

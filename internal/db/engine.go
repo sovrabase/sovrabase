@@ -29,12 +29,36 @@ type Engine struct {
 
 // NewEngine opens (or creates) a Pebble database at the given directory.
 func NewEngine(dataDir string) (*Engine, error) {
-	opts := &pebble.Options{}
+	opts := tunedPebbleOptions()
 	db, err := pebble.Open(dataDir, opts)
 	if err != nil {
 		return nil, fmt.Errorf("db: open pebble: %w", err)
 	}
 	return &Engine{db: db}, nil
+}
+
+// tunedPebbleOptions returns PebbleDB options tuned for a BaaS workload:
+// larger block cache, bigger memtables (less compaction), and periodic
+// background sync instead of fsync on every write.
+func tunedPebbleOptions() *pebble.Options {
+	opts := &pebble.Options{
+		// 64MB block cache — keeps hot data in RAM, avoids repeated decompression.
+		Cache: pebble.NewCache(64 << 20),
+		// Larger memtables (default 4MB) reduce write amplification.
+		MemTableSize: 32 << 20,
+		// Sync periodically instead of every write — big throughput win.
+		BytesPerSync: 1 << 20,
+		// More concurrent compactions for faster cleanup.
+		MaxConcurrentCompactions: func() int { return 4 },
+	}
+	opts.Experimental.EnableValueBlocks = func() bool { return true }
+	opts.Levels = make([]pebble.LevelOptions, 7)
+	for i := range opts.Levels {
+		opts.Levels[i].BlockSize = 32 << 10     // 32KB blocks
+		opts.Levels[i].TargetFileSize = 64 << 20 // 64MB SST files
+	}
+	opts.EnsureDefaults()
+	return opts
 }
 
 // NewMemEngine creates an Engine in a temporary directory, intended for tests.

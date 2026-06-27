@@ -1,8 +1,9 @@
 package realtime
 
 import (
-	"fmt"
+	"encoding/json"
 	"log/slog"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -37,13 +38,18 @@ type Subscription struct {
 	cancel       func()
 }
 
+// broadcastPayload is a pre-marshaled event sent through the client channel.
+type broadcastPayload struct {
+	data []byte
+}
+
 // Client represents a single WebSocket connection.
 type Client struct {
 	ID            string
 	ProjectID     string
 	subscriptions map[string]*Subscription
 	mu            sync.Mutex
-	events        chan *Event
+	events        chan *broadcastPayload
 	closed        bool
 }
 
@@ -52,7 +58,7 @@ func newClient(id, projectID string) *Client {
 		ID:            id,
 		ProjectID:     projectID,
 		subscriptions: make(map[string]*Subscription),
-		events:        make(chan *Event, 256),
+		events:        make(chan *broadcastPayload, 256),
 	}
 }
 
@@ -107,6 +113,7 @@ func (h *Hub) Register(client *Client) {
 }
 
 // Unregister removes a client and its subscriptions.
+// Closes the client's event channel so writeLoop exits cleanly.
 func (h *Hub) Unregister(clientID string) {
 	h.mu.Lock()
 	client, exists := h.clients[clientID]
@@ -118,6 +125,7 @@ func (h *Hub) Unregister(clientID string) {
 	if exists {
 		client.mu.Lock()
 		client.closed = true
+		close(client.events)
 		client.mu.Unlock()
 		h.logger.Info("realtime client unregistered", "client_id", clientID)
 	}
@@ -176,7 +184,18 @@ func (h *Hub) Publish(event *Event) {
 }
 
 // broadcast dispatches an event to all matching client subscriptions.
+// Pre-marshals the event to JSON once instead of per-client.
 func (h *Hub) broadcast(event *Event) {
+	// Pre-marshal once — avoids N redundant JSON encodes.
+	data, _ := json.Marshal(map[string]interface{}{
+		"type":       "event",
+		"event_type": event.Type,
+		"collection": event.Collection,
+		"id":         event.DocID,
+		"data":       event.Data,
+		"timestamp":  event.Timestamp,
+	})
+
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
@@ -186,6 +205,11 @@ func (h *Hub) broadcast(event *Event) {
 		}
 
 		client.mu.Lock()
+		if client.closed {
+			client.mu.Unlock()
+			continue
+		}
+		matched := false
 		for _, sub := range client.subscriptions {
 			if sub.Collection != event.Collection {
 				continue
@@ -193,11 +217,13 @@ func (h *Hub) broadcast(event *Event) {
 			if sub.Filter != nil && !eventMatchesFilter(event, sub.Filter) {
 				continue
 			}
-			// Send to client's event channel (non-blocking).
+			matched = true
+			break
+		}
+		if matched {
 			select {
-			case client.events <- event:
+			case client.events <- &broadcastPayload{data: data}:
 			default:
-				// Client channel full, skip.
 			}
 		}
 		client.mu.Unlock()
@@ -214,7 +240,7 @@ func eventMatchesFilter(event *Event, filter map[string]interface{}) bool {
 		if !ok {
 			return false
 		}
-		if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) {
+		if !reflect.DeepEqual(got, want) {
 			return false
 		}
 	}

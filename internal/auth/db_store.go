@@ -12,10 +12,15 @@ type DBUserStore struct {
 	engine *db.Engine
 }
 
-// NewDBUserStore creates a new DBUserStore and ensures the _users collection exists.
+// NewDBUserStore creates a new DBUserStore and ensures the _users collection
+// and essential indexes exist. Indexes allow O(log n) lookups by email,
+// verification token, and reset token instead of full-collection scans.
 func NewDBUserStore(engine *db.Engine) *DBUserStore {
-	// Ensure collection exists; ignore already exists errors.
 	_ = engine.CreateCollection("_users")
+	// Create indexes for hot lookup paths. Ignore errors if they already exist.
+	_ = engine.CreateIndex("_users", "email", db.IndexUnique)
+	_ = engine.CreateIndex("_users", "verification_token", db.IndexSimple)
+	_ = engine.CreateIndex("_users", "reset_token", db.IndexSimple)
 	return &DBUserStore{engine: engine}
 }
 
@@ -84,11 +89,6 @@ func (s *DBUserStore) GetByResetToken(token string) (*User, error) {
 
 // Update persists changes to an existing user.
 func (s *DBUserStore) Update(user *User) error {
-	// Check that the user exists first
-	if _, err := s.GetByID(user.ID); err != nil {
-		return err
-	}
-
 	doc := userToMap(user)
 	if err := s.engine.Update("_users", user.ID, doc); err != nil {
 		return fmt.Errorf("auth: update user: %w", err)
@@ -98,11 +98,6 @@ func (s *DBUserStore) Update(user *User) error {
 
 // Delete removes a user by ID.
 func (s *DBUserStore) Delete(id string) error {
-	// Check that the user exists first
-	if _, err := s.GetByID(id); err != nil {
-		return err
-	}
-
 	if err := s.engine.Delete("_users", id); err != nil {
 		return fmt.Errorf("auth: delete user: %w", err)
 	}

@@ -54,9 +54,13 @@ func metaPathFor(diskPath string) string {
 	return diskPath + metadataSuffix
 }
 
+// maxListMetadata caps the number of metadata entries loaded in a single List
+// call. Prevents OOM on buckets with millions of files.
+const maxListMetadata = 10000
+
 // listMetadata walks the given directory and collects FileInfo for
-// every metadata file found.
-func listMetadata(dir string) ([]FileInfo, error) {
+// every metadata file found. Stops after maxEntries to prevent OOM.
+func listMetadata(dir string, maxEntries int) ([]FileInfo, error) {
 	var results []FileInfo
 
 	err := filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
@@ -69,9 +73,11 @@ func listMetadata(dir string) ([]FileInfo, error) {
 		if filepath.Ext(path) != ".json" {
 			return nil
 		}
-		// Only pick up files ending in .meta.json
 		if filepath.Ext(path[:len(path)-5]) != ".meta" {
 			return nil
+		}
+		if len(results) >= maxEntries {
+			return filepath.SkipAll
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -79,8 +85,6 @@ func listMetadata(dir string) ([]FileInfo, error) {
 		}
 		var info FileInfo
 		if err := json.Unmarshal(data, &info); err != nil {
-			// Skip files that aren't valid metadata (e.g. .json files
-			// that happen to be stored in buckets).
 			return nil
 		}
 		results = append(results, info)
