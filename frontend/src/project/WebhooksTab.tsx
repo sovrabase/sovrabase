@@ -82,7 +82,7 @@ export default function WebhooksTab({ projectId }: Props) {
                 <tr key={w.id} className="hover:bg-bg-input/50 transition-colors">
                   <td className="px-4 py-3 font-medium text-text-primary">{w.name}</td>
                   <td className="px-4 py-3 text-text-secondary font-mono text-xs" title={w.url}>{truncateUrl(w.url)}</td>
-                  <td className="px-4 py-3"><div className="flex gap-1 flex-wrap">{w.events.map((ev, i) => (<span key={i} className="inline-flex px-2 py-0.5 bg-accent/10 text-accent rounded-full text-xs font-mono">{ev}</span>))}</div></td>
+                  <td className="px-4 py-3"><div className="flex gap-1 flex-wrap">{w.events?.map((ev, i) => (<span key={i} className="inline-flex px-2 py-0.5 bg-accent/10 text-accent rounded-full text-xs font-mono">{ev}</span>))}</div></td>
                   <td className="px-4 py-3">{w.enabled ? (<span className="inline-flex items-center gap-1 text-xs text-success"><ToggleRight className="w-4 h-4" /> Active</span>) : (<span className="inline-flex items-center gap-1 text-xs text-text-muted"><ToggleLeft className="w-4 h-4" /> Disabled</span>)}</td>
                   <td className="px-4 py-3 text-text-secondary text-xs">{formatDate(w.created_at)}</td>
                 </tr>
