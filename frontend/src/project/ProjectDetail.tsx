@@ -92,7 +92,7 @@ export default function ProjectDetail() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button onClick={() => navigate(-1)} className="p-2 rounded-md hover:bg-bg-input border border-transparent hover:border-border transition-colors text-text-secondary hover:text-text-primary" title="Back">
