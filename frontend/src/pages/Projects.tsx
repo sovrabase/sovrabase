@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Plus, Trash2, Copy, Key, Loader2, AlertTriangle,
+  Plus, Trash2, Copy, Loader2, AlertTriangle,
   Users, FolderKanban, Eye, EyeOff,
 } from 'lucide-react';
 import { useProjects } from '../store';

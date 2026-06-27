@@ -139,7 +139,7 @@ export default function ConfigTab({ projectId }: Props) {
       )}
 
       {/* Add Modal */}
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Config Entry">
+      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add Config Entry">
         <form onSubmit={handleAdd} className="space-y-4">
           <div>
             <label className="block text-sm text-text-secondary mb-1">Key</label>
@@ -173,12 +173,11 @@ export default function ConfigTab({ projectId }: Props) {
       </Modal>
 
       <ConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
+        isOpen={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Delete Config Entry"
         message={`Delete config key "${deleteTarget}"? This cannot be undone.`}
-        loading={submitting}
       />
     </div>
   );

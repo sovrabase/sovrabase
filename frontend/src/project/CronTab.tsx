@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, ToggleLeft, ToggleRight, Plus, Loader2, X } from 'lucide-react';
+import { Clock, ToggleLeft, ToggleRight, Plus, Loader2 } from 'lucide-react';
 import { api, formatDate } from '../api';
 import type { CronJob } from '../types';
 import Modal from '../components/Modal';

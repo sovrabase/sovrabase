@@ -5,7 +5,7 @@ import { TabBar } from '../components/TabBar';
 
 interface Props {
   projectId: string;
-  apiKey: string;
+  apiKey?: string;
 }
 
 type SnippetLang = 'curl' | 'dart' | 'javascript';

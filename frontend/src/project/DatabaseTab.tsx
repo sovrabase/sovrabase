@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Search, Upload, Database, FileText, Shield, Loader2, Check } from 'lucide-react';
+import { Plus, Trash2, Search, Upload, Database, FileText, Loader2, Check } from 'lucide-react';
 import { api } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import type { DatabaseDocument } from '../types';
 
 interface CollectionInfo { name: string; doc_count?: number; schema_columns?: string[]; indexes?: string[]; }
-interface DbAnalysis { collections: CollectionInfo[]; }
 interface RlsRules { get: string; list: string; create: string; update: string; delete: string; enabled: boolean; }
 interface Props { projectId: string; }
 
@@ -33,7 +32,11 @@ export default function DatabaseTab({ projectId }: Props) {
 
   useEffect(() => {
     setLoadingCols(true);
-    api<DbAnalysis>(`/admin/projects/${encodeURIComponent(projectId)}/db-analysis`).then((d) => setCollections(d.collections || [])).catch(() => {}).finally(() => setLoadingCols(false));
+    api<{ collections: Record<string, { doc_count?: number; schema_columns?: string[]; indexes?: string[] }> }>(`/admin/projects/${encodeURIComponent(projectId)}/db-analysis`)
+      .then((d) => {
+        const cols = d.collections || {};
+        setCollections(Object.entries(cols).map(([name, info]) => ({ name, ...info })));
+      }).catch(() => {}).finally(() => setLoadingCols(false));
   }, [projectId]);
 
   const loadDocs = useCallback(async (colName: string) => {
@@ -58,8 +61,9 @@ export default function DatabaseTab({ projectId }: Props) {
       await api(`/admin/projects/${encodeURIComponent(projectId)}/collections`, { method: 'POST', body: JSON.stringify({ name: newColName.trim() }) });
       showToast(`Collection "${newColName.trim()}" created`, 'success');
       setShowNewCol(false); setNewColName('');
-      const d = await api<DbAnalysis>(`/admin/projects/${encodeURIComponent(projectId)}/db-analysis`);
-      setCollections(d.collections || []);
+      const d = await api<{ collections: Record<string, { doc_count?: number }> }>(`/admin/projects/${encodeURIComponent(projectId)}/db-analysis`);
+      const cols = d.collections || {};
+      setCollections(Object.entries(cols).map(([name, info]) => ({ name, ...info })));
     } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
     setCreatingCol(false);
   };

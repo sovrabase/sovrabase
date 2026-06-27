@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Shield, Users, Cloud, Mail, GitBranch, ScrollText, Database, Loader2, Check, Plus, RefreshCw, Save, Zap } from 'lucide-react';
+import { Shield, Users, Cloud, Mail, GitBranch, ScrollText, Database, Loader2, Plus, RefreshCw, Save, Zap } from 'lucide-react';
 import { api, formatBytes, formatDate } from '../api';
 import { useToast } from '../components/Toast';
 import Modal from '../components/Modal';

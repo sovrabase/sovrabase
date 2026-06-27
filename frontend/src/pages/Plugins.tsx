@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Loader2, Puzzle, Zap, Route } from 'lucide-react';
 import { usePlugins } from '../store';
-import type { HookInfo, RouteInfo } from '../types';
 
 const hookColors: Record<string, string> = {
   record: 'bg-[#5b5bff]/15 text-[#5b5bff]',

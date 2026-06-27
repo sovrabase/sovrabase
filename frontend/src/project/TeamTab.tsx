@@ -139,7 +139,7 @@ export default function TeamTab({ projectId }: Props) {
       )}
 
       {/* Invite Modal */}
-      <Modal open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite Team Member">
+      <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite Team Member">
         <form onSubmit={handleInvite} className="space-y-4">
           <div>
             <label className="block text-sm text-text-secondary mb-1">Email</label>
@@ -161,12 +161,11 @@ export default function TeamTab({ projectId }: Props) {
       </Modal>
 
       <ConfirmDialog
-        open={!!removeTarget}
-        onClose={() => setRemoveTarget(null)}
+        isOpen={!!removeTarget}
+        onCancel={() => setRemoveTarget(null)}
         onConfirm={removeMember}
-        title="Remove Member"
-        message="Are you sure you want to remove this team member? This action cannot be undone."
-        loading={submitting}
+        title="Remove Team Member"
+        message="Are you sure? This cannot be undone."
       />
     </div>
   );

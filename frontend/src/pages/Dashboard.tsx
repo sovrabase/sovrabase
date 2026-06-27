@@ -5,12 +5,7 @@ import { useDashboard } from '../store';
 import { formatBytes } from '../api';
 import { StatCard } from '../components/StatCard';
 
-const regionFlags: Record<string, string> = {
-  'us-east-1': '\u{1F1FA}\u{1F1F8}', 'us-west-1': '\u{1F1FA}\u{1F1F8}',
-  'eu-west-1': '\u{1F1EA}\u{1F1FA}', 'eu-central-1': '\u{1F1EA}\u{1F1FA}',
-  'ap-southeast-1': '\u{1F1F8}\u{1F1EC}', 'ap-northeast-1': '\u{1F1EF}\u{1F1F5}',
-  'sa-east-1': '\u{1F1E7}\u{1F1F7}',
-};
+// regionFlags removed (unused)
 
 type QuickTab = 'create' | 'flutter' | 'rest';
 
