@@ -40,15 +40,13 @@ export default function DatabaseTab({ projectId }: Props) {
   const loadDocs = useCallback(async (colName: string) => {
     setLoadingDocs(true);
     try {
-      const headers: Record<string, string> = {};
-      const key = localStorage.getItem('sovrabase_admin_token');
-      if (key) headers['X-Project-Key'] = key;
-      const res = await fetch(`/api/v1/collections/${encodeURIComponent(colName)}/query`, { headers });
-      const json = await res.json();
-      setDocs(json.documents || json.data || []);
+      const data = await api<{ documents: DatabaseDocument[] }>(
+        `/admin/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(colName)}/documents`
+      );
+      setDocs(data.documents || []);
     } catch { setDocs([]); }
     setLoadingDocs(false);
-  }, []);
+  }, [projectId]);
 
   const selectCol = (name: string) => { setSelectedCol(name); setSelectedDoc(null); setDocFilter(''); loadDocs(name); };
 

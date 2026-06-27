@@ -24,12 +24,12 @@ export default function StorageTab({ projectId }: Props) {
 
   useEffect(() => {
     setLoadingBuckets(true);
-    api<{ buckets: BucketInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/buckets`).then((d) => setBuckets(d.buckets || [])).catch(() => {}).finally(() => setLoadingBuckets(false));
+    api<{ buckets: BucketInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`).then((d) => setBuckets(d.buckets || [])).catch(() => {}).finally(() => setLoadingBuckets(false));
   }, [projectId]);
 
   const loadFiles = useCallback(async (bucketName: string) => {
     setLoadingFiles(true);
-    try { const d = await api<{ files: StorageFile[] }>(`/admin/projects/${encodeURIComponent(projectId)}/buckets/${encodeURIComponent(bucketName)}/files`); setFiles(d.files || []); } catch { setFiles([]); }
+    try { const d = await api<{ files: StorageFile[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets/${encodeURIComponent(bucketName)}/files`); setFiles(d.files || []); } catch { setFiles([]); }
     setLoadingFiles(false);
   }, [projectId]);
 
@@ -39,10 +39,10 @@ export default function StorageTab({ projectId }: Props) {
     if (!newBucketName.trim()) return;
     setCreatingBucket(true);
     try {
-      await api(`/admin/projects/${encodeURIComponent(projectId)}/buckets`, { method: 'POST', body: JSON.stringify({ name: newBucketName.trim() }) });
+      await api(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`, { method: 'POST', body: JSON.stringify({ name: newBucketName.trim() }) });
       showToast(`Bucket "${newBucketName.trim()}" created`, 'success');
       setShowNewBucket(false); setNewBucketName('');
-      const d = await api<{ buckets: BucketInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/buckets`);
+      const d = await api<{ buckets: BucketInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`);
       setBuckets(d.buckets || []);
     } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
     setCreatingBucket(false);
@@ -50,7 +50,7 @@ export default function StorageTab({ projectId }: Props) {
 
   const deleteBucket = async (name: string) => {
     if (!confirm(`Delete bucket "${name}" and all files?`)) return;
-    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/buckets/${encodeURIComponent(name)}`, { method: 'DELETE' }); showToast(`Bucket "${name}" deleted`, 'success'); setSelectedBucket(null); setFiles([]); setBuckets((p) => p.filter((b) => b.name !== name)); } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
+    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets/${encodeURIComponent(name)}`, { method: 'DELETE' }); showToast(`Bucket "${name}" deleted`, 'success'); setSelectedBucket(null); setFiles([]); setBuckets((p) => p.filter((b) => b.name !== name)); } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,7 +61,7 @@ export default function StorageTab({ projectId }: Props) {
       const token = localStorage.getItem('sovrabase_admin_token');
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`/admin/projects/${encodeURIComponent(projectId)}/buckets/${encodeURIComponent(selectedBucket)}/files`, { method: 'POST', headers, body: form });
+      const res = await fetch(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets/${encodeURIComponent(selectedBucket)}/files`, { method: 'POST', headers, body: form });
       if (!res.ok) throw new Error(await res.text());
       showToast(`File "${file.name}" uploaded`, 'success');
       loadFiles(selectedBucket);
@@ -71,7 +71,7 @@ export default function StorageTab({ projectId }: Props) {
 
   const deleteFile = async (filePath: string) => {
     if (!confirm('Delete this file?') || !selectedBucket) return;
-    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/buckets/${encodeURIComponent(selectedBucket)}/files/${encodeURIComponent(filePath)}`, { method: 'DELETE' }); showToast('File deleted', 'success'); setFiles((p) => p.filter((f) => f.path !== filePath)); } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
+    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets/${encodeURIComponent(selectedBucket)}/files/${encodeURIComponent(filePath)}`, { method: 'DELETE' }); showToast('File deleted', 'success'); setFiles((p) => p.filter((f) => f.path !== filePath)); } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
   };
 
   const preview = async (file: StorageFile) => {

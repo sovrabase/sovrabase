@@ -84,7 +84,7 @@ export default function LogsTab({ projectId }: Props) {
     );
   }
 
-  const m = data.metrics;
+  const m = data.metrics || {} as LogMetrics;
 
   return (
     <div className="space-y-6">
