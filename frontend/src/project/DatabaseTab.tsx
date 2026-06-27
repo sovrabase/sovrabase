@@ -32,8 +32,10 @@ export default function DatabaseTab({ projectId }: Props) {
 
   useEffect(() => {
     setLoadingCols(true);
-    api<{ collections: CollectionInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/collections`)
-      .then((d) => setCollections(d.collections || []))
+    api<{ collections: (string | CollectionInfo)[] }>(`/admin/projects/${encodeURIComponent(projectId)}/collections`)
+      .then((d) => setCollections((d.collections || []).map((c) =>
+        typeof c === 'string' ? { name: c } : c
+      )))
       .catch(() => {}).finally(() => setLoadingCols(false));
   }, [projectId]);
 
@@ -57,8 +59,8 @@ export default function DatabaseTab({ projectId }: Props) {
       await api(`/admin/projects/${encodeURIComponent(projectId)}/collections`, { method: 'POST', body: JSON.stringify({ name: newColName.trim() }) });
       showToast(`Collection "${newColName.trim()}" created`, 'success');
       setShowNewCol(false); setNewColName('');
-      const d = await api<{ collections: CollectionInfo[] }>(`/admin/projects/${encodeURIComponent(projectId)}/collections`);
-      setCollections(d.collections || []);
+      const d = await api<{ collections: (string | CollectionInfo)[] }>(`/admin/projects/${encodeURIComponent(projectId)}/collections`);
+      setCollections((d.collections || []).map((c) => typeof c === 'string' ? { name: c } : c));
     } catch (e: unknown) { showToast((e as Error).message || 'Failed', 'error'); }
     setCreatingCol(false);
   };
