@@ -47,17 +47,17 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <StatCard
-          icon={FolderKanban}
+          icon={<FolderKanban className="w-5 h-5" />}
           label="Projects"
           value={stats?.projects ?? '—'}
         />
         <StatCard
-          icon={HardDrive}
+          icon={<HardDrive className="w-5 h-5" />}
           label="Storage Used"
           value={stats?.storage_bytes != null ? formatBytes(stats.storage_bytes) : '—'}
         />
         <StatCard
-          icon={Globe}
+          icon={<Globe className="w-5 h-5" />}
           label="Region"
           value={stats?.region ?? '—'}
           subtitle={stats?.version ? `v${stats.version}` : undefined}
