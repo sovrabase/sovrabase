@@ -18,11 +18,21 @@ import ApiTab from './ApiTab';
 import LogsTab from './LogsTab';
 
 const TABS = [
-  'Overview', 'Team', 'Database', 'Auth', 'Storage',
-  'Config', 'Cron', 'Webhooks', 'Queues', 'Analytics', 'API', 'Logs',
-] as const;
+  { id: 'Overview', label: 'Overview' },
+  { id: 'Team', label: 'Team' },
+  { id: 'Database', label: 'Database' },
+  { id: 'Auth', label: 'Auth' },
+  { id: 'Storage', label: 'Storage' },
+  { id: 'Config', label: 'Config' },
+  { id: 'Cron', label: 'Cron' },
+  { id: 'Webhooks', label: 'Webhooks' },
+  { id: 'Queues', label: 'Queues' },
+  { id: 'Analytics', label: 'Analytics' },
+  { id: 'API', label: 'API' },
+  { id: 'Logs', label: 'Logs' },
+];
 
-type Tab = (typeof TABS)[number];
+type Tab = typeof TABS[number]['id'];
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -96,7 +106,7 @@ export default function ProjectDetail() {
 
       {/* Tab Bar */}
       <div className="mb-6">
-        <TabBar tabs={[...TABS]} active={activeTab} onChange={(t) => setActiveTab(t as Tab)} />
+        <TabBar tabs={TABS} activeTab={activeTab} onClick={(t: string) => setActiveTab(t as Tab)} />
       </div>
 
       {/* Tab Content */}
