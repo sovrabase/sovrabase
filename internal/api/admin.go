@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/db"
@@ -59,6 +60,8 @@ var adminPermissionMap = []struct {
 }{
 	// super_admin only routes
 	{"/admin/admins", []string{"POST", "DELETE", "PUT"}, auth.AdminRoleSuper},
+	// Global member management (super_admin only)
+	{"/admin/members", []string{"GET", "DELETE"}, auth.AdminRoleSuper},
 	// Admin CRUD read — all authenticated admins
 	{"/admin/admins", []string{"GET"}, auth.AdminRoleSupport},
 	// Audit logs — all authenticated admins
@@ -232,8 +235,16 @@ func (a *AdminServer) adminAuthMiddleware(next http.Handler) http.Handler {
 		return
 	}
 
-	// For member tokens, skip AdminStore / RBAC checks.
+	// For member tokens, verify the member still has valid credentials.
 	if claims.Role == "member" {
+		if a.teamStore != nil {
+			// Try to get credential — if deleted, the member no longer exists
+			storedID, _, err := a.teamStore.GetMemberCredential(claims.Email)
+			if err != nil || storedID != claims.UserID {
+				writeError(w, http.StatusUnauthorized, "account has been removed — please log in again")
+				return
+			}
+		}
 		ctx := context.WithValue(r.Context(), claimsKey, claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 		return
@@ -288,7 +299,11 @@ func (a *AdminServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 				writeError(w, http.StatusInternalServerError, "failed to generate token")
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]string{"token": token, "role": "admin"})
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"token":   token,
+				"role":    string(adminUser.Role),
+				"user_id": adminUser.ID,
+			})
 			return
 		}
 	} else {
@@ -300,7 +315,11 @@ func (a *AdminServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 				writeError(w, http.StatusInternalServerError, "failed to generate token")
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]string{"token": token, "role": "admin"})
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"token":   token,
+				"role":    string(adminUser.Role),
+				"user_id": adminUser.ID,
+			})
 			return
 		}
 	}
@@ -334,7 +353,11 @@ func (a *AdminServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 				writeError(w, http.StatusInternalServerError, "failed to generate token")
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]string{"token": signed, "role": "member"})
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"token":   signed,
+				"role":    "member",
+				"user_id": memberUserID,
+			})
 			return
 		}
 		// Fallback: try authenticating directly against all projects.
@@ -495,6 +518,13 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /admin/invitations/{token}", http.HandlerFunc(a.handleGetInvitation))               // public — no auth required
 	mux.Handle("POST /admin/invitations/{token}/accept", http.HandlerFunc(a.handleAcceptInvitation))     // auth in handler
 	mux.Handle("POST /admin/invitations/{token}/register", http.HandlerFunc(a.handleRegisterAndAccept))  // creates account + accepts
+
+	// Global member management endpoints (Root Admin only)
+	mux.Handle("GET /admin/members", a.adminAuthMiddleware(http.HandlerFunc(a.handleListGlobalMembers)))
+	mux.Handle("GET /admin/members/me", a.adminAuthMiddleware(http.HandlerFunc(a.handleGetMyProfile)))
+	mux.Handle("PUT /admin/members/me", a.adminAuthMiddleware(http.HandlerFunc(a.handleUpdateMyProfile)))
+	mux.Handle("GET /admin/members/{email}/projects", a.adminAuthMiddleware(http.HandlerFunc(a.handleGetMemberProjects)))
+	mux.Handle("DELETE /admin/members/{email}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleDeleteGlobalMember))))
 
 	// Remote config management endpoints
 	mux.Handle("GET /admin/projects/{id}/config", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListConfig))))
@@ -967,27 +997,21 @@ func (a *AdminServer) handleCreateProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Use authenticated admin's user ID when owner_id is not provided
+	if req.OwnerID == "" {
+		if claims, ok := r.Context().Value(claimsKey).(*auth.Claims); ok && claims.UserID != "" {
+			req.OwnerID = claims.UserID
+			// Store email lookup index so the admin appears with an email in member lists
+			if a.teamStore != nil && claims.Email != "" {
+				_ = a.teamStore.StoreMemberEmail(claims.UserID, claims.Email)
+			}
+		}
+	}
+
 	proj, err := a.projects.CreateProject(req.Name, req.OwnerID)
 	if err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
-	}
-
-	// Insert owner into __members collection.
-	env, envErr := a.projects.GetProjectEnv(proj.ID)
-	if envErr == nil {
-		now := time.Now().UTC()
-		memberDoc := map[string]interface{}{
-			"_id":        req.OwnerID,
-			"user_id":    req.OwnerID,
-			"project_id": proj.ID,
-			"role":       "owner",
-			"joined_at":  now.Format(time.RFC3339Nano),
-			"is_owner":   true,
-		}
-		_ = env.Engine.CreateCollection("__members")
-		_ = env.Engine.Insert("__members", req.OwnerID, memberDoc)
-		// mpidx index already written by CreateProject in manager.go.
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -1106,6 +1130,20 @@ func (a *AdminServer) handleStats(w http.ResponseWriter, r *http.Request) {
 	storageUsed := cachedDirSize(a.dataDir, skipDirs, skipFiles)
 	count := a.projects.ProjectCount()
 
+	// Get process memory footprint (current Go heap allocation)
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	memoryBytes := memStats.Alloc
+
+	// Calculate max storage allowed (sum of all active project StorageQuota values)
+	maxStorageBytes := int64(0)
+	allProjects := a.projects.ListProjects()
+	for _, proj := range allProjects {
+		if proj.Status == "active" {
+			maxStorageBytes += proj.StorageQuota
+		}
+	}
+
 	repl := a.replStatus
 	if repl == nil {
 		repl = &ReplicationStatus{Enabled: false, Role: "standalone"}
@@ -1132,21 +1170,23 @@ func (a *AdminServer) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"projects":       count,
-		"version":        ServerVersion,
-		"go_version":     runtime.Version(),
-		"region":         "eu-west",
-		"providers":      []string{"scaleway", "ovhcloud", "hetzner"},
-		"storage_mb":     storageUsed / (1024 * 1024),
-		"storage_bytes":  storageUsed,
-		"storage_driver": storageDriver,
-		"s3_endpoint":    s3Endpoint,
-		"s3_access_key":  s3AccessKey,
-		"s3_prefix":      s3Prefix,
-		"os":             runtime.GOOS,
-		"arch":           runtime.GOARCH,
-		"replication":    repl,
-		"uptime":         formatUptime(time.Since(a.startTime)),
+		"projects":          count,
+		"version":           ServerVersion,
+		"go_version":        runtime.Version(),
+		"region":            "eu-west",
+		"providers":         []string{"scaleway", "ovhcloud", "hetzner"},
+		"storage_mb":        storageUsed / (1024 * 1024),
+		"storage_bytes":     storageUsed,
+		"memory_bytes":      memoryBytes,
+		"max_storage_bytes": maxStorageBytes,
+		"storage_driver":    storageDriver,
+		"s3_endpoint":       s3Endpoint,
+		"s3_access_key":     s3AccessKey,
+		"s3_prefix":         s3Prefix,
+		"os":                runtime.GOOS,
+		"arch":              runtime.GOARCH,
+		"replication":       repl,
+		"uptime":            formatUptime(time.Since(a.startTime)),
 	})
 }
 
@@ -1416,8 +1456,7 @@ func (a *AdminServer) handleCreateCollection(w http.ResponseWriter, r *http.Requ
 // reservedCollections cannot be dropped or cleared via the admin API because
 // auth and other internal services depend on them.
 var reservedCollections = map[string]bool{
-	"_users":    true,
-	"__members": true,
+	"_users": true,
 }
 
 func isReservedCollection(name string) bool {
@@ -2693,17 +2732,54 @@ func (a *AdminServer) handleSetOAuthProviders(w http.ResponseWriter, r *http.Req
 
 // ─── Team Management Handlers ───────────────────────────────────────────────
 
+// teamPermissionHelper checks if the current user (from JWT claims) has permission
+// to perform team management actions on a project. Admins and project owners can manage teams.
+func (a *AdminServer) teamPermissionHelper(w http.ResponseWriter, r *http.Request, projectID string) (string, bool) {
+	claims, ok := r.Context().Value(claimsKey).(*auth.Claims)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized: no claims")
+		return "", false
+	}
+
+	// Admin users (role=member in JWT is used for team members, but admins use AdminRole)
+	// For admins, always allow
+	if claims.Role != "member" {
+		return claims.UserID, true
+	}
+
+	// For team members, check if they are owner
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return "", false
+	}
+
+	// Check if user is owner of the project
+	isOwner := a.teamStore.HasRole(projectID, claims.UserID, tenant.RoleOwner)
+	if !isOwner {
+		writeError(w, http.StatusForbidden, "forbidden: only project owners can manage team members")
+		return "", false
+	}
+
+	return claims.UserID, true
+}
+
 func (a *AdminServer) handleListMembers(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+
 	env, err := a.projects.GetProjectEnv(id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
-	docs, listErr := env.Engine.List("__members")
-	if listErr != nil || docs == nil {
-		docs = []map[string]interface{}{}
+	members, err := a.teamStore.ListMembers(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 
 	type memberResult struct {
@@ -2715,20 +2791,67 @@ func (a *AdminServer) handleListMembers(w http.ResponseWriter, r *http.Request) 
 		Email     string `json:"email,omitempty"`
 		Name      string `json:"name,omitempty"`
 	}
-	result := make([]memberResult, 0, len(docs))
-	for _, doc := range docs {
-		m := memberResult{}
-		if v, ok := doc["user_id"].(string); ok { m.UserID = v }
-		if v, ok := doc["project_id"].(string); ok { m.ProjectID = v }
-		if v, ok := doc["role"].(string); ok { m.Role = v }
-		if v, ok := doc["joined_at"].(string); ok { m.JoinedAt = v }
-		if v, ok := doc["is_owner"].(bool); ok { m.IsOwner = v }
-		// Enrich with user info from _users
-		if user, uErr := env.Auth.GetUser(m.UserID); uErr == nil {
-			m.Email = user.Email
-			m.Name = user.Name
+	result := make([]memberResult, 0, len(members))
+	for _, m := range members {
+		res := memberResult{
+			UserID:    m.UserID,
+			ProjectID: m.ProjectID,
+			Role:      string(m.Role),
+			JoinedAt:  m.JoinedAt.Format(time.RFC3339Nano),
+			IsOwner:   m.IsOwner,
 		}
-		result = append(result, m)
+		// Try to get email from TeamStore first (team members)
+		if email, err := a.teamStore.GetEmailByUserID(m.UserID); err == nil && email != "" {
+			res.Email = email
+		} else if user, uErr := env.Auth.GetUser(m.UserID); uErr == nil {
+			// Fallback to _users for legacy users
+			res.Email = user.Email
+			res.Name = user.Name
+		} else if a.adminStore != nil {
+			// Fallback to AdminStore for admin/owner users
+			if admin, aErr := a.adminStore.GetByID(m.UserID); aErr == nil {
+				res.Email = admin.Email
+				res.Name = admin.Name
+			}
+		}
+		result = append(result, res)
+	}
+
+	// Ensure the creator/owner is always in the returned member list
+	proj, _ := a.projects.GetProject(id)
+	if proj != nil && proj.OwnerID != "" {
+		found := false
+		for _, m := range result {
+			if m.UserID == proj.OwnerID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Add owner if not present (shouldn't happen, but safety check)
+			res := memberResult{
+				UserID:    proj.OwnerID,
+				ProjectID: id,
+				Role:      string(tenant.RoleOwner),
+				JoinedAt:  proj.CreatedAt.Format(time.RFC3339Nano),
+				IsOwner:   true,
+			}
+			// Try to get email from TeamStore first (team members)
+			if email, err := a.teamStore.GetEmailByUserID(proj.OwnerID); err == nil && email != "" {
+				res.Email = email
+			} else if user, uErr := env.Auth.GetUser(proj.OwnerID); uErr == nil {
+				// Fallback to _users for legacy users
+				res.Email = user.Email
+				res.Name = user.Name
+			} else if a.adminStore != nil {
+				// Fallback to AdminStore for admin/owner users
+				if admin, aErr := a.adminStore.GetByID(proj.OwnerID); aErr == nil {
+					res.Email = admin.Email
+					res.Name = admin.Name
+				}
+			}
+			result = append(result, res)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -2743,6 +2866,13 @@ func (a *AdminServer) handleCreateInvitation(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusInternalServerError, "team store not available")
 		return
 	}
+
+	// Check if current user has permission (owner or admin)
+	_, ok := a.teamPermissionHelper(w, r, id)
+	if !ok {
+		return
+	}
+
 	var req struct {
 		Email string      `json:"email"`
 		Role  tenant.Role `json:"role"`
@@ -2769,7 +2899,7 @@ func (a *AdminServer) handleCreateInvitation(w http.ResponseWriter, r *http.Requ
 
 	// Get the admin user info from JWT claims for created_by
 	createdBy := "admin"
-	if claims, ok := r.Context().Value("claims").(*auth.Claims); ok {
+	if claims, ok := r.Context().Value(claimsKey).(*auth.Claims); ok {
 		createdBy = claims.UserID
 	}
 
@@ -2796,18 +2926,27 @@ func (a *AdminServer) handleCreateInvitation(w http.ResponseWriter, r *http.Requ
 func (a *AdminServer) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	userID := r.PathValue("userId")
-	env, err := a.projects.GetProjectEnv(id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
 		return
 	}
-	if err := env.Engine.Delete("__members", userID); err != nil {
+
+	// Check if current user has permission (owner or admin)
+	currentUserID, ok := a.teamPermissionHelper(w, r, id)
+	if !ok {
+		return
+	}
+
+	// Prevent removing yourself
+	if currentUserID == userID {
+		writeError(w, http.StatusForbidden, "cannot remove yourself from the team")
+		return
+	}
+
+	if err := a.teamStore.RemoveMember(id, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
-	}
-	// Remove from global member-project index.
-	if a.teamStore != nil {
-		_ = a.teamStore.RemoveMemberProjectIndex(userID, id)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
 }
@@ -2815,11 +2954,18 @@ func (a *AdminServer) handleRemoveMember(w http.ResponseWriter, r *http.Request)
 func (a *AdminServer) handleUpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	userID := r.PathValue("userId")
-	env, err := a.projects.GetProjectEnv(id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
 		return
 	}
+
+	// Check if current user has permission (owner or admin)
+	_, ok := a.teamPermissionHelper(w, r, id)
+	if !ok {
+		return
+	}
+
 	var req struct {
 		Role string `json:"role"`
 	}
@@ -2827,17 +2973,281 @@ func (a *AdminServer) handleUpdateMemberRole(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	memberDoc, getErr := env.Engine.Get("__members", userID)
-	if getErr != nil {
-		writeError(w, http.StatusNotFound, "member not found")
-		return
-	}
-	memberDoc["role"] = req.Role
-	if err := env.Engine.Update("__members", userID, memberDoc); err != nil {
+	if err := a.teamStore.UpdateMemberRole(id, userID, tenant.Role(req.Role)); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// ─── Member Self-Management Handlers ──────────────────────────────────────
+
+// handleGetMyProfile returns the profile of the currently authenticated user.
+// Works for both team members and admin users.
+func (a *AdminServer) handleGetMyProfile(w http.ResponseWriter, r *http.Request) {
+	claims, ok := r.Context().Value(claimsKey).(*auth.Claims)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	// For admin users, return admin profile
+	if claims.Role != "member" {
+		if a.adminStore != nil {
+			admin, err := a.adminStore.GetByID(claims.UserID)
+			if err == nil {
+				writeJSON(w, http.StatusOK, map[string]interface{}{
+					"user_id":    admin.ID,
+					"email":      admin.Email,
+					"name":       admin.Name,
+					"role":       "admin",
+					"admin_role": string(admin.Role),
+				})
+				return
+			}
+		}
+		// Fallback for legacy admins
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"user_id": claims.UserID,
+			"email":   claims.Email,
+			"role":    "admin",
+		})
+		return
+	}
+
+	// For team members
+	profile := map[string]interface{}{
+		"user_id": claims.UserID,
+		"email":   claims.Email,
+		"role":    "member",
+	}
+
+	// Get display name if set
+	if name, err := a.teamStore.GetMemberName(claims.UserID); err == nil {
+		profile["name"] = name
+	}
+
+	// Get project count
+	if projectIDs, err := a.teamStore.GetMemberProjects(claims.UserID); err == nil {
+		profile["project_count"] = len(projectIDs)
+	}
+
+	writeJSON(w, http.StatusOK, profile)
+}
+
+// handleUpdateMyProfile updates the current user's profile (name and/or password).
+// For password change, the current password must be provided for verification.
+func (a *AdminServer) handleUpdateMyProfile(w http.ResponseWriter, r *http.Request) {
+	claims, ok := r.Context().Value(claimsKey).(*auth.Claims)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req struct {
+		Name            string `json:"name,omitempty"`
+		CurrentPassword string `json:"current_password,omitempty"`
+		NewPassword     string `json:"new_password,omitempty"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// For admin users — update via AdminStore
+	if claims.Role != "member" {
+		if a.adminStore == nil {
+			writeError(w, http.StatusBadRequest, "admin store not available for profile updates")
+			return
+		}
+		admin, err := a.adminStore.GetByID(claims.UserID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "admin not found")
+			return
+		}
+
+		// Update name if provided
+		if req.Name != "" {
+			admin.Name = req.Name
+		}
+
+		// Update password if both current and new are provided
+		if req.NewPassword != "" {
+			if req.CurrentPassword == "" {
+				writeError(w, http.StatusBadRequest, "current password is required")
+				return
+			}
+			if err := auth.CheckPassword(admin.PasswordHash, req.CurrentPassword); err != nil {
+				writeError(w, http.StatusUnauthorized, "current password is incorrect")
+				return
+			}
+			hash, err := auth.HashPassword(req.NewPassword)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to hash password")
+				return
+			}
+			admin.PasswordHash = string(hash)
+		}
+
+		if err := a.adminStore.Update(admin); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to update profile")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+		return
+	}
+
+	// For team members — update via TeamStore
+	email := claims.Email
+	if email == "" {
+		// Try to get email from userID
+		var err error
+		email, err = a.teamStore.GetEmailByUserID(claims.UserID)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "email not found for user")
+			return
+		}
+	}
+
+	// Update display name if provided
+	if req.Name != "" {
+		if err := a.teamStore.SetMemberName(claims.UserID, req.Name); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to update name")
+			return
+		}
+	}
+
+	// Update password if provided
+	if req.NewPassword != "" {
+		if req.CurrentPassword == "" {
+			writeError(w, http.StatusBadRequest, "current password is required")
+			return
+		}
+		// Verify current password
+		_, storedHash, err := a.teamStore.GetMemberCredential(email)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "current password verification failed")
+			return
+		}
+		if err := auth.CheckPassword(storedHash, req.CurrentPassword); err != nil {
+			writeError(w, http.StatusUnauthorized, "current password is incorrect")
+			return
+		}
+		hash, err := auth.HashPassword(req.NewPassword)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to hash password")
+			return
+		}
+		if err := a.teamStore.UpdateMemberPassword(email, string(hash)); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to update password")
+			return
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// ─── Global Member Management Handlers (Root Admin only) ─────────────────────
+
+func (a *AdminServer) handleListGlobalMembers(w http.ResponseWriter, r *http.Request) {
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+	members, err := a.teamStore.ListAllMembers()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Merge admin users into the member list
+	if a.adminStore != nil {
+		admins, aErr := a.adminStore.List()
+		if aErr == nil {
+			for _, admin := range admins {
+				// Skip if already in members (same user_id)
+				duplicate := false
+				for _, m := range members {
+					if m["user_id"] == admin.ID {
+						duplicate = true
+						break
+					}
+				}
+				if !duplicate {
+					// Get admin's project count
+					projectIDs, _ := a.teamStore.GetMemberProjects(admin.ID)
+					members = append(members, map[string]interface{}{
+						"user_id":       admin.ID,
+						"email":         admin.Email,
+						"name":          admin.Name,
+						"is_admin":      true,
+						"admin_role":    string(admin.Role),
+						"project_ids":   projectIDs,
+						"project_count": len(projectIDs),
+					})
+				}
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"members": members,
+		"count":   len(members),
+	})
+}
+
+func (a *AdminServer) handleDeleteGlobalMember(w http.ResponseWriter, r *http.Request) {
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+	email := r.PathValue("email")
+	if email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+	if err := a.teamStore.DeleteMember(email); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (a *AdminServer) handleGetMemberProjects(w http.ResponseWriter, r *http.Request) {
+	if a.teamStore == nil {
+		writeError(w, http.StatusInternalServerError, "team store not available")
+		return
+	}
+	email := r.PathValue("email")
+	if email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	// Get userID from email
+	userID, err := a.teamStore.GetUserIDByEmail(email)
+	if err != nil {
+		if err.Error() == "user not found" {
+			writeError(w, http.StatusNotFound, "member not found")
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+
+	// Get all projects for this user
+	projectIDs, err := a.teamStore.GetMemberProjects(userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"user_id":       userID,
+		"email":         email,
+		"project_ids":   projectIDs,
+		"project_count": len(projectIDs),
+	})
 }
 
 func (a *AdminServer) handleGetInvitation(w http.ResponseWriter, r *http.Request) {
@@ -3034,45 +3444,15 @@ func (a *AdminServer) handleAcceptInvitation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Validate invitation token to get project info
-	inv, invErr := a.teamStore.GetInvitation(invitationToken)
-	if invErr != nil {
-		writeError(w, http.StatusNotFound, invErr.Error())
+	// Accept the invitation via TeamStore
+	member, err := a.teamStore.AcceptInvitation(invitationToken, claims.UserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
-	}
-	if inv.Status != tenant.InvitationPending {
-		writeError(w, http.StatusGone, "invitation is no longer valid")
-		return
-	}
-
-	// Insert into __members
-	env, envErr := a.projects.GetProjectEnv(inv.ProjectID)
-	if envErr != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load project")
-		return
-	}
-	now := time.Now().UTC()
-	memberDoc := map[string]interface{}{
-		"_id":        claims.UserID,
-		"user_id":    claims.UserID,
-		"project_id": inv.ProjectID,
-		"role":       string(inv.Role),
-		"joined_at":  now.Format(time.RFC3339Nano),
-		"is_owner":   false,
-	}
-	_ = env.Engine.CreateCollection("__members")
-	if insErr := env.Engine.Insert("__members", claims.UserID, memberDoc); insErr != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save membership: "+insErr.Error())
-		return
-	}
-
-	// Keep global member-project index in sync.
-	if a.teamStore != nil {
-		_ = a.teamStore.AddMemberProjectIndex(claims.UserID, inv.ProjectID)
 	}
 
 	// Get project info
-	proj, _ := a.projects.GetProject(inv.ProjectID)
+	proj, _ := a.projects.GetProject(member.ProjectID)
 	apiKey := ""
 	apiURL := r.Host
 	projectName := ""
@@ -3089,7 +3469,7 @@ func (a *AdminServer) handleAcceptInvitation(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":       "accepted",
 		"project_name": projectName,
-		"project_id":   inv.ProjectID,
+		"project_id":   member.ProjectID,
 		"api_key":      apiKey,
 		"api_url":      apiURL,
 	})
@@ -3128,56 +3508,41 @@ func (a *AdminServer) handleRegisterAndAccept(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Create the user account in the project's auth service.
-	env, err := a.projects.GetProjectEnv(inv.ProjectID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load project")
+	// Check if the user already has an account — block re-registration
+	userID := ""
+	existingUserID, _, credErr := a.teamStore.GetMemberCredential(inv.Email)
+	if credErr == nil && existingUserID != "" {
+		writeError(w, http.StatusConflict, "You already have an account. Please sign in first.")
 		return
 	}
+	userID = uuid.New().String()
 
-	user, tokens, err := env.Auth.SignUp(inv.Email, req.Password)
-	if err != nil {
-		writeError(w, http.StatusConflict, "email already registered: "+err.Error())
-		return
-	}
-
-	// Store the member's credential for dashboard login
+	// Hash the password and store/update credentials globally via TeamStore
 	hash, hashErr := auth.HashPassword(req.Password)
 	if hashErr != nil {
 		writeError(w, http.StatusInternalServerError, "failed to hash password")
 		return
 	}
+
 	if a.teamStore != nil {
-		_ = a.teamStore.StoreMemberCredential(inv.Email, user.ID, hash)
+		if err := a.teamStore.StoreMemberCredential(inv.Email, userID, hash); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to store credentials")
+			return
+		}
 	}
 
-	// Accept the invitation — insert into __members collection.
-	now := time.Now().UTC()
-	memberDoc := map[string]interface{}{
-		"_id":        user.ID,
-		"user_id":    user.ID,
-		"project_id": inv.ProjectID,
-		"role":       string(inv.Role),
-		"joined_at":  now.Format(time.RFC3339Nano),
-		"is_owner":   false,
-	}
-	// Ensure __members collection exists
-	_ = env.Engine.CreateCollection("__members")
-	if insErr := env.Engine.Insert("__members", user.ID, memberDoc); insErr != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save membership: "+insErr.Error())
+	// Accept the invitation via TeamStore
+	member, err := a.teamStore.AcceptInvitation(invitationToken, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Keep global member-project index in sync.
-	if a.teamStore != nil {
-		_ = a.teamStore.AddMemberProjectIndex(user.ID, inv.ProjectID)
-	}
-
 	// Get project info to return to the user
-	proj, err := a.projects.GetProject(inv.ProjectID)
+	proj, err := a.projects.GetProject(member.ProjectID)
 	apiKey := ""
 	apiURL := r.Host
-	projectName := inv.ProjectID
+	projectName := member.ProjectID
 	if proj != nil {
 		apiKey = proj.JWTSecret
 		projectName = proj.Name
@@ -3189,14 +3554,12 @@ func (a *AdminServer) handleRegisterAndAccept(w http.ResponseWriter, r *http.Req
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
-		"status":        "accepted",
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-		"user_id":       user.ID,
-		"project_name":  projectName,
-		"project_id":    inv.ProjectID,
-		"api_key":       apiKey,
-		"api_url":       apiURL,
+		"status":       "accepted",
+		"user_id":      userID,
+		"project_name": projectName,
+		"project_id":   member.ProjectID,
+		"api_key":      apiKey,
+		"api_url":      apiURL,
 	})
 }
 

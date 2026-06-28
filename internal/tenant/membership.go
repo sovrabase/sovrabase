@@ -115,7 +115,19 @@ func (ts *TeamStore) AddMember(projectID, userID string, role Role) error {
 		return fmt.Errorf("team: marshal member: %w", err)
 	}
 
-	return ts.db.Set(key, data, pebble.Sync)
+	// Write the member record
+	if err := ts.db.Set(key, data, pebble.Sync); err != nil {
+		return fmt.Errorf("team: save member: %w", err)
+	}
+
+	// Update the member-project index for efficient lookup
+	if err := ts.AddMemberProjectIndex(userID, projectID); err != nil {
+		// Rollback member record if index update fails
+		ts.db.Delete(key, pebble.Sync)
+		return fmt.Errorf("team: update member-project index: %w", err)
+	}
+
+	return nil
 }
 
 // RemoveMember removes a user from a project team.
@@ -131,7 +143,17 @@ func (ts *TeamStore) RemoveMember(projectID, userID string) error {
 	}
 	closer.Close()
 
-	return ts.db.Delete(key, pebble.Sync)
+	// Delete the member record
+	if err := ts.db.Delete(key, pebble.Sync); err != nil {
+		return fmt.Errorf("team: delete member: %w", err)
+	}
+
+	// Remove from the member-project index
+	if err := ts.RemoveMemberProjectIndex(userID, projectID); err != nil {
+		return fmt.Errorf("team: remove member-project index: %w", err)
+	}
+
+	return nil
 }
 
 // ListMembers returns all members of a project.
@@ -411,15 +433,31 @@ func (ts *TeamStore) saveInvitation(inv *Invitation) error {
 // the dashboard. Keyed by email (not per-project).
 
 const memberCredPrefix = "mcred:"
+const userEmailIdxPrefix = "uidx:"
 
 func memberCredKey(email string) []byte {
 	return []byte(memberCredPrefix + email)
 }
 
+func userEmailIdxKey(userID string) []byte {
+	return []byte(userEmailIdxPrefix + userID)
+}
+
+// StoreMemberEmail stores just the email lookup index for a user, without
+// creating a member credential (used for admin/owner email resolution).
+func (ts *TeamStore) StoreMemberEmail(userID, email string) error {
+	return ts.db.Set(userEmailIdxKey(userID), []byte(email), pebble.Sync)
+}
+
 // StoreMemberCredential saves a password hash and userID for a team member email.
+// Also maintains a reverse index (uidx:{userID}) for O(1) email lookups.
 func (ts *TeamStore) StoreMemberCredential(email, userID, passwordHash string) error {
 	data := userID + "\n" + passwordHash
-	return ts.db.Set(memberCredKey(email), []byte(data), pebble.Sync)
+	if err := ts.db.Set(memberCredKey(email), []byte(data), pebble.Sync); err != nil {
+		return err
+	}
+	// Maintain reverse index
+	return ts.db.Set(userEmailIdxKey(userID), []byte(email), pebble.Sync)
 }
 
 // GetMemberCredential returns the stored password hash and userID for an email,
@@ -435,6 +473,162 @@ func (ts *TeamStore) GetMemberCredential(email string) (userID, passwordHash str
 		return "", "", fmt.Errorf("invalid credential format")
 	}
 	return parts[0], parts[1], nil
+}
+
+// ListAllMembers returns all member credentials (email and userID only, password excluded)
+// by iterating over the mcred:* prefix. Also includes project_ids for each member.
+func (ts *TeamStore) ListAllMembers() ([]map[string]interface{}, error) {
+	prefix := []byte(memberCredPrefix)
+	iter, err := ts.db.NewIter(&pebble.IterOptions{
+		LowerBound: prefix,
+		UpperBound: keyUpperBound(prefix),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("team: list all members iter: %w", err)
+	}
+	defer iter.Close()
+
+	var members []map[string]interface{}
+	for iter.First(); iter.Valid(); iter.Next() {
+		// Key format: mcred:{email}
+		email := strings.TrimPrefix(string(iter.Key()), memberCredPrefix)
+		if email == "" {
+			continue
+		}
+
+		val := iter.Value()
+		parts := strings.SplitN(string(val), "\n", 2)
+		if len(parts) >= 1 && parts[0] != "" {
+			userID := parts[0]
+			// Get member projects efficiently using index
+			projectIDs, _ := ts.GetMemberProjects(userID) // ignore errors, may have no projects
+			members = append(members, map[string]interface{}{
+				"user_id":      userID,
+				"email":        email,
+				"project_ids":  projectIDs,
+				"project_count": len(projectIDs),
+			})
+		}
+	}
+	if err := iter.Error(); err != nil {
+		return nil, fmt.Errorf("team: iterate all members: %w", err)
+	}
+	if members == nil {
+		members = []map[string]interface{}{}
+	}
+	return members, nil
+}
+
+// DeleteMember removes the member credential entry for the given email
+// AND removes the member from all projects they belong to.
+func (ts *TeamStore) DeleteMember(email string) error {
+	// First, get the userID from the credential
+	val, closer, err := ts.db.Get(memberCredKey(email))
+	if err != nil && err != pebble.ErrNotFound {
+		return fmt.Errorf("get credential: %w", err)
+	}
+	var userID string
+	if err == nil {
+		defer closer.Close()
+		parts := strings.SplitN(string(val), "\n", 2)
+		if len(parts) >= 1 && parts[0] != "" {
+			userID = parts[0]
+		}
+	}
+
+	// Delete the credential and index
+	if err := ts.db.Delete(memberCredKey(email), pebble.Sync); err != nil && err != pebble.ErrNotFound {
+		return fmt.Errorf("delete member credential: %w", err)
+	}
+
+	// If we have a userID, remove index and all project memberships
+	if userID != "" {
+		_ = ts.db.Delete(userEmailIdxKey(userID), pebble.Sync) // ignore if not found
+
+		projectIDs, err := ts.GetMemberProjects(userID)
+		if err != nil {
+			return fmt.Errorf("get member projects: %w", err)
+		}
+		for _, projectID := range projectIDs {
+			_ = ts.RemoveMember(projectID, userID) // ignore errors for individual removals
+		}
+	}
+
+	return nil
+}
+
+// GetUserIDByEmail retrieves the user ID for a given email from credentials.
+func (ts *TeamStore) GetUserIDByEmail(email string) (string, error) {
+	val, closer, err := ts.db.Get(memberCredKey(email))
+	if err != nil {
+		if err == pebble.ErrNotFound {
+			return "", fmt.Errorf("user not found")
+		}
+		return "", fmt.Errorf("get user ID: %w", err)
+	}
+	defer closer.Close()
+
+	parts := strings.SplitN(string(val), "\n", 2)
+	if len(parts) < 1 || parts[0] == "" {
+		return "", fmt.Errorf("invalid credential format")
+	}
+	return parts[0], nil
+}
+
+// GetEmailByUserID retrieves the email for a given userID from credentials.
+// Uses the reverse index (uidx:{userID}) for O(1) lookup.
+func (ts *TeamStore) GetEmailByUserID(userID string) (string, error) {
+	val, closer, err := ts.db.Get(userEmailIdxKey(userID))
+	if err != nil {
+		return "", err
+	}
+	defer closer.Close()
+	return string(val), nil
+}
+
+// ─── Member Self-Management ──────────────────────────────────────────────
+
+const memberNamePrefix = "mname:"
+
+func memberNameKey(userID string) []byte {
+	return []byte(memberNamePrefix + userID)
+}
+
+// UpdateMemberPassword changes the password hash for a member credential.
+// Returns an error if the email has no credential.
+func (ts *TeamStore) UpdateMemberPassword(email, newPasswordHash string) error {
+	val, closer, err := ts.db.Get(memberCredKey(email))
+	if err != nil {
+		if err == pebble.ErrNotFound {
+			return fmt.Errorf("team: no credential for %q", email)
+		}
+		return fmt.Errorf("team: get credential: %w", err)
+	}
+	defer closer.Close()
+
+	parts := strings.SplitN(string(val), "\n", 2)
+	if len(parts) < 1 || parts[0] == "" {
+		return fmt.Errorf("team: invalid credential format")
+	}
+	userID := parts[0]
+
+	data := userID + "\n" + newPasswordHash
+	return ts.db.Set(memberCredKey(email), []byte(data), pebble.Sync)
+}
+
+// GetMemberName retrieves the display name for a member.
+func (ts *TeamStore) GetMemberName(userID string) (string, error) {
+	val, closer, err := ts.db.Get(memberNameKey(userID))
+	if err != nil {
+		return "", err
+	}
+	defer closer.Close()
+	return string(val), nil
+}
+
+// SetMemberName stores a display name for a member.
+func (ts *TeamStore) SetMemberName(userID, name string) error {
+	return ts.db.Set(memberNameKey(userID), []byte(name), pebble.Sync)
 }
 
 // ─── Member-Project Index ──────────────────────────────────────────────────

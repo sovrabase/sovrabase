@@ -24,17 +24,19 @@ export const useAuth = create<AuthState>((set) => ({
   isAuthenticated: hasToken(),
   role: getRole(),
   login: async (email: string, password: string) => {
-    const data = await api<{ token: string; role?: string }>('/admin/login', {
+    const data = await api<{ token: string; role?: string; user_id?: string }>('/admin/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
     setToken(data.token);
     if (data.role) setRole(data.role);
+    if (data.user_id) localStorage.setItem('sovrabase_admin_user_id', data.user_id);
     set({ isAuthenticated: true, role: data.role || null });
   },
   logout: () => {
     clearToken();
     localStorage.removeItem('sovrabase_admin_role');
+    localStorage.removeItem('sovrabase_admin_user_id');
     set({ isAuthenticated: false, role: null });
   },
   checkAuth: () => {

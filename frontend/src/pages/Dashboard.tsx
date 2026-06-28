@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderKanban, HardDrive, Globe, Cloud, Activity, ArrowUp, ArrowDown, Loader2, AlertTriangle, Zap, Copy, Check } from 'lucide-react';
+import { FolderKanban, HardDrive, Globe, Cloud, Activity, ArrowUp, ArrowDown, Loader2, AlertTriangle, Zap, Copy, Check, Cpu } from 'lucide-react';
 import { useDashboard } from '../store';
 import { formatBytes } from '../api';
 import { StatCard } from '../components/StatCard';
@@ -73,16 +73,22 @@ export default function Dashboard() {
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
         <StatCard
           icon={<FolderKanban className="w-5 h-5" />}
           label="Projects"
           value={stats?.projects ?? '—'}
         />
         <StatCard
+          icon={<Cpu className="w-5 h-5" />}
+          label="Memory Usage"
+          value={stats?.memory_bytes != null ? formatBytes(stats.memory_bytes) : '—'}
+        />
+        <StatCard
           icon={<HardDrive className="w-5 h-5" />}
           label="Storage Used"
           value={stats?.storage_bytes != null ? formatBytes(stats.storage_bytes) : '—'}
+          subtitle={stats?.max_storage_bytes != null ? `of ${formatBytes(stats.max_storage_bytes)}` : undefined}
         />
         <StatCard
           icon={<Globe className="w-5 h-5" />}

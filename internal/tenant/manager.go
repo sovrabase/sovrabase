@@ -140,10 +140,13 @@ func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) 
 	}
 
 	id := uuid.New().String()
-	jwtSecret := pm.cfg.JWTSecret
-	if jwtSecret == "" {
-		jwtSecret = "change-me-in-production"
+	// Generate a unique API key per project — always random, never shared.
+	// The config jwt_secret is for admin token signing only, NOT project isolation.
+	randomBytes := make([]byte, 32)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return nil, fmt.Errorf("tenant: generate secret: %w", err)
 	}
+	jwtSecret := hex.EncodeToString(randomBytes)
 
 	projectDir := filepath.Join(pm.baseDir, "projects", id)
 	proj := &Project{
@@ -169,12 +172,10 @@ func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) 
 		return nil, err
 	}
 
-	// Auto-add the project owner to global member-project index.
-	// The actual __members insertion happens in handleCreateProject (admin.go)
-	// since the engine is lazily created.
+	// Auto-add the project owner to TeamStore (global master DB)
 	ts := NewTeamStore(pm.db)
-	if err := ts.AddMemberProjectIndex(ownerID, id); err != nil {
-		return nil, fmt.Errorf("tenant: add owner to index: %w", err)
+	if err := ts.AddMember(id, ownerID, RoleOwner); err != nil {
+		return nil, fmt.Errorf("tenant: add owner to team: %w", err)
 	}
 
 	pm.projects[id] = proj
@@ -362,14 +363,15 @@ func (pm *ProjectManager) loadAll() error {
 			continue
 		}
 		if proj.JWTSecret == "" {
-			proj.JWTSecret = pm.cfg.JWTSecret
-			if proj.JWTSecret == "" {
-				proj.JWTSecret = "change-me-in-production"
-			}
-			// Save it back to master DB
-			data, err := json.Marshal(&proj)
-			if err == nil {
-				_ = pm.db.Set(projectDBKey(proj.ID), data, pebble.Sync)
+			// Backfill missing API key with a unique random one
+			randomBytes := make([]byte, 32)
+			if _, err := rand.Read(randomBytes); err == nil {
+				proj.JWTSecret = hex.EncodeToString(randomBytes)
+				// Save it back to master DB
+				data, err := json.Marshal(&proj)
+				if err == nil {
+					_ = pm.db.Set(projectDBKey(proj.ID), data, pebble.Sync)
+				}
 			}
 		}
 

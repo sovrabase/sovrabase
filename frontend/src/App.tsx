@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Settings from './pages/Settings';
 import Plugins from './pages/Plugins';
+import GlobalMembers from './pages/GlobalMembers';
+import Profile from './pages/Profile';
 import ProjectDetail from './project/ProjectDetail';
 
 function AuthGuard() {
@@ -34,6 +36,8 @@ function AppRoutes() {
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/plugins" element={<Plugins />} />
+          <Route path="/members" element={<GlobalMembers />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
       </Route>
 

@@ -18,6 +18,7 @@ export interface TeamMember {
   email?: string;
   role: 'owner' | 'admin' | 'developer' | 'viewer';
   joined_at?: string;
+  is_owner?: boolean;
 }
 
 export interface Collection {
@@ -158,7 +159,9 @@ export interface RouteInfo {
 
 export interface DashboardStats {
   projects: number;
+  memory_bytes?: number;
   storage_bytes: number;
+  max_storage_bytes?: number;
   region: string;
   version: string;
 }

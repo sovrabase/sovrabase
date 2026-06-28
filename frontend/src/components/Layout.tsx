@@ -1,11 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, Settings, Puzzle, Flag, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Settings, Puzzle, Flag, LogOut, Users, User } from 'lucide-react';
 import { useAuth, useDashboard } from '../store';
 import { useEffect } from 'react';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/projects', label: 'Projects', icon: FolderKanban },
+  { to: '/profile', label: 'Profile', icon: User },
 ];
 
 const adminNavItems = [
@@ -13,11 +14,16 @@ const adminNavItems = [
   { to: '/plugins', label: 'Plugins', icon: Puzzle },
 ];
 
+const superAdminNavItems = [
+  { to: '/members', label: 'All Users', icon: Users },
+];
+
 export function Layout() {
   const { logout, role } = useAuth();
   const { stats, loadDashboard } = useDashboard();
   const navigate = useNavigate();
-  const isAdmin = role === 'admin' || !role; // default to admin for backward compat
+  const isAdmin = role === 'admin' || role === 'super_admin' || !role; // default to admin for backward compat
+  const isSuperAdmin = role === 'super_admin';
 
   useEffect(() => {
     loadDashboard();
@@ -60,6 +66,12 @@ export function Layout() {
             </NavLink>
           ))}
           {isAdmin && adminNavItems.map((item) => (
+            <NavLink key={item.to} to={item.to} className={linkClass}>
+              <item.icon className="w-5 h-5" />
+              {item.label}
+            </NavLink>
+          ))}
+          {isSuperAdmin && superAdminNavItems.map((item) => (
             <NavLink key={item.to} to={item.to} className={linkClass}>
               <item.icon className="w-5 h-5" />
               {item.label}
