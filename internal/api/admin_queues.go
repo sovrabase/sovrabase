@@ -45,7 +45,6 @@ func getQueueStore(projectID string, projects *tenant.ProjectManager) (*queue.St
 // @Tags         queues
 // @Accept       json
 // @Produce      json
-// @Security     BearerAuth
 // @Param        body  body  object{queue=string,body=map[string]interface{}}  true  "Queue message"
 // @Success      201   {object}  map[string]string
 // @Failure      400   {object}  map[string]string
@@ -87,7 +86,6 @@ func (s *Server) handleQueueSend(w http.ResponseWriter, r *http.Request) {
 // @Tags         queues
 // @Accept       json
 // @Produce      json
-// @Security     BearerAuth
 // @Param        body  body  object{queue=string,limit=int}  true  "Receive request"
 // @Success      200   {object}  map[string]interface{}
 // @Failure      400   {object}  map[string]string
@@ -135,7 +133,6 @@ func (s *Server) handleQueueReceive(w http.ResponseWriter, r *http.Request) {
 // @Tags         queues
 // @Accept       json
 // @Produce      json
-// @Security     BearerAuth
 // @Param        body  body  object{queue=string,id=string}  true  "Delete request"
 // @Success      200   {object}  map[string]string
 // @Failure      400   {object}  map[string]string

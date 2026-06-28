@@ -889,7 +889,6 @@ func (s *Server) publishRealtime(eventType realtime.EventType, projectID, collec
 // @Tags database
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param collection path string true "Collection name"
 // @Param document body map[string]interface{} true "Document to insert"
 // @Success 201 {object} map[string]interface{} "Created document"
@@ -972,7 +971,6 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 // @Tags database
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
 // @Success 200 {object} map[string]interface{} "Retrieved document"
@@ -1013,7 +1011,6 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 // @Tags database
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
 // @Param document body map[string]interface{} true "Partial document update"
@@ -1096,7 +1093,6 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 // @Tags database
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
 // @Success 200 {object} map[string]string "Document deleted"
@@ -1168,7 +1164,6 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 // @Tags database
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param collection path string true "Collection name"
 // @Param select query string false "Comma-separated list of fields to return"
 // @Param limit query int false "Maximum number of documents to return (paginated response)"
@@ -1198,7 +1193,7 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 
 	filter := make(map[string]interface{})
 	for key, values := range q {
-		if key == "select" || key == "limit" || key == "offset" {
+		if key == "select" || key == "limit" || key == "offset" || key == "project_key" || key == "token" {
 			continue
 		}
 		if len(values) > 0 {
@@ -1278,7 +1273,6 @@ type queryRequest struct {
 // @Tags database
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param collection path string true "Collection name"
 // @Param request body queryRequest true "Query parameters"
 // @Success 200 {object} map[string]interface{} "Query results or paginated response"
@@ -1385,7 +1379,6 @@ func parseIntParam(s string, defaultVal int) int {
 // @Tags storage
 // @Accept multipart/form-data
 // @Produce json
-// @Security BearerAuth
 // @Param bucket path string true "Bucket name"
 // @Param file formData file true "File to upload"
 // @Param path formData string false "Custom file path (defaults to filename)"
@@ -1468,7 +1461,6 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 // @Tags storage
 // @Accept json
 // @Produce octet-stream
-// @Security BearerAuth
 // @Param bucket path string true "Bucket name"
 // @Param path path string true "File path"
 // @Param w query int false "Image width for transformation"
@@ -1557,7 +1549,6 @@ type signedURLResponse struct {
 // @Tags storage
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param bucket path string true "Bucket name"
 // @Param request body signedURLRequest true "Signed URL request"
 // @Success 200 {object} signedURLResponse "Signed URL"
@@ -1703,7 +1694,6 @@ func (s *Server) handleSignedDownload(w http.ResponseWriter, r *http.Request) {
 // @Tags storage
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param bucket path string true "Bucket name"
 // @Param path path string true "File path"
 // @Success 200 {object} map[string]string "File deleted"
@@ -1727,7 +1717,6 @@ func (s *Server) handleStorageDelete(w http.ResponseWriter, r *http.Request) {
 // @Tags storage
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param bucket path string true "Bucket name"
 // @Param prefix query string false "Path prefix to filter by"
 // @Success 200 {array} FileInfo "List of files"
@@ -1776,7 +1765,6 @@ type batchResult struct {
 // @Tags database
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param collection path string true "Collection name"
 // @Param request body batchRequest true "Batch operations"
 // @Success 200 {object} map[string]interface{} "Batch results"
@@ -1948,7 +1936,6 @@ type searchRequest struct {
 // @Tags database
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param collection path string true "Collection name"
 // @Param request body searchRequest true "Search parameters"
 // @Success 200 {object} map[string]interface{} "Search results"

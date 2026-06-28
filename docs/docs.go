@@ -25,11 +25,6 @@ const docTemplate = `{
     "paths": {
         "/api/v1/collections/{collection}": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "List documents in a collection with optional filtering, field selection, and pagination. Query parameters are treated as filter fields.",
                 "consumes": [
                     "application/json"
@@ -95,11 +90,6 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Insert a new document into the specified collection. An _id is auto-generated if not provided.",
                 "consumes": [
                     "application/json"
@@ -177,11 +167,6 @@ const docTemplate = `{
         },
         "/api/v1/collections/{collection}/batch": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Execute multiple insert, update, and delete operations in a single atomic batch.",
                 "consumes": [
                     "application/json"
@@ -240,11 +225,6 @@ const docTemplate = `{
         },
         "/api/v1/collections/{collection}/query": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Query documents in a collection with a structured filter, field projection, and pagination.",
                 "consumes": [
                     "application/json"
@@ -312,11 +292,6 @@ const docTemplate = `{
         },
         "/api/v1/collections/{collection}/search": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Perform a full-text search on documents in a collection.",
                 "consumes": [
                     "application/json"
@@ -384,11 +359,6 @@ const docTemplate = `{
         },
         "/api/v1/collections/{collection}/{id}": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Retrieve a single document by its ID from the specified collection.",
                 "consumes": [
                     "application/json"
@@ -452,11 +422,6 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Partially update an existing document by ID. Supports both PUT and PATCH methods.",
                 "consumes": [
                     "application/json"
@@ -539,11 +504,6 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Delete a document by ID from the specified collection.",
                 "consumes": [
                     "application/json"
@@ -611,11 +571,6 @@ const docTemplate = `{
         },
         "/api/v1/config": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Returns all config entries for the project.",
                 "produces": [
                     "application/json"
@@ -653,11 +608,6 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Creates a new config entry (POST) or updates an existing one (PUT). On successful create returns 201, on update returns 200.",
                 "consumes": [
                     "application/json"
@@ -769,11 +719,6 @@ const docTemplate = `{
         },
         "/api/v1/config/{key}": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Returns a single config entry by its key.",
                 "produces": [
                     "application/json"
@@ -826,11 +771,6 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Creates a new config entry (POST) or updates an existing one (PUT). On successful create returns 201, on update returns 200.",
                 "consumes": [
                     "application/json"
@@ -907,11 +847,6 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Deletes a config entry by its key.",
                 "produces": [
                     "application/json"
@@ -1161,11 +1096,6 @@ const docTemplate = `{
         },
         "/api/v1/queues/delete": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Deletes a message by its ID from the specified queue (acknowledges receipt).",
                 "consumes": [
                     "application/json"
@@ -1245,11 +1175,6 @@ const docTemplate = `{
         },
         "/api/v1/queues/receive": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Receives up to ` + "`" + `limit` + "`" + ` messages from the specified queue. Messages are made invisible until deleted or timeout.",
                 "consumes": [
                     "application/json"
@@ -1318,11 +1243,6 @@ const docTemplate = `{
         },
         "/api/v1/queues/send": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Sends a JSON message to the specified queue. Returns the message ID and queue name.",
                 "consumes": [
                     "application/json"
@@ -1394,11 +1314,6 @@ const docTemplate = `{
         },
         "/api/v1/storage/{bucket}/list": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "List files in a storage bucket, optionally filtered by prefix.",
                 "consumes": [
                     "application/json"
@@ -1456,11 +1371,6 @@ const docTemplate = `{
         },
         "/api/v1/storage/{bucket}/signed-url": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Generate a time-limited, cryptographically signed URL that grants temporary access to a file without requiring a project key. The signed URL can be embedded directly in \u003cimg\u003e tags, shared links, etc. Default expiry is 1 hour.",
                 "consumes": [
                     "application/json"
@@ -1527,11 +1437,6 @@ const docTemplate = `{
         },
         "/api/v1/storage/{bucket}/upload": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Upload a file to the specified storage bucket. Supports multipart form data with optional path.",
                 "consumes": [
                     "multipart/form-data"
@@ -1611,11 +1516,6 @@ const docTemplate = `{
         },
         "/api/v1/storage/{bucket}/{path}": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Download a file from the specified storage bucket. Supports optional image transformation parameters.",
                 "consumes": [
                     "application/json"
@@ -1699,11 +1599,6 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Delete a file from the specified storage bucket.",
                 "consumes": [
                     "application/json"

@@ -26,8 +26,8 @@ final client = SovrabaseClient(
 final docs = await client.from('todos').find();`;
 
 const restExamples = (origin: string) => [
-  { label: 'List collections', cmd: `curl -H "Authorization: Bearer API_KEY" \\\n  "${origin}/api/rest/v1/collections"` },
-  { label: 'Create document', cmd: `curl -X POST \\\n  -H "Authorization: Bearer API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Hello"}' \\\n  "${origin}/api/rest/v1/collections/todos/documents"` },
+  { label: 'List collection documents', cmd: `curl -H "X-Project-Key: API_KEY" \\\n  "${origin}/api/v1/collections/todos"` },
+  { label: 'Create document', cmd: `curl -X POST \\\n  -H "X-Project-Key: API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Hello"}' \\\n  "${origin}/api/v1/collections/todos"` },
 ];
 
 export default function Dashboard() {

@@ -78,7 +78,6 @@ func (s *Server) handleConfigPublic(w http.ResponseWriter, r *http.Request) {
 // @Description  Returns all config entries for the project.
 // @Tags         config
 // @Produce      json
-// @Security     BearerAuth
 // @Success      200  {object}  map[string]interface{}
 // @Failure      500  {object}  map[string]string
 // @Param        X-Project-Key  header  string  true  "Project API key for multi-tenant isolation"
@@ -108,7 +107,6 @@ func (s *Server) handleConfigList(w http.ResponseWriter, r *http.Request) {
 // @Description  Returns a single config entry by its key.
 // @Tags         config
 // @Produce      json
-// @Security     BearerAuth
 // @Param        key  path  string  true  "Config key"
 // @Success      200  {object}  configmaps.Entry
 // @Failure      404  {object}  map[string]string
@@ -144,7 +142,6 @@ type configSetRequest struct {
 // @Tags         config
 // @Accept       json
 // @Produce      json
-// @Security     BearerAuth
 // @Param        key    path      string            false  "Config key (for PUT)"
 // @Param        body   body      configSetRequest  true   "Config entry"
 // @Success      200    {object}  configmaps.Entry
@@ -207,7 +204,6 @@ func (s *Server) handleConfigSet(w http.ResponseWriter, r *http.Request) {
 // @Description  Deletes a config entry by its key.
 // @Tags         config
 // @Produce      json
-// @Security     BearerAuth
 // @Param        key  path  string  true  "Config key"
 // @Success      200  {object}  map[string]string
 // @Failure      404  {object}  map[string]string
