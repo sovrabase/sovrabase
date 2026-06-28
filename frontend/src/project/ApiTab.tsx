@@ -37,8 +37,8 @@ function buildSnippets(apiKey: string, projectId: string, origin: string): Recor
     ].join('\n'),
     javascript: [
       `const sovrabase = new SovrabaseClient({`,
-      `  apiKey: '${apiKey}',`,
-      `  projectId: '${projectId}',`,
+      `  baseUrl: '${origin}',`,
+      `  projectKey: '${apiKey}',`,
       `});`,
     ].join('\n'),
   };
