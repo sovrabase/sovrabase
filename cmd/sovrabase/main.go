@@ -188,8 +188,8 @@ func main() {
 	adminServer.RegisterRoutes(adminMux)
 	server.RegisterAdmin(adminMux)
 
-	// Plugin introspection endpoint.
-	adminMux.HandleFunc("/admin/plugins", func(w http.ResponseWriter, r *http.Request) {
+	// Plugin introspection endpoint (admin auth required).
+	adminMux.Handle("/admin/plugins", adminServer.AdminAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		info := plugin.PluginInfo{
 			Plugins: app.Plugins(),
 			Hooks:   hookManager.Info(),
@@ -197,7 +197,7 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(info)
-	})
+	})))
 
 	logger.Info("Admin API registered")
 

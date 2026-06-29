@@ -271,6 +271,12 @@ func (a *AdminServer) adminAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// AdminAuthMiddleware is the public wrapper for admin authentication middleware.
+// It requires a valid admin JWT token in the Authorization header or ?token query parameter.
+func (a *AdminServer) AdminAuthMiddleware(next http.Handler) http.Handler {
+	return a.adminAuthMiddleware(next)
+}
+
 // handleLogin handles admin login and issues a JWT token.
 // If AdminStore is available, it authenticates via the store; otherwise falls back
 // to the hardcoded config credentials (for backward compatibility during migration).
@@ -1173,7 +1179,7 @@ func (a *AdminServer) handleStats(w http.ResponseWriter, r *http.Request) {
 		"projects":          count,
 		"version":           ServerVersion,
 		"go_version":        runtime.Version(),
-		"region":            "eu-west",
+		"region":            getRegion(),
 		"providers":         []string{"scaleway", "ovhcloud", "hetzner"},
 		"storage_mb":        storageUsed / (1024 * 1024),
 		"storage_bytes":     storageUsed,
@@ -1327,13 +1333,21 @@ func (a *AdminServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"status":   "ok",
 		"version":  ServerVersion,
 		"database": dbStatus,
-		"region":   "eu-west",
+		"region":   getRegion(),
 		"uptime":   formatUptime(time.Since(a.startTime)),
 	}
 	if a.replStatus != nil {
 		resp["replication"] = a.replStatus
 	}
 	writeJSON(w, httpStatus, resp)
+}
+
+func getRegion() string {
+	reg := os.Getenv("SOVRABASE_REGION")
+	if reg == "" {
+		reg = "eu-west"
+	}
+	return reg
 }
 
 // formatUptime turns a duration into a human-readable string like "3d 4h 12m".

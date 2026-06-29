@@ -141,3 +141,15 @@ func (s *Server) clientRequestLoggerMiddleware(next http.Handler) http.Handler {
 		getRequestLogger().log(logFile, logEntry)
 	})
 }
+
+// bodyLimitMiddleware enforces a maximum request body size to prevent
+// memory exhaustion attacks. Requests exceeding the limit receive a
+// 413 Request Entity Too Large response.
+func bodyLimitMiddleware(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			next.ServeHTTP(w, r)
+		})
+	}
+}

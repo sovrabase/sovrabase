@@ -116,7 +116,8 @@ export default function Projects() {
         </div>
       ) : (
         <div className="bg-bg-card border border-border rounded-xl overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left text-text-muted text-xs font-medium uppercase tracking-wider px-6 py-3">Name</th>
@@ -192,6 +193,7 @@ export default function Projects() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

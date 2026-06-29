@@ -32,7 +32,7 @@ export default function QueuesTab({ projectId }: Props) {
   const purgeQueue = async (queueName: string) => {
     if (!confirm(`Purge all messages from "${queueName}"?`)) return;
     try {
-      await api(`/admin/projects/${encodeURIComponent(projectId)}/queues/purge`, { method: 'POST' });
+      await api(`/admin/projects/${encodeURIComponent(projectId)}/queues/purge`, { method: 'POST', body: JSON.stringify({ queue: queueName }) });
       showToast(`Queue "${queueName}" purged`, 'success');
       load();
     } catch (err) { showToast((err as Error).message, 'error'); }

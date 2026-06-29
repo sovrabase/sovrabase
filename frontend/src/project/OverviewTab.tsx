@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Copy, Eye, EyeOff, Save, Database, Globe, Settings, HardDrive, Check } from 'lucide-react';
+import { Copy, Eye, EyeOff, Save, Database, Globe, Settings, Check } from 'lucide-react';
 import { api, formatBytes, formatDate } from '../api';
 import { useToast } from '../components/Toast';
 import type { Project } from '../types';
@@ -170,54 +170,75 @@ export default function OverviewTab({ projectId }: Props) {
     return '\u25CF'.repeat(key.length - 4) + key.slice(-4);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Top row: 2 columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* CARD 1 - Project Information */}
-        <div className="bg-bg-card border border-border rounded-xl p-6 space-y-5">
-          <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-            <HardDrive className="w-5 h-5 text-accent" />
-            Project Information
-          </h2>
+  const isOnline = detail.project.is_online ?? (detail.project.status === 'active' || !detail.project.status);
 
-          <div className="space-y-3">
-            <div>
-              <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Name</p>
-              <p className="text-text-primary font-medium">{detail.project.name}</p>
+  const liveMetrics = [
+    { label: 'API Requests', val: usage?.api_requests, color: 'text-primary', sub: 'Hits since creation' },
+    { label: 'DB Reads', val: usage?.db_reads_total, color: 'text-primary', sub: 'Reads from disk' },
+    { label: 'DB Writes', val: usage?.db_writes_total, color: 'text-secondary', sub: 'Writes to disk' },
+    { label: 'Realtime Conns', val: usage?.realtime_connections, color: 'text-secondary', sub: 'Active WebSockets' },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-3">Live Metrics</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {liveMetrics.map((m) => (
+            <div key={m.label} className="bg-bg-card border border-border rounded-xl p-4 space-y-1">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">{m.label}</p>
+              <p className={`text-2xl font-bold font-mono tabular-nums ${m.color}`}>{m.val?.toLocaleString() ?? '—'}</p>
+              <p className="text-[10px] text-text-muted/60">{m.sub}</p>
             </div>
-            <div>
-              <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Project ID</p>
-              <code className="text-text-secondary text-sm font-mono">{detail.project.id}</code>
+          ))}
+        </div>
+        {!usage && (
+          <p className="text-xs text-text-muted/50 italic text-center mt-2">Loading metrics…</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-bg-card border border-border rounded-xl p-5 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-text-primary truncate">{detail.project.name}</h2>
+              <code className="text-text-muted text-xs font-mono select-all">{detail.project.id}</code>
             </div>
+            <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+              isOnline
+                ? 'bg-success/10 border-success/20 text-success'
+                : 'bg-text-muted/10 border-text-muted/20 text-text-muted'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-success' : 'bg-text-muted'}`} />
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Status</p>
-              <span className="inline-flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${detail.project.is_online ? 'bg-success' : 'bg-text-muted'}`} />
-                <span className="text-text-secondary text-sm">{detail.project.is_online ? 'Online' : 'Offline'}</span>
-              </span>
-            </div>
-            <div>
-              <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Created</p>
+              <p className="text-text-muted text-[10px] uppercase tracking-wider mb-0.5">Created</p>
               <p className="text-text-secondary text-sm">{formatDate(detail.project.created_at)}</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-[10px] uppercase tracking-wider mb-0.5">Database API</p>
+              <code className="text-text-secondary text-xs font-mono">/api/v1/collections/</code>
             </div>
           </div>
 
-          {/* API Credentials subsection */}
           <div className="border-t border-border pt-4 space-y-3">
             <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
               <KeyIcon className="w-4 h-4 text-accent" />
               API Credentials
             </h3>
             <div>
-              <p className="text-text-muted text-xs uppercase tracking-wider mb-1">API URL</p>
-              <code className="text-text-secondary text-sm font-mono break-all">{detail.api_url}</code>
+              <p className="text-text-muted text-[10px] uppercase tracking-wider mb-0.5">API URL</p>
+              <code className="text-text-secondary text-sm font-mono break-all select-all">{detail.api_url}</code>
             </div>
             <div>
-              <p className="text-text-muted text-xs uppercase tracking-wider mb-1">API Key</p>
+              <p className="text-text-muted text-[10px] uppercase tracking-wider mb-0.5">API Key</p>
               {detail.api_key ? (
                 <div className="flex items-center gap-2">
-                  <code className="text-text-secondary text-sm font-mono break-all flex-1">
+                  <code className="text-text-secondary text-sm font-mono break-all flex-1 select-all">
                     {keyRevealed ? detail.api_key : maskKey(detail.api_key)}
                     {!keyRevealed && (
                       <span className="text-text-muted ml-2 font-sans text-xs">(click to reveal)</span>
@@ -225,15 +246,15 @@ export default function OverviewTab({ projectId }: Props) {
                   </code>
                   <button
                     onClick={() => setKeyRevealed(!keyRevealed)}
-                    className="p-1.5 rounded hover:bg-bg-input text-text-muted hover:text-text-primary transition-colors"
-                    title={keyRevealed ? 'Hide' : 'Reveal'}
+                    className="p-1.5 rounded-md hover:bg-bg-input text-text-muted hover:text-text-primary transition-colors"
+                    title={keyRevealed ? 'Hide API key' : 'Reveal API key'}
                   >
                     {keyRevealed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={copyKey}
-                    className="p-1.5 rounded hover:bg-bg-input text-text-muted hover:text-text-primary transition-colors"
-                    title="Copy"
+                    className="p-1.5 rounded-md hover:bg-bg-input text-text-muted hover:text-text-primary transition-colors"
+                    title="Copy API key"
                   >
                     <Copy className="w-4 h-4" />
                   </button>
@@ -244,16 +265,13 @@ export default function OverviewTab({ projectId }: Props) {
             </div>
           </div>
         </div>
-
-        {/* CARD 2 - Project Settings */}
-        <div className="bg-bg-card border border-border rounded-xl p-6 space-y-5">
+        <div className="bg-bg-card border border-border rounded-xl p-5 space-y-4">
           <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
             <Settings className="w-5 h-5 text-accent" />
-            Project Settings
+            Settings
           </h2>
 
           <div className="space-y-4">
-            {/* Allowed Origins */}
             <div>
               <label className="flex items-center gap-2 text-text-secondary text-sm font-medium mb-1.5">
                 <Globe className="w-4 h-4" />
@@ -268,8 +286,6 @@ export default function OverviewTab({ projectId }: Props) {
               />
               <p className="text-text-muted text-xs mt-1">Comma-separated origins or * for all</p>
             </div>
-
-            {/* Storage Quota */}
             <div>
               <label className="flex items-center gap-2 text-text-secondary text-sm font-medium mb-1.5">
                 <Database className="w-4 h-4" />
@@ -295,8 +311,6 @@ export default function OverviewTab({ projectId }: Props) {
                 </select>
               </div>
             </div>
-
-            {/* Save button + status */}
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={handleSave}
@@ -304,7 +318,7 @@ export default function OverviewTab({ projectId }: Props) {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save Settings'}
+                {saving ? 'Saving…' : 'Save Settings'}
               </button>
               {saveStatus === 'success' && (
                 <span className="flex items-center gap-1 text-success text-sm">
@@ -319,9 +333,8 @@ export default function OverviewTab({ projectId }: Props) {
         </div>
       </div>
 
-      {/* CARD 2b - API Usage Stats */}
       {usage && usage.enabled && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[
             { label: 'API Requests', val: usage.api_requests, fmt: 'num' },
             { label: 'DB Reads', val: usage.db_reads_total, fmt: 'num' },
@@ -331,9 +344,9 @@ export default function OverviewTab({ projectId }: Props) {
             { label: 'Download', val: usage.bandwidth_down, fmt: 'bytes' },
             { label: 'Realtime Conns', val: usage.realtime_connections, fmt: 'num' },
           ].filter((s) => s.val != null && s.val !== 0).map((s) => (
-            <div key={s.label} className="bg-bg-card border border-border rounded-xl p-4">
-              <p className="text-text-muted text-xs uppercase tracking-wider mb-1">{s.label}</p>
-              <p className="text-text-primary text-xl font-bold font-mono">
+            <div key={s.label} className="bg-bg-card border border-border rounded-xl p-4 space-y-1">
+              <p className="text-text-muted text-xs uppercase tracking-wider">{s.label}</p>
+              <p className="text-xl font-bold font-mono tabular-nums text-text-primary">
                 {s.fmt === 'bytes' ? formatBytes(s.val!) : (s.val! as number).toLocaleString()}
               </p>
             </div>
@@ -341,7 +354,6 @@ export default function OverviewTab({ projectId }: Props) {
         </div>
       )}
 
-      {/* CARD 3 - Database Storage Analysis (full width) */}
       <div className="bg-bg-card border border-border rounded-xl p-6 space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
@@ -361,7 +373,7 @@ export default function OverviewTab({ projectId }: Props) {
           {analyzing ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Analyzing...
+              Analyzing…
             </>
           ) : (
             'Run Deep Analysis'
@@ -370,14 +382,12 @@ export default function OverviewTab({ projectId }: Props) {
 
         {showAnalysis && analysis && (
           <div className="border-t border-border pt-4 space-y-4">
-            {/* Summary */}
             <div className="flex items-center gap-2 text-text-secondary text-sm">
               <Database className="w-4 h-4" />
               Total storage:{' '}
               <span className="font-semibold text-text-primary">{formatBytes(analysis.total_size)}</span>
             </div>
 
-            {/* Collections breakdown */}
             {Object.keys(analysis.collections || {}).length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-text-primary mb-2">Collections</h4>
@@ -406,7 +416,6 @@ export default function OverviewTab({ projectId }: Props) {
               </div>
             )}
 
-            {/* Metadata + Index summary */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h4 className="text-sm font-medium text-text-primary mb-1">Metadata</h4>
@@ -418,6 +427,10 @@ export default function OverviewTab({ projectId }: Props) {
               </div>
             </div>
           </div>
+        )}
+
+        {!showAnalysis && !analyzing && (
+          <p className="text-xs text-text-muted/50 italic">Click "Run Deep Analysis" to scan database storage</p>
         )}
       </div>
     </div>

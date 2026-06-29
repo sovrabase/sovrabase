@@ -1,24 +1,88 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-app: #0a0a0f;
-  --color-bg-card: #141416;
-  --color-bg-input: #1a1a20;
-  --color-border: #222226;
-  --color-text-primary: #f0f0f5;
-  --color-text-secondary: #8b8b96;
-  --color-text-muted: #5c5c66;
-  --color-accent: #5b5bff;
-  --color-accent-hover: #4a4aee;
-  --color-success: #22c55e;
-  --color-danger: #ef4444;
-  --color-danger-hover: #dc2626;
-  --font-sans: 'Inter', -apple-system, sans-serif;
+  --color-bg-app: #12131a;
+  --color-bg-card: #1a1b22;
+  --color-bg-input: #1e1f26;
+  --color-border: #27272a;
+  --color-text-primary: #e2e1eb;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-accent: #00d2ff;
+  --color-accent-hover: #33deff;
+  --color-success: #10b981;
+  --color-danger: #ffb4ab;
+  --color-danger-hover: #93000a;
+  --font-sans: 'Geist', -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  /* SupraBase Specific Design Tokens */
+  --color-primary-container: #00d2ff;
+  --color-surface: #12131a;
+  --color-primary-fixed-dim: #33deff;
+  --color-on-secondary-fixed-variant: #5516be;
+  --color-on-surface: #e2e1eb;
+  --color-surface-container: #1e1f26;
+  --color-on-primary-container: #002d38;
+  --color-secondary-fixed-dim: #d0bcff;
+  --color-surface-container-lowest: #0c0e14;
+  --color-error-container: #93000a;
+  --color-inverse-surface: #e2e1eb;
+  --color-on-error: #690005;
+  --color-on-primary: #002029;
+  --color-surface-tint: #00d2ff;
+  --color-primary: #00d2ff;
+  --color-on-tertiary-fixed-variant: #842225;
+  --color-error: #ffb4ab;
+  --color-tertiary-fixed: #ffdad7;
+  --color-background: #12131a;
+  --color-tertiary-fixed-dim: #ffb3af;
+  --color-on-secondary: #3c0091;
+  --color-secondary-container: #571bc1;
+  --color-surface-container-low: #1a1b22;
+  --color-surface-container-highest: #33343c;
+  --color-on-tertiary: #650911;
+  --color-primary-fixed: #80ebff;
+  --color-outline: #52525b;
+  --color-on-primary-fixed: #001217;
+  --color-outline-variant: #27272a;
+  --color-secondary-fixed: #e9ddff;
+  --color-on-tertiary-container: #711419;
+  --color-on-error-container: #ffdad6;
+  --color-on-background: #e2e1eb;
+  --color-on-surface-variant: #a1a1aa;
+  --color-tertiary: #ffb3af;
+  --color-secondary: #d0bcff;
+  --color-inverse-primary: #005f73;
+  --color-surface-container-high: #282a31;
+  --color-tertiary-container: #fc7c78;
+  --color-inverse-on-surface: #2f3037;
+  --color-surface-bright: #383940;
+  --color-on-secondary-container: #c4abff;
+  --color-surface-dim: #12131a;
+  --color-on-secondary-fixed: #23005c;
+  --color-surface-variant: #33343c;
+  --color-on-primary-fixed-variant: #003a47;
+  --color-on-tertiary-fixed: #410005;
+
+  --spacing-stack-lg: 24px;
+  --spacing-container-padding: 16px;
+  --spacing-base: 4px;
+  --spacing-stack-sm: 8px;
+  --spacing-gutter: 12px;
+  --spacing-stack-md: 16px;
+
+  --font-body-md: 'Geist', sans-serif;
+  --font-headline-lg: 'Geist', sans-serif;
+  --font-label-caps: 'Geist', sans-serif;
+  --font-code-xs: 'JetBrains Mono', monospace;
+  --font-headline-md: 'Geist', sans-serif;
+  --font-code-sm: 'JetBrains Mono', monospace;
+  --font-body-lg: 'Geist', sans-serif;
 }
 
 /* Discreet horizontal scrollbar for tab bars */
@@ -97,3 +161,55 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* SupraBase Specific Styles */
+.glass-header {
+  backdrop-filter: blur(12px);
+}
+.function-card-border {
+  border: 1px solid #27272A;
+}
+.emerald-glow {
+  box-shadow: 0 0 15px -3px rgba(78, 222, 163, 0.2);
+}
+.log-accent-info {
+  border-left: 2px solid #10b981;
+}
+.log-accent-idle {
+  border-left: 2px solid #86948a;
+}
+@keyframes pulse-emerald {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.status-pulse {
+  animation: pulse-emerald 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.log-gradient-overlay {
+  background: linear-gradient(to bottom, transparent 90%, #12131a 100%);
+  pointer-events: none;
+}
+.bento-glow {
+  box-shadow: 0 0 40px -10px rgba(78, 222, 163, 0.1);
+}
+.glass-card {
+  background: rgba(24, 24, 27, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid #27272A;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.swipe-container {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.active-tab-indicator {
+  height: 2px;
+  background: #4edea3;
+  box-shadow: 0 0 8px #4edea3;
+}
+

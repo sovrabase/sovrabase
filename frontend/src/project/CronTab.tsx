@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, ToggleLeft, ToggleRight, Plus, Loader2 } from 'lucide-react';
+import { Clock, ToggleLeft, ToggleRight, Plus, Loader2, Play, Trash2 } from 'lucide-react';
 import { api, formatDate } from '../api';
 import type { CronJob } from '../types';
 import Modal from '../components/Modal';
@@ -14,6 +14,7 @@ export default function CronTab({ projectId }: Props) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', schedule: '', method: 'POST', url: '', body: '', enabled: 'true' });
   const { showToast } = useToast();
+  const [invoking, setInvoking] = useState<Record<string, 'loading' | 'success' | 'error'>>({});
 
   const load = () => {
     setLoading(true);
@@ -56,6 +57,51 @@ export default function CronTab({ projectId }: Props) {
     }
   };
 
+  const handleInvoke = async (job: CronJob) => {
+    const endpoint = job.endpoint;
+    if (!endpoint) { showToast('No endpoint URL configured', 'error'); return; }
+    setInvoking((prev) => ({ ...prev, [job.id]: 'loading' }));
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const init: RequestInit = {
+        method: job.method || 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      };
+      if (job.body && init.method !== 'GET') {
+        init.body = typeof job.body === 'string' ? job.body : JSON.stringify(job.body);
+      }
+      const res = await fetch(endpoint, init);
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      setInvoking((prev) => ({ ...prev, [job.id]: 'success' }));
+      showToast(`Triggered "${job.name}" — OK`, 'success');
+    } catch (err: unknown) {
+      clearTimeout(timeoutId);
+      setInvoking((prev) => ({ ...prev, [job.id]: 'error' }));
+      const msg = (err as Error).name === 'AbortError' ? 'Request timed out (8s)' : (err as Error).message;
+      showToast(`Trigger failed: ${msg}`, 'error');
+    } finally {
+      setTimeout(() => setInvoking((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      }), 2000);
+    }
+  };
+
+  const handleDelete = async (jobId: string) => {
+    if (!confirm('Delete this cron job?')) return;
+    try {
+      await api(`/admin/projects/${encodeURIComponent(projectId)}/cron/${jobId}`, { method: 'DELETE' });
+      showToast('Cron job deleted', 'success');
+      load();
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
+  };
+
   const inputCls = 'w-full px-3 py-2 rounded-lg bg-bg-input border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors text-sm';
 
   if (loading) {
@@ -87,6 +133,7 @@ export default function CronTab({ projectId }: Props) {
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-left px-4 py-3 font-medium">Last Run</th>
                 <th className="text-left px-4 py-3 font-medium">Next Run</th>
+                <th className="text-left px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -104,6 +151,32 @@ export default function CronTab({ projectId }: Props) {
                   </td>
                   <td className="px-4 py-3 text-text-secondary text-xs">{formatDate(job.last_run)}</td>
                   <td className="px-4 py-3 text-text-secondary text-xs">{job.next_run ? formatDate(job.next_run) : '—'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      {invoking[job.id] === 'loading' ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                      ) : invoking[job.id] === 'success' ? (
+                        <span className="text-success text-xs font-medium">OK</span>
+                      ) : invoking[job.id] === 'error' ? (
+                        <span className="text-error text-xs font-medium">Fail</span>
+                      ) : (
+                        <button
+                          onClick={() => handleInvoke(job)}
+                          className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+                          title="Trigger now"
+                        >
+                          <Play className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(job.id)}
+                        className="p-1.5 rounded-md text-text-muted hover:text-error hover:bg-error/10 transition-colors"
+                        title="Delete job"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

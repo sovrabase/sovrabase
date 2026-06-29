@@ -290,15 +290,18 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
+	// Limit request body size to 10 MB to prevent memory exhaustion attacks
+	r.Use(bodyLimitMiddleware(10 << 20))
 	r.Use(cors.Handler(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
-			// First check global allowed origins
-			if cfg.AllowOrigins == "*" || strings.EqualFold(cfg.AllowOrigins, origin) {
+			// Check global allowed origins (supports comma-separated list)
+			if cfg.AllowOrigins == "*" {
 				return true
 			}
-			// For preflight, allow if origin matches global
-			if r.Method == http.MethodOptions {
-				return cfg.AllowOrigins == "*"
+			for _, allowed := range strings.Split(cfg.AllowOrigins, ",") {
+				if strings.EqualFold(strings.TrimSpace(allowed), origin) {
+					return true
+				}
 			}
 			// Check per-project CORS
 			projectKey := r.Header.Get("X-Project-Key")

@@ -65,6 +65,7 @@ export default function TeamTab({ projectId }: Props) {
     try {
       await api(`/admin/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}/role`, {
         method: 'PUT',
+        body: JSON.stringify({ role }),
       });
       setMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, role } : m)));
       showToast('Role updated', 'success');

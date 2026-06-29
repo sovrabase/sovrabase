@@ -11,6 +11,7 @@ export interface Project {
   collection_count?: number;
   bucket_count?: number;
   is_online?: boolean;
+  status?: string;
 }
 
 export interface TeamMember {
@@ -100,6 +101,8 @@ export interface CronJob {
   name: string;
   schedule: string;
   endpoint?: string;
+  method?: string;
+  body?: unknown;
   enabled: boolean;
   last_run?: string;
   next_run?: string;

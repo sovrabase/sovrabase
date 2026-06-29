@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Webhook, ToggleLeft, ToggleRight, Plus, Loader2 } from 'lucide-react';
+import { Webhook, ToggleLeft, ToggleRight, Plus, Loader2, Trash2 } from 'lucide-react';
 import { api, formatDate } from '../api';
 import type { Webhook as WebhookType } from '../types';
 import Modal from '../components/Modal';
@@ -24,15 +24,25 @@ export default function WebhooksTab({ projectId }: Props) {
 
   useEffect(() => { load(); }, [projectId]);
 
+  const handleDelete = async (webhookId: string) => {
+    if (!confirm('Delete this webhook?')) return;
+    try {
+      await api(`/admin/projects/${encodeURIComponent(projectId)}/webhooks/${webhookId}`, { method: 'DELETE' });
+      showToast('Webhook deleted', 'success');
+      load();
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
+  };
+
   const save = async () => {
     if (!form.url.trim()) { showToast('URL is required', 'error'); return; }
     setSaving(true);
     try {
-      const events = form.events.trim() ? form.events.split(',').map((s) => s.trim()).filter(Boolean) : [];
+      const events = form.events.trim() ? form.events.split(',').map((s) => s.trim()).filter(Boolean).join(',') : '';
       await api<unknown>(`/admin/projects/${encodeURIComponent(projectId)}/webhooks`, {
         method: 'POST',
         body: JSON.stringify({
-          name: form.name.trim() || form.url.trim(),
           url: form.url.trim(),
           events,
           enabled: form.enabled === 'true',
@@ -75,6 +85,7 @@ export default function WebhooksTab({ projectId }: Props) {
                 <th className="text-left px-4 py-3 font-medium">Events</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-left px-4 py-3 font-medium">Created</th>
+                <th className="text-left px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -85,6 +96,15 @@ export default function WebhooksTab({ projectId }: Props) {
                   <td className="px-4 py-3"><div className="flex gap-1 flex-wrap">{w.events?.map((ev, i) => (<span key={i} className="inline-flex px-2 py-0.5 bg-accent/10 text-accent rounded-full text-xs font-mono">{ev}</span>))}</div></td>
                   <td className="px-4 py-3">{w.enabled ? (<span className="inline-flex items-center gap-1 text-xs text-success"><ToggleRight className="w-4 h-4" /> Active</span>) : (<span className="inline-flex items-center gap-1 text-xs text-text-muted"><ToggleLeft className="w-4 h-4" /> Disabled</span>)}</td>
                   <td className="px-4 py-3 text-text-secondary text-xs">{formatDate(w.created_at)}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleDelete(w.id)}
+                      className="p-1.5 rounded-md text-text-muted hover:text-error hover:bg-error/10 transition-colors"
+                      title="Delete webhook"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

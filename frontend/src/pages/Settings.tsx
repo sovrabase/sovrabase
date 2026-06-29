@@ -258,7 +258,8 @@ export default function Settings() {
               <Plus className="w-4 h-4" />Add Admin
             </button>
             <div className="bg-bg-card border border-border rounded-xl overflow-hidden">
-              <table className="w-full">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left text-text-muted text-xs font-medium uppercase tracking-wider px-6 py-3">ID</th>
@@ -280,6 +281,7 @@ export default function Settings() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         );
@@ -379,7 +381,8 @@ export default function Settings() {
             ) : (
               <>
                 <div className="bg-bg-card border border-border rounded-xl overflow-hidden">
-                  <table className="w-full">
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full min-w-[700px]">
                     <thead>
                       <tr className="border-b border-border">
                         {['Timestamp', 'Admin', 'Action', 'Target', 'Details'].map((h) => (
@@ -399,6 +402,7 @@ export default function Settings() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between text-sm text-text-muted">
                   <span>{pg.total > 0 ? `${pg.start}-${pg.end} of ${pg.total}` : '0 results'}</span>

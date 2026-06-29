@@ -4,6 +4,9 @@ import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 import { api } from '../api';
 import type { Project } from '../types';
 import { TabBar } from '../components/TabBar';
+import { useProjects } from '../store';
+import MobileDashboard from './MobileDashboard';
+
 import OverviewTab from './OverviewTab';
 import TeamTab from './TeamTab';
 import DatabaseTab from './DatabaseTab';
@@ -13,10 +16,10 @@ import ConfigTab from './ConfigTab';
 import CronTab from './CronTab';
 import WebhooksTab from './WebhooksTab';
 import QueuesTab from './QueuesTab';
+import IntegrationsTab from './IntegrationsTab';
 import AnalyticsTab from './AnalyticsTab';
 import ApiTab from './ApiTab';
 import LogsTab from './LogsTab';
-import IntegrationsTab from './IntegrationsTab';
 
 const TABS = [
   { id: 'Overview', label: 'Overview' },
@@ -43,6 +46,17 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
+
+  // Mobile Dashboard & Simulator States
+  const [isMobileViewport, setIsMobileViewport] = useState(window.innerWidth < 768);
+  const { projects, loadProjects } = useProjects();
+
+  useEffect(() => {
+    loadProjects();
+    const handleResize = () => setIsMobileViewport(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [loadProjects]);
 
   useEffect(() => {
     if (!id) return;
@@ -75,6 +89,21 @@ export default function ProjectDetail() {
     );
   }
 
+  // NATIVE MOBILE VIEWPORT: Bypass desktop shell and render mobile dashboard full screen
+  if (isMobileViewport) {
+    return (
+      <div className="w-full h-screen fixed inset-0 z-50">
+        <MobileDashboard
+          projectId={id!}
+          projectName={project.name}
+          projects={projects}
+          onClose={() => navigate('/projects')}
+          onChangeProject={(newId) => navigate(`/projects/${newId}`)}
+        />
+      </div>
+    );
+  }
+
   const renderTab = () => {
     const props = { projectId: id!, apiKey: project.api_key };
     switch (activeTab) {
@@ -95,7 +124,8 @@ export default function ProjectDetail() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto relative">
+      
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button onClick={() => navigate(-1)} className="p-2 rounded-md hover:bg-bg-input border border-transparent hover:border-border transition-colors text-text-secondary hover:text-text-primary" title="Back">

@@ -77,7 +77,8 @@ export default function GlobalMembers() {
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[700px] text-sm">
             <thead className="bg-bg-input text-text-muted text-xs uppercase">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">User</th>
@@ -135,6 +136,7 @@ export default function GlobalMembers() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
