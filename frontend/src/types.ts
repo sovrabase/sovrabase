@@ -214,6 +214,9 @@ export interface S3Settings {
 }
 
 export interface SmtpSettings {
+  email_provider: string;
+  email_api_key?: string;
+  email_api_secret?: string;
   smtp_host: string;
   smtp_port: number;
   smtp_user: string;
@@ -227,6 +230,24 @@ export interface ReplicationSettings {
   repl_addr: string;
   peers: string[];
   lease_ttl: string;
+}
+
+export interface EmailTemplate {
+  type: string;
+  subject: string;
+  body: string;
+  updated_at?: string;
+}
+
+export interface EmailLogEntry {
+  id: string;
+  timestamp: string;
+  provider: string;
+  from: string;
+  to: string;
+  subject: string;
+  success: boolean;
+  error?: string;
 }
 
 export interface Backup {

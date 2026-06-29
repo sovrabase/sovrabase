@@ -19,6 +19,7 @@ const (
 	TemplatePasswordReset     TemplateType = "password_reset"
 	TemplateMagicLink         TemplateType = "magic_link"
 	TemplateWelcome           TemplateType = "welcome"
+	TemplateInvitation        TemplateType = "invitation"
 )
 
 // DefaultTemplates are the built-in fallback templates.
@@ -27,6 +28,7 @@ var DefaultTemplates = map[TemplateType]string{
 	TemplatePasswordReset:     "Hello,\n\nYou requested a password reset. Click the link below:\n{{.URL}}\n\nIf you didn't request this, ignore this email.\n\n— Sovrabase",
 	TemplateMagicLink:         "Hello,\n\nClick the link below to sign in:\n{{.URL}}\n\nThis link expires in 15 minutes.\n\n— Sovrabase",
 	TemplateWelcome:           "Welcome to our app!\n\nYour account ({{.Email}}) is ready.\n\n— Sovrabase",
+	TemplateInvitation:        "Hello,\n\nYou have been invited to join the project \"{{.ProjectName}}\" on Sovrabase.\n\nClick the link below to accept the invitation:\n{{.URL}}\n\nThis invitation expires in 7 days.\n\n— Sovrabase",
 }
 
 // Template is a stored email template.

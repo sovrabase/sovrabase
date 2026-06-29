@@ -29,12 +29,15 @@ type Config struct {
 	Env             string        `yaml:"env"              json:"env"`
 
 	// SMTP / Email verification config
-	SMTPHost          string        `yaml:"smtp_host"          json:"smtp_host"`
-	SMTPPort          int           `yaml:"smtp_port"          json:"smtp_port"`
-	SMTPUser          string        `yaml:"smtp_user"          json:"smtp_user"`
-	SMTPPassword      string        `yaml:"smtp_password"      json:"smtp_password"`
-	SMTPSender        string        `yaml:"smtp_sender"        json:"smtp_sender"`
-	EmailVerification bool          `yaml:"email_verification" json:"email_verification"`
+	EmailProvider     string `yaml:"email_provider"     json:"email_provider"`     // "smtp", "resend", "mailtrap", "brevo", "mailjet"
+	EmailAPIKey       string `yaml:"email_api_key"      json:"email_api_key"`       // API key for HTTP providers
+	EmailAPISecret    string `yaml:"email_api_secret"   json:"email_api_secret"`    // API secret (Mailjet)
+	SMTPHost          string `yaml:"smtp_host"          json:"smtp_host"`
+	SMTPPort          int    `yaml:"smtp_port"          json:"smtp_port"`
+	SMTPUser          string `yaml:"smtp_user"          json:"smtp_user"`
+	SMTPPassword      string `yaml:"smtp_password"      json:"smtp_password"`
+	SMTPSender        string `yaml:"smtp_sender"        json:"smtp_sender"`
+	EmailVerification bool   `yaml:"email_verification" json:"email_verification"`
 
 	// Captcha protection
 	CaptchaEnabled  bool   `yaml:"captcha_enabled"   json:"captcha_enabled"`
@@ -223,6 +226,9 @@ func applyEnvOverrides(cfg *Config) {
 	setStr("SOVRABASE_KEY_FILE", &cfg.KeyFile)
 	setStr("SOVRABASE_ENV", &cfg.Env)
 
+	setStr("SOVRABASE_EMAIL_PROVIDER", &cfg.EmailProvider)
+	setStr("SOVRABASE_EMAIL_API_KEY", &cfg.EmailAPIKey)
+	setStr("SOVRABASE_EMAIL_API_SECRET", &cfg.EmailAPISecret)
 	setStr("SOVRABASE_SMTP_HOST", &cfg.SMTPHost)
 	setInt("SOVRABASE_SMTP_PORT", &cfg.SMTPPort)
 	setStr("SOVRABASE_SMTP_USER", &cfg.SMTPUser)

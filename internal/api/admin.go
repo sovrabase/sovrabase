@@ -3,6 +3,7 @@ package api
 import (
 	"archive/zip"
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,12 +17,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/email"
+	"github.com/ketsuna-org/sovrabase/internal/emailtemplates"
 	"github.com/ketsuna-org/sovrabase/internal/integrations"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
@@ -43,6 +47,8 @@ type AdminServer struct {
 	teamStore     *tenant.TeamStore
 	adminStore    *auth.AdminStore
 	auditStore    *auth.AuditStore
+	mailer        email.Mailer
+	emailLogStore *email.LogStore
 	startTime     time.Time
 	// BackupsHandler handles backup operations.
 	BackupsHandler http.Handler
@@ -164,6 +170,16 @@ func (a *AdminServer) SetAdminStore(store *auth.AdminStore) {
 // SetAuditStore attaches the audit store for logging admin actions.
 func (a *AdminServer) SetAuditStore(store *auth.AuditStore) {
 	a.auditStore = store
+}
+
+// SetMailer attaches an SMTP mailer for sending emails.
+func (a *AdminServer) SetMailer(m email.Mailer) {
+	a.mailer = m
+}
+
+// SetEmailLogStore attaches the email log store.
+func (a *AdminServer) SetEmailLogStore(store *email.LogStore) {
+	a.emailLogStore = store
 }
 
 // ServerVersion is the single source of truth for the version string.
@@ -465,6 +481,9 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	// Server config & restart
 	mux.Handle("GET /admin/config", a.adminAuthMiddleware(http.HandlerFunc(a.handleGetConfig)))
 	mux.Handle("POST /admin/config", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleSaveConfig))))
+	mux.Handle("POST /admin/smtp/test", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleSmtpTest))))
+	mux.Handle("GET /admin/email-log", a.adminAuthMiddleware(http.HandlerFunc(a.handleListEmailLog)))
+	mux.Handle("DELETE /admin/email-log", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleClearEmailLog))))
 	mux.Handle("POST /admin/restart", a.adminAuthMiddleware(http.HandlerFunc(a.handleRestart)))
 
 	// Database management endpoints
@@ -2204,6 +2223,10 @@ func (a *AdminServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		"s3_secret_key":    masked(a.cfg.S3SecretKey),
 		"s3_bucket_prefix": a.cfg.S3BucketPrefix,
 		"s3_use_ssl":       a.cfg.S3UseSSL,
+		// Email provider
+		"email_provider":   a.cfg.EmailProvider,
+		"email_api_key":    masked(a.cfg.EmailAPIKey),
+		"email_api_secret": masked(a.cfg.EmailAPISecret),
 		// SMTP / Email verification
 		"email_verification": a.cfg.EmailVerification,
 		"smtp_host":          a.cfg.SMTPHost,
@@ -2254,6 +2277,10 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		S3SecretKey    *string `json:"s3_secret_key"` // ignored if == secretMask
 		S3BucketPrefix *string `json:"s3_bucket_prefix"`
 		S3UseSSL       *bool   `json:"s3_use_ssl"`
+		// Email provider
+		EmailProvider   *string `json:"email_provider"`
+		EmailAPIKey     *string `json:"email_api_key"`     // ignored if == secretMask
+		EmailAPISecret  *string `json:"email_api_secret"`  // ignored if == secretMask
 		// SMTP / Email verification
 		EmailVerification *bool   `json:"email_verification"`
 		SMTPHost          *string `json:"smtp_host"`
@@ -2336,6 +2363,15 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	if req.EmailVerification != nil {
 		a.cfg.EmailVerification = *req.EmailVerification
 	}
+	if req.EmailProvider != nil {
+		a.cfg.EmailProvider = *req.EmailProvider
+	}
+	if req.EmailAPIKey != nil && *req.EmailAPIKey != secretMask {
+		a.cfg.EmailAPIKey = *req.EmailAPIKey
+	}
+	if req.EmailAPISecret != nil && *req.EmailAPISecret != secretMask {
+		a.cfg.EmailAPISecret = *req.EmailAPISecret
+	}
 	if req.SMTPHost != nil {
 		a.cfg.SMTPHost = *req.SMTPHost
 	}
@@ -2388,6 +2424,23 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		a.cfg.Peers = req.Peers
 	}
 
+	// Recreate mailer with logging wrapper
+	newMailer := email.NewMailer(email.Config{
+		Provider:  email.Provider(a.cfg.EmailProvider),
+		Sender:    a.cfg.SMTPSender,
+		SMTPHost:  a.cfg.SMTPHost,
+		SMTPPort:  a.cfg.SMTPPort,
+		SMTPUser:  a.cfg.SMTPUser,
+		SMTPPass:  a.cfg.SMTPPassword,
+		APIKey:    a.cfg.EmailAPIKey,
+		APISecret: a.cfg.EmailAPISecret,
+	})
+	if a.emailLogStore != nil {
+		a.mailer = email.NewLoggedMailer(newMailer, a.emailLogStore, a.cfg.EmailProvider, a.cfg.SMTPSender)
+	} else {
+		a.mailer = newMailer
+	}
+
 	// Persist to config.yaml
 	cfgPath := a.cfg.ConfigFile
 	if cfgPath == "" {
@@ -2402,6 +2455,91 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		"status":      "saved",
 		"config_file": cfgPath,
 	})
+}
+
+// handleSmtpTest sends a test email to the configured admin email.
+func (a *AdminServer) handleSmtpTest(w http.ResponseWriter, r *http.Request) {
+	if a.mailer == nil || !a.mailer.IsConfigured() {
+		provider := a.cfg.EmailProvider
+		if provider == "" {
+			provider = "smtp"
+		}
+		writeError(w, http.StatusBadRequest, "Email not configured: provider "+provider+" requires API key (or SMTP host/port for smtp) and a sender email")
+		return
+	}
+
+	to := a.cfg.AdminEmail
+	if to == "" {
+		writeError(w, http.StatusBadRequest, "admin email not configured")
+		return
+	}
+
+	subject := "Sovrabase SMTP Test"
+	body := "This is a test email from your Sovrabase server.\n\nIf you received this, your SMTP configuration is working correctly.\n\n— Sovrabase"
+
+	if err := a.mailer.SendMail([]string{to}, subject, body); err != nil {
+		writeError(w, http.StatusInternalServerError, "SMTP test failed: "+err.Error())
+		return
+	}
+
+	provider := a.cfg.EmailProvider
+	if provider == "" {
+		provider = "smtp"
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":    "sent",
+		"to":        to,
+		"provider":  provider,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// handleListEmailLog returns paginated email log entries.
+func (a *AdminServer) handleListEmailLog(w http.ResponseWriter, r *http.Request) {
+	if a.emailLogStore == nil {
+		writeError(w, http.StatusInternalServerError, "email log store not available")
+		return
+	}
+
+	limit := 50
+	offset := 0
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := fmt.Sscanf(l, "%d", &limit); err == nil && v > 0 {
+			// ok
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if v, err := fmt.Sscanf(o, "%d", &offset); err == nil && v >= 0 {
+			// ok
+		}
+	}
+
+	entries, total, err := a.emailLogStore.List(offset, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  entries,
+		"total": total,
+	})
+}
+
+// handleClearEmailLog clears all email log entries.
+func (a *AdminServer) handleClearEmailLog(w http.ResponseWriter, r *http.Request) {
+	if a.emailLogStore == nil {
+		writeError(w, http.StatusInternalServerError, "email log store not available")
+		return
+	}
+
+	if err := a.emailLogStore.Clear(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
 }
 
 // handleRestart triggers a graceful server restart.
@@ -2931,9 +3069,42 @@ func (a *AdminServer) handleCreateInvitation(w http.ResponseWriter, r *http.Requ
 	}
 	inviteLink := baseURL + "/admin/invitations/" + inv.Token
 
+	emailSent := false
+	if a.mailer != nil && a.mailer.IsConfigured() {
+		projectName := id
+		if proj, pErr := a.projects.GetProject(id); pErr == nil {
+			projectName = proj.Name
+		}
+
+		subject := "You're invited to join " + projectName
+		body := "Hello,\n\nYou have been invited to join the project \"" + projectName + "\" on Sovrabase.\n\nClick the link below to accept the invitation:\n" + inviteLink + "\n\nThis invitation expires in 7 days.\n\n— Sovrabase"
+
+		// Try to use the project's custom invitation template if available
+		if env, envErr := a.projects.GetProjectEnv(id); envErr == nil {
+			tmplStore := emailtemplates.NewStore(env.Engine.DB())
+			if tmpl, tmplErr := tmplStore.Get(emailtemplates.TemplateInvitation); tmplErr == nil {
+				subject = tmpl.Subject
+				var buf bytes.Buffer
+				t := template.Must(template.New("invite").Parse(tmpl.Body))
+				if tErr := t.Execute(&buf, map[string]string{
+					"ProjectName": projectName,
+					"URL":         inviteLink,
+					"Email":       req.Email,
+				}); tErr == nil {
+					body = buf.String()
+				}
+			}
+		}
+
+		if sErr := a.mailer.SendMail([]string{req.Email}, subject, body); sErr == nil {
+			emailSent = true
+		}
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"invitation":  inv,
 		"invite_link": inviteLink,
+		"email_sent":  emailSent,
 	})
 }
 

@@ -5,15 +5,25 @@ export SOVRABASE_LISTEN_ADDR
 
 .PHONY: build run test clean deps fmt lint dev swagger build-frontend
 
-BINARY_NAME=sovrabase
 BUILD_DIR=build
+ifeq ($(OS),Windows_NT)
+BINARY_NAME=sovrabase.exe
+else
+BINARY_NAME=sovrabase
+endif
 
 deps:
 	go mod tidy
 	go mod download
 
 build-frontend:
+ifeq ($(OS),Windows_NT)
+	cd frontend && npm install --silent && npm run build
+	@if exist internal\dashboard\dist rmdir /s /q internal\dashboard\dist
+	xcopy /e /i /y frontend\dist internal\dashboard\dist >nul 2>&1
+else
 	cd frontend && npm install --silent && npm run build && rm -rf ../internal/dashboard/dist && cp -r dist ../internal/dashboard/dist
+endif
 
 build: build-frontend deps
 	go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/sovrabase

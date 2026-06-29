@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Shield, Users, Cloud, Mail, GitBranch, ScrollText, Database, Loader2, Plus, RefreshCw, Save, Zap, Trash2 } from 'lucide-react';
+import { Shield, Users, Cloud, Mail, GitBranch, ScrollText, Database, Loader2, Plus, RefreshCw, Save, Zap, Trash2, Inbox } from 'lucide-react';
 import { api, formatBytes, formatDate } from '../api';
 import { useToast } from '../components/Toast';
 import Modal from '../components/Modal';
-import type { AdminUser, Backup } from '../types';
+import type { AdminUser, Backup, EmailLogEntry } from '../types';
 
-type TabKey = 'account' | 'admins' | 'security' | 'captcha' | 's3' | 'smtp' | 'replication' | 'audit' | 'backups';
+type TabKey = 'account' | 'admins' | 'security' | 'captcha' | 's3' | 'smtp' | 'replication' | 'audit' | 'backups' | 'emaillog';
 
 interface TabDef { key: TabKey; label: string; icon: typeof Shield; }
 
@@ -17,10 +17,11 @@ const tabs: TabDef[] = [
   { key: 'security', label: 'Security & Rate Limits', icon: Shield },
   { key: 'captcha', label: 'Captcha', icon: Shield },
   { key: 's3', label: 'S3 Storage', icon: Cloud },
-  { key: 'smtp', label: 'SMTP', icon: Mail },
+  { key: 'smtp', label: 'Email', icon: Mail },
   { key: 'replication', label: 'Replication', icon: GitBranch },
   { key: 'audit', label: 'Audit Log', icon: ScrollText },
   { key: 'backups', label: 'Backups', icon: Database },
+  { key: 'emaillog', label: 'Email Log', icon: Inbox },
 ];
 
 const inputCls = 'w-full px-3 py-2 rounded-lg bg-bg-input border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors text-sm';
@@ -49,6 +50,13 @@ export default function Settings() {
   const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ email: '', password: '' });
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [emailLog, setEmailLog] = useState<EmailLogEntry[]>([]);
+  const [emailLogTotal, setEmailLogTotal] = useState(0);
+  const [emailLogOffset, setEmailLogOffset] = useState(0);
+  const [emailLogLoading, setEmailLogLoading] = useState(false);
+  const [showClearEmailLog, setShowClearEmailLog] = useState(false);
+  const emailLogLimit = 50;
 
   const auditLimit = 50;
 
@@ -60,7 +68,7 @@ export default function Settings() {
       // Secret fields are write-only — never populate them from the backend response.
       // They come back as "••••••••" (secretMask) which would break the password
       // confirmation check in saveConfig if loaded into the form.
-      const secretKeys = new Set(['admin_password', 'jwt_secret', 's3_secret_key', 'smtp_password', 'captcha_secret']);
+      const secretKeys = new Set(['admin_password', 'jwt_secret', 's3_secret_key', 'smtp_password', 'email_api_key', 'email_api_secret', 'captcha_secret']);
       for (const [k, v] of Object.entries(data)) {
         if (secretKeys.has(k)) continue;
         if (typeof v === 'boolean' || typeof v === 'string') flat[k] = v;
@@ -105,12 +113,39 @@ export default function Settings() {
     try { const d = await api<{ backups: Backup[] }>('/admin/backups'); setBackups(d.backups || []); } catch { /* */ }
   }, []);
 
+  const loadEmailLog = useCallback(async (offset = 0) => {
+    setEmailLogLoading(true);
+    try {
+      const d = await api<{ data: EmailLogEntry[]; total: number }>(`/admin/email-log?limit=${emailLogLimit}&offset=${offset}`);
+      if (offset === 0) {
+        setEmailLog(d.data || []);
+      } else {
+        setEmailLog((prev) => [...prev, ...(d.data || [])]);
+      }
+      setEmailLogTotal(d.total ?? 0);
+      setEmailLogOffset(offset);
+    } catch { /* */ }
+    finally { setEmailLogLoading(false); }
+  }, []);
+
+  const handleClearEmailLog = async () => {
+    try {
+      await api('/admin/email-log', { method: 'DELETE' });
+      showToast('Email log cleared', 'success');
+      setShowClearEmailLog(false);
+      setEmailLog([]);
+      setEmailLogTotal(0);
+      setEmailLogOffset(0);
+    } catch (err) { showToast((err as Error).message, 'error'); }
+  };
+
   useEffect(() => { loadConfig(); loadSystemInfo(); }, [loadConfig, loadSystemInfo]);
 
   useEffect(() => {
     if (tab === 'admins') loadAdmins();
     else if (tab === 'audit') { setAuditOffset(0); loadAudit(0, auditAction, auditTarget); }
     else if (tab === 'backups') loadBackups();
+    else if (tab === 'emaillog') { setEmailLogOffset(0); loadEmailLog(0); }
     else setLoading(false);
   }, [tab]);
 
@@ -123,7 +158,7 @@ export default function Settings() {
     setSaving(true);
     try {
       const body: Record<string, unknown> = { ...form };
-      if (body.peers && typeof body.peers === 'string') {
+      if (typeof body.peers === 'string') {
         body.peers = (body.peers as string).split('\n').map((s: string) => s.trim()).filter(Boolean);
       }
       // Convert numeric fields from string to number for the backend
@@ -157,6 +192,18 @@ export default function Settings() {
       showToast((err as Error).message, 'error');
     }
   }, [showToast]);
+
+  const handleTestSmtp = async () => {
+    setTestingSmtp(true);
+    try {
+      await api('/admin/smtp/test', { method: 'POST' });
+      showToast('Test email sent successfully', 'success');
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    } finally {
+      setTestingSmtp(false);
+    }
+  };
 
   const handleAddAdmin = async () => {
     try {
@@ -325,17 +372,29 @@ export default function Settings() {
           </div>
         );
 
-      case 'smtp':
+      case 'smtp': {
+        const provider = (form.email_provider as string) || 'smtp';
+        const isSmtp = provider === 'smtp';
+        const isMailjet = provider === 'mailjet';
         return (
           <div className="space-y-4 max-w-md">
+            {sel('email_provider', 'Provider', ['smtp', 'resend', 'mailtrap', 'brevo', 'mailjet'])}
+            {!isSmtp && f('email_api_key', 'API Key', { type: 'password', ph: 'Leave blank to keep current' })}
+            {!isSmtp && isMailjet && f('email_api_secret', 'API Secret', { type: 'password', ph: 'Leave blank to keep current' })}
             {f('email_verification', 'Enable Email Verification', { toggle: true })}
-            {f('smtp_host', 'SMTP Host')}
-            {f('smtp_port', 'Port', { type: 'number' })}
             {f('smtp_sender', 'Sender Email', { type: 'email' })}
-            {f('smtp_user', 'Username')}
-            {f('smtp_password', 'Password', { type: 'password', ph: 'Leave blank to keep current' })}
+            {isSmtp && f('smtp_host', 'SMTP Host')}
+            {isSmtp && f('smtp_port', 'Port', { type: 'number' })}
+            {isSmtp && f('smtp_user', 'Username')}
+            {isSmtp && f('smtp_password', 'Password', { type: 'password', ph: 'Leave blank to keep current' })}
+            <div className="pt-4 border-t border-border">
+              <button onClick={handleTestSmtp} disabled={testingSmtp} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors">
+                {testingSmtp ? <Loader2 className="w-4 h-4 animate-spin" /> : null}{testingSmtp ? 'Sending...' : 'Send Test Email'}
+              </button>
+              <p className="text-xs text-text-muted mt-2">Sends a test email to the configured admin email address.</p>
+            </div>
           </div>
-        );
+        );}
 
       case 'replication':
         return (
@@ -449,6 +508,81 @@ export default function Settings() {
                 ))}
               </div>
             )}
+          </div>
+        );
+
+      case 'emaillog':
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-text-primary font-semibold">Email Log ({emailLogTotal})</h3>
+              {emailLog.length > 0 && (
+                <button onClick={() => setShowClearEmailLog(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-danger/30 text-danger text-sm font-medium hover:bg-danger/10 transition-colors">
+                  <Trash2 className="w-4 h-4" /> Clear Log
+                </button>
+              )}
+            </div>
+
+            {emailLog.length === 0 ? (
+              <p className="text-text-muted text-sm py-8 text-center">No email log entries yet</p>
+            ) : (
+              <div className="border border-border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-bg-input text-text-muted text-xs uppercase">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-medium">Time</th>
+                      <th className="text-left px-4 py-3 font-medium">Provider</th>
+                      <th className="text-left px-4 py-3 font-medium">To</th>
+                      <th className="text-left px-4 py-3 font-medium">Subject</th>
+                      <th className="text-center px-4 py-3 font-medium">Status</th>
+                      <th className="text-left px-4 py-3 font-medium">Error</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {emailLog.map((e) => (
+                      <tr key={e.id} className="hover:bg-bg-input/50 transition-colors">
+                        <td className="px-4 py-3 text-xs text-text-muted whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-xs text-text-secondary">{e.provider}</td>
+                        <td className="px-4 py-3 text-xs text-text-primary">{e.to}</td>
+                        <td className="px-4 py-3 text-xs text-text-primary max-w-[200px] truncate" title={e.subject}>{e.subject}</td>
+                        <td className="px-4 py-3 text-center">
+                          {e.success ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-success font-medium">✔ Sent</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs text-danger font-medium">✘ Failed</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-danger max-w-[200px] truncate" title={e.error}>{e.error || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {emailLog.length < emailLogTotal && (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => loadEmailLog(emailLogOffset + emailLogLimit)}
+                  disabled={emailLogLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                >
+                  {emailLogLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Load More ({emailLog.length} / {emailLogTotal})
+                </button>
+              </div>
+            )}
+
+            {/* Clear Log Confirmation */}
+            <Modal isOpen={showClearEmailLog} onClose={() => setShowClearEmailLog(false)} title="Clear Email Log" size="sm">
+              <div className="space-y-4">
+                <p className="text-text-secondary text-sm">Clear all email log entries? This cannot be undone.</p>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setShowClearEmailLog(false)} className="px-4 py-2 rounded-lg text-text-secondary text-sm hover:bg-bg-input transition-colors">Cancel</button>
+                  <button onClick={handleClearEmailLog} className="px-4 py-2 rounded-lg bg-danger text-white text-sm font-medium hover:bg-red-600 transition-colors">Clear</button>
+                </div>
+              </div>
+            </Modal>
           </div>
         );
 

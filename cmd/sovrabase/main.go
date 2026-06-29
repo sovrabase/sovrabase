@@ -19,12 +19,15 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -34,6 +37,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/dashboard"
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/email"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/plugin"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
@@ -60,13 +64,22 @@ func main() {
 		logger.Warn("Using default JWT secret — CHANGE IT in config.yaml or SOVRABASE_JWT_SECRET environment variable")
 	}
 
+	// Kill any stale sovrabase instance that might be holding PebbleDB locks
+	// (common after Ctrl+C on Windows, where the process doesn't fully exit).
+	killStaleInstances(logger)
+
 	// Initialize database engine
 	engine, err := db.NewEngine(filepath.Join(cfg.DataDir, "db"))
 	if err != nil {
 		logger.Error("Failed to open database", "error", err)
 		os.Exit(1)
 	}
-	defer engine.Close()
+	engineClosed := false
+	defer func() {
+		if !engineClosed {
+			engine.Close()
+		}
+	}()
 
 	// Initialize auth service — backed by PebbleDB so accounts survive restarts.
 	userStore := auth.NewDBUserStore(engine)
@@ -185,6 +198,24 @@ func main() {
 	// Wire team store into admin server
 	adminServer.SetTeamStore(projectMgr.GetTeamStore())
 
+	// Initialize email log store (uses master DB for global storage)
+	emailLogStore := email.NewLogStore(engine.DB())
+	adminServer.SetEmailLogStore(emailLogStore)
+
+	// Initialize and wire mailer with logging wrapper
+	mailer := email.NewMailer(email.Config{
+		Provider:  email.Provider(cfg.EmailProvider),
+		Sender:    cfg.SMTPSender,
+		SMTPHost:  cfg.SMTPHost,
+		SMTPPort:  cfg.SMTPPort,
+		SMTPUser:  cfg.SMTPUser,
+		SMTPPass:  cfg.SMTPPassword,
+		APIKey:    cfg.EmailAPIKey,
+		APISecret: cfg.EmailAPISecret,
+	})
+	loggedMailer := email.NewLoggedMailer(mailer, emailLogStore, cfg.EmailProvider, cfg.SMTPSender)
+	adminServer.SetMailer(loggedMailer)
+
 	adminServer.RegisterRoutes(adminMux)
 	server.RegisterAdmin(adminMux)
 
@@ -277,24 +308,11 @@ func main() {
 	}()
 
 	// Restart channel: when a restart is requested via the dashboard
+	restartCh := make(chan struct{}, 1)
 	adminServer.OnRestart = func() {
 		logger.Info("Restart requested via dashboard — respawning...")
-		go func() {
-			time.Sleep(300 * time.Millisecond)
-			exe, err := os.Executable()
-			if err != nil {
-				exe = os.Args[0]
-			}
-			cmd := exec.Command(exe, os.Args[1:]...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			cmd.Stdin = os.Stdin
-			if startErr := cmd.Start(); startErr != nil {
-				logger.Error("Failed to restart process", "error", startErr)
-				return
-			}
-			cancel()
-		}()
+		restartCh <- struct{}{}
+		cancel()
 	}
 
 	// Start server in a goroutine
@@ -327,5 +345,42 @@ func main() {
 		logger.Error("MeterStore close error", "error", err)
 	}
 
+	// If restart was requested, spawn new process after releasing PebbleDB locks.
+	select {
+	case <-restartCh:
+		projectMgr.Close()
+		engine.Close()
+		engineClosed = true
+		exe, err := os.Executable()
+		if err != nil {
+			exe = os.Args[0]
+		}
+		if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(exe), ".exe") {
+			exe += ".exe"
+		}
+		cmd := exec.Command(exe, os.Args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if startErr := cmd.Start(); startErr != nil {
+			logger.Error("Failed to restart process", "error", startErr)
+		}
+		os.Exit(0)
+	default:
+	}
+
 	logger.Info("Sovrabase stopped")
+}
+
+// killStaleInstances force-kills any old sovrabase.exe process that may be
+// holding PebbleDB file locks after an unclean Ctrl+C on Windows.
+func killStaleInstances(logger *slog.Logger) {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	ourPID := os.Getpid()
+	cmd := exec.Command("taskkill", "/F", "/IM", "sovrabase.exe", "/FI", fmt.Sprintf("PID ne %d", ourPID))
+	out, _ := cmd.CombinedOutput()
+	if strings.Contains(string(out), "SUCCESS") {
+		logger.Info("Cleaned up stale sovrabase instance(s)")
+	}
 }

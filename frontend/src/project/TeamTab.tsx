@@ -22,6 +22,7 @@ export default function TeamTab({ projectId }: Props) {
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const [copied, setCopied] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<Role | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -110,11 +111,12 @@ export default function TeamTab({ projectId }: Props) {
     if (!email) return;
     setSubmitting(true);
     try {
-      const res = await api<{ invitation: unknown; invite_link: string }>(`/admin/projects/${encodeURIComponent(projectId)}/invite`, {
+      const res = await api<{ invitation: unknown; invite_link: string; email_sent?: boolean }>(`/admin/projects/${encodeURIComponent(projectId)}/invite`, {
         method: 'POST',
         body: JSON.stringify({ email, role }),
       });
       setInviteLink(res.invite_link);
+      setEmailSent(res.email_sent ?? false);
       showToast('Invitation created', 'success');
       loadMembers();
     } catch (e) {
@@ -217,10 +219,14 @@ export default function TeamTab({ projectId }: Props) {
       )}
 
       {/* Invite Modal */}
-      <Modal isOpen={inviteOpen} onClose={() => { setInviteOpen(false); setInviteLink(null); }} title={inviteLink ? 'Invite Created' : 'Invite Team Member'}>
+      <Modal isOpen={inviteOpen} onClose={() => { setInviteOpen(false); setInviteLink(null); setEmailSent(false); }} title={inviteLink ? 'Invite Created' : 'Invite Team Member'}>
         {inviteLink ? (
           <div className="space-y-4">
-            <p className="text-text-muted text-sm">Share this link with the invitee. They must be logged in to accept the invitation.</p>
+            {emailSent ? (
+              <p className="text-sm text-success font-medium">✓ Invitation email sent</p>
+            ) : (
+              <p className="text-text-muted text-sm">Share this link with the invitee. They must be logged in to accept the invitation.</p>
+            )}
             <div className="flex items-center gap-2 bg-bg-input border border-border rounded-lg px-3 py-2.5">
               <Link2 className="w-4 h-4 text-text-muted shrink-0" />
               <code className="flex-1 text-text-primary text-xs font-mono break-all">{inviteLink}</code>

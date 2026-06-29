@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,12 +30,30 @@ type Engine struct {
 
 // NewEngine opens (or creates) a Pebble database at the given directory.
 func NewEngine(dataDir string) (*Engine, error) {
+	// Clean up orphaned LOCK file from a previous crash/unclean shutdown.
+	// On Windows, Ctrl+C can leave the LOCK file behind even though the
+	// process that held it is gone. If we can open the file for writing,
+	// no process holds the lock and it's safe to delete.
+	cleanupOrphanedLock(dataDir)
+
 	opts := tunedPebbleOptions()
 	db, err := pebble.Open(dataDir, opts)
 	if err != nil {
 		return nil, fmt.Errorf("db: open pebble: %w", err)
 	}
 	return &Engine{db: db}, nil
+}
+
+// cleanupOrphanedLock removes the Pebble LOCK file if the process that held
+// it has already exited. Pebble opens its LOCK with shareMode=0 (no sharing),
+// which means the file cannot be deleted while the owning process lives.
+// If os.Remove succeeds, the old process is definitively dead.
+func cleanupOrphanedLock(dataDir string) {
+	lockFile := filepath.Join(dataDir, "LOCK")
+	if _, err := os.Stat(lockFile); os.IsNotExist(err) {
+		return
+	}
+	os.Remove(lockFile)
 }
 
 // tunedPebbleOptions returns PebbleDB options tuned for a BaaS workload:
