@@ -14,7 +14,7 @@ const redocTemplate = `<!DOCTYPE html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sovrabase API Reference</title>
-  <style>body{margin:0;padding:0}</style>
+  <style>body{margin:0;padding:0;background:#121215}</style>
 </head>
 <body>
   <div id="redoc"></div>
@@ -32,7 +32,7 @@ const redocTemplate = `<!DOCTYPE html>
             primary: { main: '#5b5bff' },
             success: { main: '#00c853' },
             error: { main: '#ff5252' },
-            text: { primary: '#e0e0e0', secondary: '#5c5c66' },
+            text: { primary: '#e0e0e0', secondary: '#9e9eaa' },
             http: { get: '#61affe', post: '#49cc90', put: '#fca130', delete: '#f93e3e' },
           },
           typography: {
