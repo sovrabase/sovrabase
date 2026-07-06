@@ -1,7 +1,9 @@
 // Package dashboard provides an embedded admin dashboard for the Sovrabase
 // Control Plane. It serves a React SPA built with Vite at ../frontend/.
 //
-// Build: cd ../frontend && npm run build && cp -r dist ../internal/dashboard/
+// Build:
+//   make build-frontend   (local)
+//   docker build .        (multi-stage Dockerfile rebuilds frontend)
 package dashboard
 
 import (

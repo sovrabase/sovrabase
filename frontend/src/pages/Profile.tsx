@@ -28,7 +28,9 @@ export default function Profile() {
     try {
       const [data, config] = await Promise.all([
         api<MyProfile>('/admin/members/me'),
-        api<{ admin_password_locked?: boolean }>('/admin/config').catch(() => ({})),
+        api<{ admin_password_locked?: boolean }>('/admin/config').catch(
+          (): { admin_password_locked?: boolean } => ({}),
+        ),
       ]);
       setProfile(data);
       setName(data.name || '');

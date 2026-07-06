@@ -1,0 +1,24 @@
+#!/bin/sh
+# Rebuild embedded dashboard when frontend sources are staged.
+# Install: make install-hooks
+
+set -e
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+if ! printf '%s\n' "$staged" | grep -qE '^frontend/'; then
+	exit 0
+fi
+
+if printf '%s\n' "$staged" | grep -qE '^frontend/node_modules/'; then
+	echo "pre-commit: refusing commit with staged frontend/node_modules files"
+	exit 1
+fi
+
+echo "pre-commit: frontend changed — rebuilding dashboard..."
+(cd frontend && npm install --silent && npm run build)
+rm -rf internal/dashboard/dist
+cp -r frontend/dist internal/dashboard/dist
+git add internal/dashboard/dist
