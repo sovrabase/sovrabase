@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Copy, Eye, EyeOff, Save, Database, Globe, Settings, Check } from 'lucide-react';
-import { api, formatBytes, formatDate } from '../api';
+import { api, adminProjectPath, formatBytes, formatDate } from '../api';
 import { useToast } from '../components/Toast';
 import type { Project } from '../types';
 
@@ -91,7 +91,7 @@ export default function OverviewTab({ projectId }: Props) {
 
   useEffect(() => {
     fetchDetail();
-    api<UsageData>(`/admin/projects/${encodeURIComponent(projectId)}/usage`).then(setUsage).catch(() => {});
+    api<UsageData>(adminProjectPath(projectId, '/usage')).then(setUsage).catch(() => setUsage(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 

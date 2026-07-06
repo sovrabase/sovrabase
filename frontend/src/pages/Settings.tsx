@@ -3,6 +3,7 @@ import { Shield, Users, Cloud, Mail, GitBranch, ScrollText, Database, Loader2, P
 import { api, formatBytes, formatDate } from '../api';
 import { useToast } from '../components/Toast';
 import Modal from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import type { AdminUser, Backup, EmailLogEntry } from '../types';
 
 type TabKey = 'account' | 'admins' | 'security' | 'captcha' | 's3' | 'smtp' | 'replication' | 'audit' | 'backups' | 'emaillog';
@@ -56,6 +57,7 @@ export default function Settings() {
   const [emailLogOffset, setEmailLogOffset] = useState(0);
   const [emailLogLoading, setEmailLogLoading] = useState(false);
   const [showClearEmailLog, setShowClearEmailLog] = useState(false);
+  const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
   const [retryingEmail, setRetryingEmail] = useState<string | null>(null);
   const emailLogLimit = 50;
 
@@ -111,8 +113,25 @@ export default function Settings() {
   }, []);
 
   const loadBackups = useCallback(async () => {
-    try { const d = await api<{ backups: Backup[] }>('/admin/backups'); setBackups(d.backups || []); } catch { /* */ }
+    try {
+      const d = await api<{ backups: Backup[] }>('/admin/backups');
+      setBackups(d.backups || []);
+    } catch {
+      setBackups([]);
+    }
   }, []);
+
+  const handleDeleteBackup = async () => {
+    if (!backupToDelete) return;
+    try {
+      await api(`/admin/backups/${encodeURIComponent(backupToDelete)}`, { method: 'DELETE' });
+      showToast('Backup deleted', 'success');
+      setBackupToDelete(null);
+      loadBackups();
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    }
+  };
 
   const loadEmailLog = useCallback(async (offset = 0) => {
     setEmailLogLoading(true);
@@ -523,7 +542,7 @@ export default function Settings() {
                         className="px-3 py-1.5 rounded-lg border border-border text-text-secondary text-xs hover:text-text-primary hover:bg-bg-card transition-colors"
                       >Download</button>
                       <button
-                        onClick={async () => { if (!confirm(`Delete backup "${b.name}"?`)) return; try { await api(`/admin/backups/${encodeURIComponent(b.name)}`, { method: 'DELETE' }); showToast('Backup deleted', 'success'); loadBackups(); } catch (e) { showToast((e as Error).message, 'error'); } }}
+                        onClick={() => setBackupToDelete(b.name)}
                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-danger text-xs hover:bg-danger/10 transition-colors"
                       ><Trash2 className="w-3.5 h-3.5" /> Delete</button>
                     </div>
@@ -722,6 +741,16 @@ export default function Settings() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={backupToDelete !== null}
+        title="Delete backup"
+        message={backupToDelete ? `Delete backup "${backupToDelete}"? This cannot be undone.` : ''}
+        confirmLabel="Delete"
+        variant="danger"
+        onCancel={() => setBackupToDelete(null)}
+        onConfirm={handleDeleteBackup}
+      />
 
       {/* Danger Zone */}
       <div className="mt-8 p-6 bg-danger/5 border border-danger/20 rounded-xl">

@@ -10,9 +10,10 @@ import {
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react';
-import { api, formatBytes } from '../api';
+import { api, adminProjectPath, formatBytes } from '../api';
 import type { ServerlessFunction, TestResult } from '../types';
 import Modal from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 import FunctionMetricsChart from './FunctionMetricsChart';
 
@@ -126,12 +127,13 @@ export default function FunctionsTab({ projectId, apiKey }: Props) {
   const [testBody, setTestBody] = useState('');
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
   const { showToast } = useToast();
 
   const load = useCallback(() => {
     setLoading(true);
-    api<{ data: ServerlessFunction[] }>(`/admin/projects/${encodeURIComponent(projectId)}/functions`)
+    api<{ data: ServerlessFunction[] }>(adminProjectPath(projectId, '/functions'))
       .then((res) => {
         const list = res.data || [];
         setFns(list);
@@ -201,13 +203,14 @@ export default function FunctionsTab({ projectId, apiKey }: Props) {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this function?')) return;
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
     try {
-      await api(`/admin/projects/${encodeURIComponent(projectId)}/functions/${encodeURIComponent(id)}`, {
+      await api(adminProjectPath(projectId, `/functions/${encodeURIComponent(deleteTargetId)}`), {
         method: 'DELETE',
       });
-      if (selectedId === id) setSelectedId(null);
+      if (selectedId === deleteTargetId) setSelectedId(null);
+      setDeleteTargetId(null);
       showToast('Function deleted', 'success');
       load();
     } catch (err) {
@@ -383,7 +386,7 @@ export default function FunctionsTab({ projectId, apiKey }: Props) {
                       )}
                     </button>
                     <button
-                      onClick={() => handleDelete(selected.id)}
+                      onClick={() => setDeleteTargetId(selected.id)}
                       className="p-2 rounded-md text-text-muted hover:text-danger hover:bg-danger/10"
                       title="Delete"
                     >
@@ -706,6 +709,16 @@ export default function FunctionsTab({ projectId, apiKey }: Props) {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        isOpen={deleteTargetId !== null}
+        title="Delete function"
+        message="Delete this function? This cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

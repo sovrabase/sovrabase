@@ -22,20 +22,19 @@ func TestGenerateMFASecret(t *testing.T) {
 }
 
 func TestTOTPKnownVector(t *testing.T) {
-	// RFC 6238 test vectors use a known secret and check specific codes.
-	// Secret: ASCII "12345678901234567890" → base32: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+	// HMAC-SHA-256 TOTP vectors (secret decodes to ASCII "12345678901234567890").
 	secret := "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 
-	// Known T=59 → counter=1 → expected code: 287082
+	// T=59 → counter=1
 	code := computeTOTP(secret, 1)
-	if code != "287082" {
-		t.Errorf("T=59: expected 287082, got %s", code)
+	if code != "247374" {
+		t.Errorf("T=59: expected 247374, got %s", code)
 	}
 
-	// Known T=1111111109 → counter=37037036 → expected code: 081804
+	// T=1111111109 → counter=37037036
 	code = computeTOTP(secret, 37037036)
-	if code != "081804" {
-		t.Errorf("T=1111111109: expected 081804, got %s", code)
+	if code != "756375" {
+		t.Errorf("T=1111111109: expected 756375, got %s", code)
 	}
 }
 
@@ -75,6 +74,9 @@ func TestGenerateOTPUri(t *testing.T) {
 	}
 	if !contains(uri, "secret=JBSWY3DPEHPK3PXP") {
 		t.Errorf("URI doesn't contain secret: %s", uri)
+	}
+	if !contains(uri, "algorithm=SHA256") {
+		t.Errorf("URI should use SHA256 algorithm: %s", uri)
 	}
 	if !contains(uri, "issuer=TestApp") {
 		t.Errorf("URI doesn't contain issuer: %s", uri)

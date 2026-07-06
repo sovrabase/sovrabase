@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, HardDrive, FolderOpen, FileText, Upload, Download, Eye, Trash2, Loader2 } from 'lucide-react';
-import { api, formatBytes, formatDate } from '../api';
+import { api, adminProjectPath, formatBytes, formatDate } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
@@ -28,7 +28,10 @@ export default function StorageTab({ projectId }: Props) {
 
   useEffect(() => {
     setLoadingBuckets(true);
-    api<{ buckets: string[] }>(`/admin/projects/${encodeURIComponent(projectId)}/storage/buckets`).then((d) => setBuckets((d.buckets || []).map((s) => ({ name: s })))).catch(() => {}).finally(() => setLoadingBuckets(false));
+    api<{ buckets: string[] }>(adminProjectPath(projectId, '/storage/buckets'))
+      .then((d) => setBuckets((d.buckets || []).map((s) => ({ name: s }))))
+      .catch(() => setBuckets([]))
+      .finally(() => setLoadingBuckets(false));
   }, [projectId]);
 
   const loadFiles = useCallback(async (bucketName: string) => {

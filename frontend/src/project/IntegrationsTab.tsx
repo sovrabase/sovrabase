@@ -67,7 +67,7 @@ export default function IntegrationsTab({ projectId }: Props) {
       for (const field of editing.config_fields) {
         const val = editConfig[field.key] ?? '';
         if (field.type === 'boolean') {
-          config[field.key] = val === 'true' || val === 'true';
+          config[field.key] = val === 'true';
         } else if (field.type === 'number') {
           config[field.key] = val === '' ? 0 : Number(val);
         } else {

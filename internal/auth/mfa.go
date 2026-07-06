@@ -3,7 +3,7 @@ package auth
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
@@ -31,7 +31,7 @@ func GenerateOTPUri(secret, accountName, issuer string) string {
 	}
 	// URL-encode the label.
 	label := fmt.Sprintf("%s:%s", issuer, accountName)
-	return fmt.Sprintf("otpauth://totp/%s?secret=%s&issuer=%s&algorithm=SHA1&digits=6&period=30",
+	return fmt.Sprintf("otpauth://totp/%s?secret=%s&issuer=%s&algorithm=SHA256&digits=6&period=30",
 		label, secret, issuer)
 }
 
@@ -74,8 +74,8 @@ func computeTOTP(secret string, counter int64) string {
 	var buf [8]byte
 	binary.BigEndian.PutUint64(buf[:], uint64(counter))
 
-	// HMAC-SHA1.
-	mac := hmac.New(sha1.New, key)
+	// HMAC-SHA-256 (RFC 6238).
+	mac := hmac.New(sha256.New, key)
 	mac.Write(buf[:])
 	hash := mac.Sum(nil)
 

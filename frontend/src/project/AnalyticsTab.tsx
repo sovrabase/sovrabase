@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BarChart3, TrendingUp, Clock, RefreshCw, Loader2 } from 'lucide-react';
-import { api } from '../api';
+import { api, adminProjectPath } from '../api';
 
 interface TopEvent {
   name: string;
@@ -28,9 +28,9 @@ export default function AnalyticsTab({ projectId }: Props) {
 
   const load = useCallback(() => {
     setLoading(true);
-    api<AnalyticsData>(`/admin/projects/${encodeURIComponent(projectId)}/analytics`)
+    api<AnalyticsData>(adminProjectPath(projectId, '/analytics'))
       .then(setData)
-      .catch(() => {})
+      .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [projectId]);
 

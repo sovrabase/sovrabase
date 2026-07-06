@@ -62,6 +62,11 @@ export function hasToken(): boolean {
   return !!getToken();
 }
 
+/** Build `/admin/projects/{id}/suffix` without repeating encodeURIComponent. */
+export function adminProjectPath(projectId: string, suffix: string): string {
+  return `/admin/projects/${encodeURIComponent(projectId)}${suffix}`;
+}
+
 // ===== Utility =====
 export function escapeHtml(str: string): string {
   return str

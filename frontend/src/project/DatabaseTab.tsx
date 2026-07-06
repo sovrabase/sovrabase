@@ -172,7 +172,8 @@ export default function DatabaseTab({ projectId }: Props) {
       .then((d) => setCollections((d.collections || []).map((c) =>
         typeof c === 'string' ? { name: c } : c
       )))
-      .catch(() => {}).finally(() => setLoadingCols(false));
+      .catch(() => setCollections([]))
+      .finally(() => setLoadingCols(false));
   }, [projectId]);
 
   const loadDocs = useCallback(async (colName: string): Promise<DatabaseDocument[]> => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Search, Users, Shield, Mail, Key, Loader2, Check, Globe, Zap, Pencil, ChevronDown, ChevronUp, SlidersHorizontal, Eye, EyeOff } from 'lucide-react';
-import { api, formatDate } from '../api';
+import { api, adminProjectPath, formatDate } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import type { OAuthProvider } from '../types';
@@ -242,8 +242,8 @@ export default function AuthTab({ projectId }: Props) {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api<UserRow[]>(`/admin/projects/${encodeURIComponent(projectId)}/users`).then((d) => setUsers(d || [])).catch(() => {}),
-      api<{ providers: OAuthProvider[] }>(`/admin/projects/${encodeURIComponent(projectId)}/auth/providers`).then((d) => setProviders(d.providers || [])).catch(() => {}),
+      api<UserRow[]>(adminProjectPath(projectId, '/users')).then((d) => setUsers(d || [])).catch(() => setUsers([])),
+      api<{ providers: OAuthProvider[] }>(adminProjectPath(projectId, '/auth/providers')).then((d) => setProviders(d.providers || [])).catch(() => setProviders([])),
     ]).finally(() => setLoading(false));
   }, [projectId]);
 

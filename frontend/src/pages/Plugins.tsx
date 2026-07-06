@@ -33,7 +33,7 @@ export default function Plugins() {
     loadPlugins();
     api<{ integrations: IntegrationDef[] }>('/admin/integrations/catalog')
       .then((d) => setCatalog(d.integrations || []))
-      .catch(() => {})
+      .catch(() => setCatalog([]))
       .finally(() => setCatLoading(false));
   }, [loadPlugins]);
 

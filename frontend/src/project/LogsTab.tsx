@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Trash2, Loader2, Activity, Cloud, HardDrive, Database } from 'lucide-react';
-import { api, formatBytes, formatDate } from '../api';
+import { api, adminProjectPath, formatBytes, formatDate } from '../api';
+import { useToast } from '../components/Toast';
 
 interface LogEntry { timestamp: string; method: string; path: string; status: number; duration: string; ip?: string; }
 interface UsageMetrics {
@@ -21,6 +22,7 @@ const METHOD_COLORS: Record<string, string> = {
 };
 
 export default function LogsTab({ projectId }: Props) {
+  const { showToast } = useToast();
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [usage, setUsage] = useState<UsageMetrics>({});
   const [loading, setLoading] = useState(true);
@@ -31,9 +33,9 @@ export default function LogsTab({ projectId }: Props) {
     setLoading(true);
     Promise.all([
       api<{ entries: LogEntry[]; total: number; limit: number; offset: number }>(
-        `/admin/projects/${encodeURIComponent(projectId)}/logs?limit=${LOG_PAGE_SIZE}`
+        adminProjectPath(projectId, `/logs?limit=${LOG_PAGE_SIZE}`),
       ).catch(() => ({ entries: [], total: 0, limit: LOG_PAGE_SIZE, offset: 0 })),
-      api<UsageMetrics>(`/admin/projects/${encodeURIComponent(projectId)}/usage`).catch(() => ({})),
+      api<UsageMetrics>(adminProjectPath(projectId, '/usage')).catch((): UsageMetrics => ({})),
     ]).then(([logsResp, usageData]) => {
       setEntries(logsResp.entries || []);
       setLogTotal(logsResp.total || 0);
@@ -44,7 +46,13 @@ export default function LogsTab({ projectId }: Props) {
   useEffect(() => { load(); }, [load]);
 
   const clearLogs = async () => {
-    try { await api(`/admin/projects/${encodeURIComponent(projectId)}/logs`, { method: 'DELETE' }); setEntries([]); setLogTotal(0); } catch {}
+    try {
+      await api(adminProjectPath(projectId, '/logs'), { method: 'DELETE' });
+      setEntries([]);
+      setLogTotal(0);
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
   };
 
   const methodColor = (m: string) => METHOD_COLORS[m] || 'bg-bg-input text-text-secondary';
