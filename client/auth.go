@@ -118,7 +118,7 @@ func (c *Client) SignInWithMFA(email, password string) (*SignInResult, error) {
 		"password": password,
 	}
 	var result SignInResult
-	if err := c.doJSON("POST", "/auth/v1/signin-mfa", body, &result); err != nil {
+	if err := c.doJSON("POST", "/auth/v1/signin", body, &result); err != nil {
 		// If server returned mfa_required, try to extract the SignInResult from the error.
 		if strings.Contains(err.Error(), "mfa_required") {
 			return nil, err
@@ -139,7 +139,7 @@ func (c *Client) CompleteMFAChallenge(challengeToken, code string) (*TokenPair, 
 		"code":            code,
 	}
 	var token TokenPair
-	if err := c.doJSON("POST", "/auth/v1/mfa/complete", body, &token); err != nil {
+	if err := c.doJSON("POST", "/auth/v1/mfa/challenge", body, &token); err != nil {
 		return nil, err
 	}
 	c.SetAuth(token.AccessToken, token.RefreshToken)

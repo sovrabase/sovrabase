@@ -13,7 +13,7 @@ func (m *ResendMailer) IsConfigured() bool {
 	return m.cfg.APIKey != "" && m.cfg.Sender != ""
 }
 
-func (m *ResendMailer) SendMail(to []string, subject, body string) error {
+func (m *ResendMailer) SendMail(to []string, subject string, msg Message) error {
 	if !m.IsConfigured() {
 		return fmt.Errorf("email: Resend not configured")
 	}
@@ -21,7 +21,10 @@ func (m *ResendMailer) SendMail(to []string, subject, body string) error {
 		"from":    m.cfg.Sender,
 		"to":      to,
 		"subject": subject,
-		"text":    body,
+		"text":    msg.Text,
+	}
+	if msg.HTML != "" {
+		payload["html"] = msg.HTML
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {

@@ -13,7 +13,7 @@ func (m *BrevoMailer) IsConfigured() bool {
 	return m.cfg.APIKey != "" && m.cfg.Sender != ""
 }
 
-func (m *BrevoMailer) SendMail(to []string, subject, body string) error {
+func (m *BrevoMailer) SendMail(to []string, subject string, msg Message) error {
 	if !m.IsConfigured() {
 		return fmt.Errorf("email: Brevo not configured")
 	}
@@ -22,10 +22,13 @@ func (m *BrevoMailer) SendMail(to []string, subject, body string) error {
 		recipients[i] = map[string]string{"email": addr}
 	}
 	payload := map[string]interface{}{
-		"sender":     map[string]string{"email": m.cfg.Sender},
-		"to":         recipients,
-		"subject":    subject,
-		"textContent": body,
+		"sender":      map[string]string{"email": m.cfg.Sender},
+		"to":          recipients,
+		"subject":     subject,
+		"textContent": msg.Text,
+	}
+	if msg.HTML != "" {
+		payload["htmlContent"] = msg.HTML
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {

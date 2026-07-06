@@ -42,12 +42,13 @@ export default function EmailTemplatesTab({ projectId }: Props) {
     const form = e.currentTarget;
     const subject = (form.elements.namedItem('subject') as HTMLInputElement).value.trim();
     const body = (form.elements.namedItem('body') as HTMLTextAreaElement).value.trim();
+    const htmlBody = (form.elements.namedItem('html_body') as HTMLTextAreaElement)?.value.trim() ?? '';
     if (!subject || !body) return;
     setSubmitting(true);
     try {
       await api(`/admin/projects/${encodeURIComponent(projectId)}/email-templates`, {
         method: 'POST',
-        body: JSON.stringify({ type: editTarget.type, subject, body }),
+        body: JSON.stringify({ type: editTarget.type, subject, body, html_body: htmlBody }),
       });
       showToast('Template saved', 'success');
       setEditTarget(null);
@@ -146,8 +147,12 @@ export default function EmailTemplatesTab({ projectId }: Props) {
               <input name="subject" defaultValue={editTarget.subject} required className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-accent" />
             </div>
             <div>
-              <label className="block text-sm text-text-secondary mb-1">Body</label>
+              <label className="block text-sm text-text-secondary mb-1">Body (plain text)</label>
               <textarea name="body" defaultValue={editTarget.body} required rows={12} className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm font-mono placeholder:text-text-muted focus:outline-none focus:border-accent resize-y" />
+            </div>
+            <div>
+              <label className="block text-sm text-text-secondary mb-1">Body (HTML) <span className="text-text-muted font-normal">— optional, providers that support HTML will use it</span></label>
+              <textarea name="html_body" defaultValue={(editTarget as any).html_body || ''} rows={8} className="w-full bg-bg-input border border-border rounded-md px-3 py-2 text-text-primary text-sm font-mono placeholder:text-text-muted focus:outline-none focus:border-accent resize-y" placeholder="<html><body><p>Your content here</p></body></html>" />
             </div>
             <div className="bg-bg-input border border-border rounded-lg p-3">
               <p className="text-xs text-text-muted font-medium mb-1.5">Available variables:</p>

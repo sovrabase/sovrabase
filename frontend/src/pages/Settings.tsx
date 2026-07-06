@@ -56,6 +56,7 @@ export default function Settings() {
   const [emailLogOffset, setEmailLogOffset] = useState(0);
   const [emailLogLoading, setEmailLogLoading] = useState(false);
   const [showClearEmailLog, setShowClearEmailLog] = useState(false);
+  const [retryingEmail, setRetryingEmail] = useState<string | null>(null);
   const emailLogLimit = 50;
 
   const auditLimit = 50;
@@ -127,6 +128,19 @@ export default function Settings() {
     } catch { /* */ }
     finally { setEmailLogLoading(false); }
   }, []);
+
+  const handleRetryEmailEntry = async (id: string) => {
+    setRetryingEmail(id);
+    try {
+      await api(`/admin/email-log/${encodeURIComponent(id)}/retry`, { method: 'POST' });
+      showToast('Email re-sent successfully', 'success');
+      loadEmailLog(0);
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    } finally {
+      setRetryingEmail(null);
+    }
+  };
 
   const handleClearEmailLog = async () => {
     try {
@@ -376,9 +390,18 @@ export default function Settings() {
         const provider = (form.email_provider as string) || 'smtp';
         const isSmtp = provider === 'smtp';
         const isMailjet = provider === 'mailjet';
+        const PROVIDER_HELP: Record<string, string> = {
+          smtp: 'SMTP host/port — works with any SMTP server (Gmail, Mailgun, etc.)',
+          resend: 'Requires: API Key from resend.com. Domain must be verified on Resend.',
+          mailtrap: 'Requires: API Key from mailtrap.io. Perfect for testing (sandbox mode).',
+          brevo: 'Requires: API Key from brevo.com (ex Sendinblue).',
+          mailjet: 'Requires: API Key + Secret Key from mailjet.com.',
+          maildev: 'Built-in catch-all — emails are logged locally, never sent. No setup needed.',
+        };
         return (
           <div className="space-y-4 max-w-md">
-            {sel('email_provider', 'Provider', ['smtp', 'resend', 'mailtrap', 'brevo', 'mailjet'])}
+            {sel('email_provider', 'Provider', ['smtp', 'resend', 'mailtrap', 'brevo', 'mailjet', 'maildev'])}
+            <p className="text-xs text-text-muted -mt-2">{PROVIDER_HELP[provider]}</p>
             {!isSmtp && f('email_api_key', 'API Key', { type: 'password', ph: 'Leave blank to keep current' })}
             {!isSmtp && isMailjet && f('email_api_secret', 'API Secret', { type: 'password', ph: 'Leave blank to keep current' })}
             {f('email_verification', 'Enable Email Verification', { toggle: true })}
@@ -552,7 +575,21 @@ export default function Settings() {
                             <span className="inline-flex items-center gap-1 text-xs text-danger font-medium">✘ Failed</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-danger max-w-[200px] truncate" title={e.error}>{e.error || '—'}</td>
+                        <td className="px-4 py-3 text-xs text-danger max-w-[200px] truncate" title={e.error}>
+                          {e.error ? (
+                            <div className="flex items-center gap-2">
+                              <span className="truncate">{e.error}</span>
+                              <button
+                                onClick={() => handleRetryEmailEntry(e.id)}
+                                disabled={retryingEmail === e.id}
+                                className="shrink-0 p-1 rounded hover:bg-accent/10 text-accent transition-colors"
+                                title="Retry"
+                              >
+                                {retryingEmail === e.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          ) : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

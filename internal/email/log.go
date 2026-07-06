@@ -17,6 +17,8 @@ type EmailLogEntry struct {
 	From      string    `json:"from"`
 	To        string    `json:"to"`
 	Subject   string    `json:"subject"`
+	TextBody  string    `json:"text_body"`
+	HtmlBody  string    `json:"html_body"`
 	Success   bool      `json:"success"`
 	Error     string    `json:"error,omitempty"`
 }

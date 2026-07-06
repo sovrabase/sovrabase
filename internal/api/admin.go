@@ -484,6 +484,7 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/smtp/test", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleSmtpTest))))
 	mux.Handle("GET /admin/email-log", a.adminAuthMiddleware(http.HandlerFunc(a.handleListEmailLog)))
 	mux.Handle("DELETE /admin/email-log", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleClearEmailLog))))
+	mux.Handle("POST /admin/email-log/{id}/retry", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleRetryEmailLog))))
 	mux.Handle("POST /admin/restart", a.adminAuthMiddleware(http.HandlerFunc(a.handleRestart)))
 
 	// Database management endpoints
@@ -591,6 +592,18 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /admin/projects/{id}/integrations", a.adminAuthMiddleware(http.HandlerFunc(a.handleListProjectIntegrations)))
 	mux.Handle("PUT /admin/projects/{id}/integrations", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleSetProjectIntegrations))))
 	mux.Handle("POST /admin/projects/{id}/queues/{queueName}/make-visible", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminMakeVisible))))
+
+	// Serverless functions
+	mux.Handle("GET /admin/projects/{id}/functions", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListFunctions))))
+	mux.Handle("POST /admin/projects/{id}/functions", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminCreateFunction))))
+	mux.Handle("GET /admin/projects/{id}/functions/{functionId}", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminGetFunction))))
+	mux.Handle("PUT /admin/projects/{id}/functions/{functionId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminUpdateFunction))))
+	mux.Handle("DELETE /admin/projects/{id}/functions/{functionId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminDeleteFunction))))
+	mux.Handle("POST /admin/projects/{id}/functions/{functionId}/test", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminTestFunction))))
+	mux.Handle("GET /admin/projects/{id}/functions/{functionId}/executions", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListFunctionExecutions))))
+	mux.Handle("GET /admin/projects/{id}/functions/{functionId}/executions/{execId}", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminGetFunctionExecution))))
+	mux.Handle("GET /admin/projects/{id}/functions/{functionId}/metrics", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminFunctionMetrics))))
+	mux.Handle("GET /admin/projects/{id}/functions/metrics/summary", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminFunctionsMetricsSummary))))
 }
 
 // ─── Admin CRUD Handlers ─────────────────────────────────────────────────────
@@ -2474,10 +2487,12 @@ func (a *AdminServer) handleSmtpTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	subject := "Sovrabase SMTP Test"
-	body := "This is a test email from your Sovrabase server.\n\nIf you received this, your SMTP configuration is working correctly.\n\n— Sovrabase"
+	msg := email.Message{
+		Text: "This is a test email from your Sovrabase server.\n\nIf you received this, your SMTP configuration is working correctly.\n\n— Sovrabase",
+		HTML: "<p>This is a test email from your Sovrabase server.</p><p>If you received this, your SMTP configuration is working correctly.</p><p>— Sovrabase</p>",
+	}
 
-	if err := a.mailer.SendMail([]string{to}, subject, body); err != nil {
+	if err := a.mailer.SendMail([]string{to}, "Sovrabase SMTP Test", msg); err != nil {
 		writeError(w, http.StatusInternalServerError, "SMTP test failed: "+err.Error())
 		return
 	}
@@ -2540,6 +2555,52 @@ func (a *AdminServer) handleClearEmailLog(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
+}
+
+// handleRetryEmailLog re-sends a previously failed email.
+func (a *AdminServer) handleRetryEmailLog(w http.ResponseWriter, r *http.Request) {
+	if a.mailer == nil || !a.mailer.IsConfigured() {
+		writeError(w, http.StatusBadRequest, "email not configured")
+		return
+	}
+	if a.emailLogStore == nil {
+		writeError(w, http.StatusInternalServerError, "email log store not available")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "missing email log id")
+		return
+	}
+
+	// Fetch the original log entry
+	entries, _, err := a.emailLogStore.List(0, 10000)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var original *email.EmailLogEntry
+	for _, e := range entries {
+		if e.ID == id {
+			original = e
+			break
+		}
+	}
+	if original == nil {
+		writeError(w, http.StatusNotFound, "email log entry not found")
+		return
+	}
+
+	to := strings.Split(original.To, ", ")
+	msg := email.Message{Text: original.TextBody, HTML: original.HtmlBody}
+	if err := a.mailer.SendMail(to, original.Subject, msg); err != nil {
+		writeError(w, http.StatusInternalServerError, "retry failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "retried"})
 }
 
 // handleRestart triggers a graceful server restart.
@@ -3077,7 +3138,8 @@ func (a *AdminServer) handleCreateInvitation(w http.ResponseWriter, r *http.Requ
 		}
 
 		subject := "You're invited to join " + projectName
-		body := "Hello,\n\nYou have been invited to join the project \"" + projectName + "\" on Sovrabase.\n\nClick the link below to accept the invitation:\n" + inviteLink + "\n\nThis invitation expires in 7 days.\n\n— Sovrabase"
+		txtBody := "Hello,\n\nYou have been invited to join the project \"" + projectName + "\" on Sovrabase.\n\nClick the link below to accept the invitation:\n" + inviteLink + "\n\nThis invitation expires in 7 days.\n\n— Sovrabase"
+		htmlBody := ""
 
 		// Try to use the project's custom invitation template if available
 		if env, envErr := a.projects.GetProjectEnv(id); envErr == nil {
@@ -3091,12 +3153,23 @@ func (a *AdminServer) handleCreateInvitation(w http.ResponseWriter, r *http.Requ
 					"URL":         inviteLink,
 					"Email":       req.Email,
 				}); tErr == nil {
-					body = buf.String()
+					txtBody = buf.String()
+				}
+				if tmpl.HtmlBody != "" {
+					var hbuf bytes.Buffer
+					ht := template.Must(template.New("invite-html").Parse(tmpl.HtmlBody))
+					if htErr := ht.Execute(&hbuf, map[string]string{
+						"ProjectName": projectName,
+						"URL":         inviteLink,
+						"Email":       req.Email,
+					}); htErr == nil {
+						htmlBody = hbuf.String()
+					}
 				}
 			}
 		}
 
-		if sErr := a.mailer.SendMail([]string{req.Email}, subject, body); sErr == nil {
+		if sErr := a.mailer.SendMail([]string{req.Email}, subject, email.Message{Text: txtBody, HTML: htmlBody}); sErr == nil {
 			emailSent = true
 		}
 	}

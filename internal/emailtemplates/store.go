@@ -36,6 +36,7 @@ type Template struct {
 	Type      TemplateType `json:"type"`
 	Subject   string       `json:"subject"`
 	Body      string       `json:"body"`
+	HtmlBody  string       `json:"html_body"`
 	UpdatedAt time.Time    `json:"updated_at"`
 }
 

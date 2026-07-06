@@ -3,6 +3,7 @@ import { api, formatBytes } from '../api';
 import { useToast } from '../components/Toast';
 import type { Project, DatabaseDocument } from '../types';
 import { useDashboard } from '../store';
+import FunctionsTab from './FunctionsTab';
 
 interface MobileDashboardProps {
   projectId: string;
@@ -156,7 +157,7 @@ export default function MobileDashboard({
   const [invokingStates, setInvokingStates] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
 
   // Navigation & Sub-page Launcher States
-  const [activeSubPage, setActiveSubPage] = useState<'grid' | 'storage' | 'team' | 'config' | 'webhooks' | 'cron' | 'queues' | 'integrations' | 'analytics' | 'api'>('grid');
+  const [activeSubPage, setActiveSubPage] = useState<'grid' | 'storage' | 'team' | 'config' | 'webhooks' | 'cron' | 'functions' | 'queues' | 'integrations' | 'analytics' | 'api'>('grid');
 
   // Storage Tab States
   const [buckets, setBuckets] = useState<any[]>([]);
@@ -1914,6 +1915,7 @@ export default function MobileDashboard({
                     { id: 'config', name: 'Project Config', desc: 'Credentials & API keys', icon: 'settings', color: 'text-primary bg-primary/10 border-primary/20' },
                     { id: 'webhooks', name: 'Webhooks', desc: 'Outgoing event alerts', icon: 'webhook', color: 'text-secondary bg-secondary/10 border-secondary/20 animate-pulse' },
                     { id: 'cron', name: 'Cron Jobs', desc: 'Scheduled callbacks', icon: 'alarm', color: 'text-primary bg-primary/10 border-primary/20' },
+                    { id: 'functions', name: 'Functions', desc: 'Serverless JS & Go', icon: 'bolt', color: 'text-secondary bg-secondary/10 border-secondary/20' },
                     { id: 'queues', name: 'Message Queues', desc: 'Topic-based worker logs', icon: 'queue', color: 'text-secondary bg-secondary/10 border-secondary/20' },
                     { id: 'integrations', name: 'Integrations', desc: 'Connect plugin APIs', icon: 'extension', color: 'text-primary bg-primary/10 border-primary/20' },
                     { id: 'analytics', name: 'Analytics', desc: 'Traffic & storage charts', icon: 'bar_chart', color: 'text-secondary bg-secondary/10 border-secondary/20 animate-pulse' },
@@ -2361,7 +2363,6 @@ export default function MobileDashboard({
               </div>
             )}
 
-            {/* CRON JOBS SUB-PAGE */}
             {activeSubPage === 'cron' && (
               <div className="space-y-4 animate-fade-slide">
                 <div className="flex justify-between items-end pb-1 border-b border-outline-variant/20">
@@ -2429,6 +2430,12 @@ export default function MobileDashboard({
                     Add scheduled task
                   </button>
                 </div>
+              </div>
+            )}
+
+            {activeSubPage === 'functions' && (
+              <div className="animate-fade-slide px-1">
+                <FunctionsTab projectId={projectId} apiKey={projectDetail?.api_key} />
               </div>
             )}
 

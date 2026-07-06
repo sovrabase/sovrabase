@@ -14,6 +14,7 @@ import AuthTab from './AuthTab';
 import StorageTab from './StorageTab';
 import ConfigTab from './ConfigTab';
 import CronTab from './CronTab';
+import FunctionsTab from './FunctionsTab';
 import WebhooksTab from './WebhooksTab';
 import QueuesTab from './QueuesTab';
 import IntegrationsTab from './IntegrationsTab';
@@ -30,6 +31,7 @@ const TABS = [
   { id: 'Storage', label: 'Storage' },
   { id: 'Config', label: 'Config' },
   { id: 'Cron', label: 'Cron' },
+  { id: 'Functions', label: 'Functions' },
   { id: 'Webhooks', label: 'Webhooks' },
   { id: 'Queues', label: 'Queues' },
   { id: 'Integrations', label: 'Integrations' },
@@ -116,6 +118,7 @@ export default function ProjectDetail() {
       case 'Storage': return <StorageTab {...props} />;
       case 'Config': return <ConfigTab {...props} />;
       case 'Cron': return <CronTab {...props} />;
+      case 'Functions': return <FunctionsTab {...props} />;
       case 'Webhooks': return <WebhooksTab {...props} />;
       case 'Queues': return <QueuesTab {...props} />;
       case 'Integrations': return <IntegrationsTab {...props} />;

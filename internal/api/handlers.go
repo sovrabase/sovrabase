@@ -91,6 +91,7 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 
 	// Fire integration triggers (notifications) for signup
 	s.fireIntegrationTriggers("auth:signup", "", "", map[string]interface{}{"email": req.Email, "user_id": user.ID}, r)
+	s.fireFunctionTriggers("auth:signup", "", "", map[string]interface{}{"email": req.Email, "user_id": user.ID}, r)
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"user":  user,
@@ -151,6 +152,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 
 	// Fire integration triggers (notifications) for signin
 	s.fireIntegrationTriggers("auth:signin", "", "", map[string]interface{}{"email": req.Email}, r)
+	s.fireFunctionTriggers("auth:signin", "", "", map[string]interface{}{"email": req.Email}, r)
 
 	writeJSON(w, http.StatusOK, result)
 }
@@ -959,6 +961,7 @@ func (s *Server) handleInsert(w http.ResponseWriter, r *http.Request) {
 
 	// Fire integration triggers (notifications)
 	s.fireIntegrationTriggers("record:create", collection, id, created, r)
+	s.fireFunctionTriggers("record:create", collection, id, created, r)
 
 	// Webhook trigger
 	s.fireWebhooks(r, collection, "insert", id, created)
@@ -1081,6 +1084,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	// Fire integration triggers (notifications)
 	s.fireIntegrationTriggers("record:update", collection, id, updated, r)
+	s.fireFunctionTriggers("record:update", collection, id, updated, r)
 
 	// Webhook trigger
 	s.fireWebhooks(r, collection, "update", id, updated)
@@ -1152,6 +1156,7 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 	// Fire integration triggers (notifications)
 	s.fireIntegrationTriggers("record:delete", collection, id, existing, r)
+	s.fireFunctionTriggers("record:delete", collection, id, existing, r)
 
 	// Webhook trigger
 	s.fireWebhooks(r, collection, "delete", id, existing)

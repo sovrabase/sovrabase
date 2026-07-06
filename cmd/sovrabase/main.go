@@ -38,6 +38,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/dashboard"
 	"github.com/ketsuna-org/sovrabase/internal/db"
 	"github.com/ketsuna-org/sovrabase/internal/email"
+	"github.com/ketsuna-org/sovrabase/internal/functions"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
 	"github.com/ketsuna-org/sovrabase/plugin"
 	"github.com/ketsuna-org/sovrabase/internal/realtime"
@@ -47,6 +48,14 @@ import (
 )
 
 func main() {
+	if functions.IsFnWorkerProcess(os.Args) {
+		if err := functions.WorkerMain(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
@@ -241,6 +250,7 @@ func main() {
 
 	// Start cron schedulers for all existing projects.
 	api.StartProjectSchedulers(ctx, projectMgr)
+	api.RegisterFunctionStores(ctx, projectMgr, meterStore)
 	logger.Info("Cron schedulers started", "projects", projectMgr.ProjectCount())
 
 	// Start replication node if configured

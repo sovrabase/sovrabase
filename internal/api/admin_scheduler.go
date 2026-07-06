@@ -66,6 +66,7 @@ func (a *AdminServer) projectSchedulerCached(r *http.Request) (*scheduler.Store,
 	}
 	store = scheduler.NewStore(env.Engine.DB())
 	schedulerCache[projectID] = store
+	go store.Start(context.Background())
 	return store, nil
 }
 

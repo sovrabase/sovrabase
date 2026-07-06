@@ -15,10 +15,16 @@ const (
 	ProviderMailtrap Provider = "mailtrap"
 	ProviderBrevo    Provider = "brevo"
 	ProviderMailjet  Provider = "mailjet"
+	ProviderMaildev  Provider = "maildev"
 )
 
+type Message struct {
+	Text string
+	HTML string
+}
+
 type Mailer interface {
-	SendMail(to []string, subject, body string) error
+	SendMail(to []string, subject string, msg Message) error
 	IsConfigured() bool
 }
 
@@ -43,6 +49,8 @@ func NewMailer(cfg Config) Mailer {
 		return &BrevoMailer{cfg: cfg}
 	case ProviderMailjet:
 		return &MailjetMailer{cfg: cfg}
+	case ProviderMaildev:
+		return &MaildevMailer{cfg: cfg}
 	default:
 		return &SmtpMailer{cfg: cfg}
 	}

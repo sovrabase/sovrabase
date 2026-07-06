@@ -20,8 +20,8 @@ func (m *LoggedMailer) IsConfigured() bool {
 	return m.inner.IsConfigured()
 }
 
-func (m *LoggedMailer) SendMail(to []string, subject, body string) error {
-	err := m.inner.SendMail(to, subject, body)
+func (m *LoggedMailer) SendMail(to []string, subject string, msg Message) error {
+	err := m.inner.SendMail(to, subject, msg)
 
 	entry := EmailLogEntry{
 		Timestamp: time.Now().UTC(),
@@ -29,13 +29,15 @@ func (m *LoggedMailer) SendMail(to []string, subject, body string) error {
 		From:      m.from,
 		To:        strings.Join(to, ", "),
 		Subject:   subject,
+		TextBody:  msg.Text,
+		HtmlBody:  msg.HTML,
 		Success:   err == nil,
 	}
 	if err != nil {
 		entry.Error = err.Error()
 	}
 	if appendErr := m.logStore.Append(&entry); appendErr != nil {
-		_ = appendErr // Don't mask the original send error
+		_ = appendErr
 	}
 	return err
 }

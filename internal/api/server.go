@@ -371,6 +371,15 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	// only project_key is needed. Must be outside the /api/v1 auth group.
 	r.With(s.rateLimitMiddleware, s.projectMiddleware).Post("/api/v1/integrations/{provider}/webhook", s.handleIntegrationWebhook)
 
+	// Serverless functions — HTTP trigger. Public functions skip auth.
+	r.Route("/api/v1/functions", func(r chi.Router) {
+		r.Use(s.rateLimitMiddleware)
+		r.Use(s.projectMiddleware)
+		r.Use(s.clientRequestLoggerMiddleware)
+		r.Use(s.authMiddleware)
+		r.HandleFunc("/{name}", s.handleFunctionHTTP)
+	})
+
 	// API routes (rate limited + auth)
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(s.rateLimitMiddleware)

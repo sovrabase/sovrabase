@@ -29,7 +29,7 @@ type Config struct {
 	Env             string        `yaml:"env"              json:"env"`
 
 	// SMTP / Email verification config
-	EmailProvider     string `yaml:"email_provider"     json:"email_provider"`     // "smtp", "resend", "mailtrap", "brevo", "mailjet"
+	EmailProvider     string `yaml:"email_provider"     json:"email_provider"`     // "smtp", "resend", "mailtrap", "brevo", "mailjet", "maildev"
 	EmailAPIKey       string `yaml:"email_api_key"      json:"email_api_key"`       // API key for HTTP providers
 	EmailAPISecret    string `yaml:"email_api_secret"   json:"email_api_secret"`    // API secret (Mailjet)
 	SMTPHost          string `yaml:"smtp_host"          json:"smtp_host"`

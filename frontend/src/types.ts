@@ -100,12 +100,91 @@ export interface CronJob {
   id: string;
   name: string;
   schedule: string;
-  endpoint?: string;
+  url?: string;
+  endpoint?: string; // legacy alias
   method?: string;
   body?: unknown;
   enabled: boolean;
   last_run?: string;
   next_run?: string;
+}
+
+export interface MetricSample {
+  offset_ms: number;
+  heap_bytes: number;
+  cpu_ms: number;
+}
+
+export interface ExecutionMetrics {
+  duration_ms: number;
+  mem_alloc_bytes: number;
+  mem_peak_bytes: number;
+  cpu_user_ms: number;
+  cpu_sys_ms: number;
+  isolated?: boolean;
+  samples?: MetricSample[];
+}
+
+export interface ServerlessFunction {
+  id: string;
+  name: string;
+  language?: string;
+  trigger: string;
+  collection?: string;
+  schedule?: string;
+  code: string;
+  public: boolean;
+  timeout_ms: number;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TestHTTPResponse {
+  status: number;
+  headers?: Record<string, string>;
+  body?: unknown;
+}
+
+export interface TestResult {
+  status: 'success' | 'error' | 'timeout';
+  duration_ms: number;
+  metrics?: ExecutionMetrics;
+  response?: TestHTTPResponse;
+  output?: string;
+  error?: string;
+}
+
+export interface FunctionExecution {
+  id: string;
+  function_id: string;
+  trigger: string;
+  status: string;
+  duration_ms: number;
+  error?: string;
+  output?: string;
+  metrics?: ExecutionMetrics;
+  created_at: string;
+}
+
+export interface MetricsBucket {
+  hour: string;
+  function_id: string;
+  exec_count: number;
+  duration_p50_ms: number;
+  duration_p95_ms: number;
+  mem_peak_max_bytes: number;
+  cpu_avg_ms: number;
+  error_count: number;
+}
+
+export interface CronJobExecution {
+  job_id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  status_code?: number;
+  error?: string;
 }
 
 export interface Webhook {

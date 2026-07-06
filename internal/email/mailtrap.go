@@ -13,7 +13,7 @@ func (m *MailtrapMailer) IsConfigured() bool {
 	return m.cfg.APIKey != "" && m.cfg.Sender != ""
 }
 
-func (m *MailtrapMailer) SendMail(to []string, subject, body string) error {
+func (m *MailtrapMailer) SendMail(to []string, subject string, msg Message) error {
 	if !m.IsConfigured() {
 		return fmt.Errorf("email: Mailtrap not configured")
 	}
@@ -25,7 +25,10 @@ func (m *MailtrapMailer) SendMail(to []string, subject, body string) error {
 		"from":    map[string]string{"email": m.cfg.Sender},
 		"to":      recipients,
 		"subject": subject,
-		"text":    body,
+		"text":    msg.Text,
+	}
+	if msg.HTML != "" {
+		payload["html"] = msg.HTML
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {

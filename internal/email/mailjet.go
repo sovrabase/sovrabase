@@ -13,7 +13,7 @@ func (m *MailjetMailer) IsConfigured() bool {
 	return m.cfg.APIKey != "" && m.cfg.Sender != ""
 }
 
-func (m *MailjetMailer) SendMail(to []string, subject, body string) error {
+func (m *MailjetMailer) SendMail(to []string, subject string, msg Message) error {
 	if !m.IsConfigured() {
 		return fmt.Errorf("email: Mailjet not configured")
 	}
@@ -21,15 +21,17 @@ func (m *MailjetMailer) SendMail(to []string, subject, body string) error {
 	for i, addr := range to {
 		recipients[i] = map[string]string{"Email": addr}
 	}
+	message := map[string]interface{}{
+		"From":     map[string]string{"Email": m.cfg.Sender},
+		"To":       recipients,
+		"Subject":  subject,
+		"TextPart": msg.Text,
+	}
+	if msg.HTML != "" {
+		message["HTMLPart"] = msg.HTML
+	}
 	payload := map[string]interface{}{
-		"Messages": []map[string]interface{}{
-			{
-				"From":     map[string]string{"Email": m.cfg.Sender},
-				"To":       recipients,
-				"Subject":  subject,
-				"TextPart": body,
-			},
-		},
+		"Messages": []map[string]interface{}{message},
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
