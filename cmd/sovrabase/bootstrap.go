@@ -37,6 +37,8 @@ func runSovrabase(logger *slog.Logger, cfg *config.Config) {
 
 	killStaleInstances(logger)
 
+	validateHAConfig(cfg, logger)
+
 	engine, err := db.NewEngine(filepath.Join(cfg.DataDir, "db"))
 	if err != nil {
 		logger.Error("Failed to open database", "error", err)
@@ -169,7 +171,6 @@ func runSovrabase(logger *slog.Logger, cfg *config.Config) {
 	adminServer.SetMailer(loggedMailer)
 
 	adminServer.RegisterRoutes(adminMux)
-	server.RegisterAdmin(adminMux)
 
 	adminMux.Handle("/admin/plugins", adminServer.AdminAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		info := plugin.PluginInfo{
@@ -181,67 +182,58 @@ func runSovrabase(logger *slog.Logger, cfg *config.Config) {
 		json.NewEncoder(w).Encode(info)
 	})))
 
-	logger.Info("Admin API registered")
-
-	server.SetDashboard(dashboard.Handler())
-	logger.Info("Dashboard registered")
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	api.StartProjectSchedulers(ctx, projectMgr)
-	api.RegisterFunctionStores(ctx, projectMgr, meterStore)
-	logger.Info("Cron schedulers started", "projects", projectMgr.ProjectCount())
+	var masterJobsHandle *masterJobs
 
 	if cfg.IsReplicationEnabled() {
-		replNode, err := startReplication(ctx, cfg, engine)
+		replCluster, err := startReplication(ctx, cfg, engine)
 		if err != nil {
 			logger.Error("Failed to start replication", "error", err)
 			os.Exit(1)
 		}
+
+		projectMgr.SetCluster(replCluster)
+		setupReplicationRealtime(realtimeHub, replCluster)
+
+		server.SetCluster(replCluster)
+		adminServer.SetCluster(replCluster)
+		server.SetAdminReplicationMiddleware(adminServer.ReplicationMiddleware)
+
+		replicatedDB := replication.NewReplicatedDB(engine, replCluster)
+		server.SetReplicatedDB(replicatedDB)
+
 		adminServer.SetReplicationStatus(&api.ReplicationStatus{
 			Enabled: true,
-			Role:    cfg.Role,
+			Role:    string(replCluster.Role()),
 			NodeID:  cfg.NodeID,
 			Peers:   len(cfg.Peers),
 		})
-		logger.Info("Replication node started", "role", cfg.Role)
+		logger.Info("Replication cluster started", "role", replCluster.Role())
 
-		replicatedDB := replication.NewReplicatedDB(engine, replNode)
-		server.SetReplicatedDB(replicatedDB)
-		logger.Info("ReplicatedDB set on API server")
-	}
+		if replCluster.Role() == replication.RoleMaster {
+			masterJobsHandle = startMasterBackgroundJobs(ctx, logger, cfg, projectMgr, meterStore)
+		}
 
-	if cfg.BackupInterval > 0 {
-		backupTicker := time.NewTicker(cfg.BackupInterval)
-		defer backupTicker.Stop()
-		go func() {
-			for {
-				select {
-				case <-backupTicker.C:
-					logger.Info("Running scheduled backup...")
-					backupDir := filepath.Join(cfg.DataDir, "backups")
-					if err := os.MkdirAll(backupDir, 0755); err != nil {
-						logger.Error("Failed to create backup directory", "error", err)
-						continue
-					}
-					timestamp := time.Now().UTC().Format("20060102T150405Z")
-					backupName := "backup-" + timestamp
-					backupPath := filepath.Join(backupDir, backupName)
-					if err := projectMgr.Backup(backupPath); err != nil {
-						logger.Error("Failed to create backup", "error", err)
-						continue
-					}
-					logger.Info("Scheduled backup completed", "name", backupName, "path", backupPath)
-				case <-ctx.Done():
-					return
-				}
+		replCluster.SetOnPromote(func() {
+			projectMgr.InvalidateEnvCache()
+			if masterJobsHandle != nil {
+				masterJobsHandle.Stop()
 			}
-		}()
-		logger.Info("Backup scheduler started", "interval", cfg.BackupInterval)
+			masterJobsHandle = startMasterBackgroundJobs(ctx, logger, cfg, projectMgr, meterStore)
+			logger.Info("Master background jobs restarted after promotion")
+		})
 	} else {
-		logger.Info("Backup scheduler disabled (interval <= 0)")
+		masterJobsHandle = startMasterBackgroundJobs(ctx, logger, cfg, projectMgr, meterStore)
+		logger.Info("Cron schedulers started", "projects", projectMgr.ProjectCount())
 	}
+
+	server.RegisterAdmin(adminMux)
+	logger.Info("Admin API registered")
+
+	server.SetDashboard(dashboard.Handler())
+	logger.Info("Dashboard registered")
 
 	go func() {
 		sigCh := make(chan os.Signal, 1)
@@ -270,6 +262,10 @@ func runSovrabase(logger *slog.Logger, cfg *config.Config) {
 		logger.Error("Server error", "error", err)
 	case <-ctx.Done():
 		logger.Info("Graceful shutdown initiated")
+	}
+
+	if masterJobsHandle != nil {
+		masterJobsHandle.Stop()
 	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)

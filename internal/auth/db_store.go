@@ -7,15 +7,27 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/db"
 )
 
-// DBUserStore implements UserStore using a db.Engine.
+// userEngine is the subset of db/replication operations needed for auth storage.
+type userEngine interface {
+	CreateCollection(name string) error
+	CreateIndex(collection, field string, idxType db.IndexType) error
+	Insert(collection, id string, doc map[string]interface{}) error
+	Update(collection, id string, doc map[string]interface{}) error
+	Get(collection, id string) (map[string]interface{}, error)
+	Delete(collection, id string) error
+	Query(collection string, filter map[string]interface{}, projection []string) ([]map[string]interface{}, error)
+	List(collection string) ([]map[string]interface{}, error)
+}
+
+// DBUserStore implements UserStore using a document engine.
 type DBUserStore struct {
-	engine *db.Engine
+	engine userEngine
 }
 
 // NewDBUserStore creates a new DBUserStore and ensures the _users collection
 // and essential indexes exist. Indexes allow O(log n) lookups by email,
 // verification token, and reset token instead of full-collection scans.
-func NewDBUserStore(engine *db.Engine) *DBUserStore {
+func NewDBUserStore(engine userEngine) *DBUserStore {
 	_ = engine.CreateCollection("_users")
 	// Create indexes for hot lookup paths. Ignore errors if they already exist.
 	_ = engine.CreateIndex("_users", "email", db.IndexUnique)

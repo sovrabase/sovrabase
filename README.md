@@ -206,9 +206,11 @@ make dev
 ## Roadmap
 
 - [x] Phase 1: Core monolith binary (MVP)
-- [ ] Phase 2: High-availability replication
+- [x] Phase 2: High-availability replication
 - [ ] Phase 3: Sovereign cloud SaaS
 - [ ] Phase 4: Open-core launch
+
+See [docs/ha-deployment.md](docs/ha-deployment.md) for HA setup instructions.
 
 ## License
 

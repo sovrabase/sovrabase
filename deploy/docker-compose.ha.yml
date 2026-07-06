@@ -1,0 +1,73 @@
+# Sovrabase HA — 3-node example (Master + Heir + Reader)
+#
+# Usage:
+#   docker compose -f deploy/docker-compose.ha.yml up -d
+#
+# Requires: Docker Compose v2, S3 credentials in .env
+
+services:
+  master:
+    image: ghcr.io/ketsuna-org/sovrabase:latest
+    environment:
+      SOVRABASE_ROLE: master
+      SOVRABASE_NODE_ID: master-1
+      SOVRABASE_REPL_ADDR: ":9090"
+      SOVRABASE_DATA_DIR: /data
+      SOVRABASE_JWT_SECRET: ${SOVRABASE_JWT_SECRET:-change-me-in-production}
+      SOVRABASE_S3_ENABLED: "true"
+      SOVRABASE_S3_ENDPOINT: ${SOVRABASE_S3_ENDPOINT}
+      SOVRABASE_S3_ACCESS_KEY: ${SOVRABASE_S3_ACCESS_KEY}
+      SOVRABASE_S3_SECRET_KEY: ${SOVRABASE_S3_SECRET_KEY}
+      SOVRABASE_S3_BUCKET_PREFIX: ${SOVRABASE_S3_BUCKET_PREFIX:-sovrabase}
+    volumes:
+      - master_data:/data
+    ports:
+      - "6070:6070"
+      - "9090:9090"
+
+  heir:
+    image: ghcr.io/ketsuna-org/sovrabase:latest
+    environment:
+      SOVRABASE_ROLE: heir
+      SOVRABASE_NODE_ID: heir-1
+      SOVRABASE_REPL_ADDR: ":9090"
+      SOVRABASE_PEERS: '["master:9090"]'
+      SOVRABASE_DATA_DIR: /data
+      SOVRABASE_JWT_SECRET: ${SOVRABASE_JWT_SECRET:-change-me-in-production}
+      SOVRABASE_S3_ENABLED: "true"
+      SOVRABASE_S3_ENDPOINT: ${SOVRABASE_S3_ENDPOINT}
+      SOVRABASE_S3_ACCESS_KEY: ${SOVRABASE_S3_ACCESS_KEY}
+      SOVRABASE_S3_SECRET_KEY: ${SOVRABASE_S3_SECRET_KEY}
+      SOVRABASE_S3_BUCKET_PREFIX: ${SOVRABASE_S3_BUCKET_PREFIX:-sovrabase}
+    volumes:
+      - heir_data:/data
+    ports:
+      - "6071:6070"
+    depends_on:
+      - master
+
+  reader:
+    image: ghcr.io/ketsuna-org/sovrabase:latest
+    environment:
+      SOVRABASE_ROLE: reader
+      SOVRABASE_NODE_ID: reader-1
+      SOVRABASE_REPL_ADDR: ":9090"
+      SOVRABASE_PEERS: '["master:9090"]'
+      SOVRABASE_DATA_DIR: /data
+      SOVRABASE_JWT_SECRET: ${SOVRABASE_JWT_SECRET:-change-me-in-production}
+      SOVRABASE_S3_ENABLED: "true"
+      SOVRABASE_S3_ENDPOINT: ${SOVRABASE_S3_ENDPOINT}
+      SOVRABASE_S3_ACCESS_KEY: ${SOVRABASE_S3_ACCESS_KEY}
+      SOVRABASE_S3_SECRET_KEY: ${SOVRABASE_S3_SECRET_KEY}
+      SOVRABASE_S3_BUCKET_PREFIX: ${SOVRABASE_S3_BUCKET_PREFIX:-sovrabase}
+    volumes:
+      - reader_data:/data
+    ports:
+      - "6072:6070"
+    depends_on:
+      - master
+
+volumes:
+  master_data:
+  heir_data:
+  reader_data:

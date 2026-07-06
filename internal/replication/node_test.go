@@ -559,5 +559,5 @@ func newTestEngineForNode(t *testing.T, node *Node) *db.Engine {
 	// Let's just create a separate engine for verification in the test.
 	// For now, tests that need to verify engine state use the original engine
 	// reference from newTestNode. We'll adjust the helper.
-	return node.engine
+	return node.DefaultEngine()
 }

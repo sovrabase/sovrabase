@@ -45,6 +45,13 @@ var (
 		},
 		[]string{"operation", "collection"},
 	)
+
+	sovrabaseReplicationLagLSN = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "sovrabase_replication_lag_lsn",
+			Help: "Replication lag in LSN units (current minus last applied).",
+		},
+	)
 )
 
 func init() {
@@ -53,7 +60,13 @@ func init() {
 		sovrabaseHttpRequestDurationSeconds,
 		sovrabaseActiveProjects,
 		sovrabaseDbOperationsTotal,
+		sovrabaseReplicationLagLSN,
 	)
+}
+
+// SetReplicationLag updates the replication lag gauge.
+func SetReplicationLag(lag uint64) {
+	sovrabaseReplicationLagLSN.Set(float64(lag))
 }
 
 // MetricsMiddleware is an HTTP middleware that counts requests and observes duration.

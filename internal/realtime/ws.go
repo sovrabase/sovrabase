@@ -81,21 +81,23 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate JWT.
-	claims, err := auth.ValidateToken(am.Token, h.jwtSecret)
+	jwtSecret := h.jwtSecret
+	projectKey := am.ProjectKey
+	projectID := projectKey
+	if h.projectManager != nil && projectKey != "" {
+		if proj, err := h.projectManager.GetProjectBySecret(projectKey); err == nil && proj != nil {
+			projectID = proj.ID
+			jwtSecret = proj.JWTSecret
+		}
+	}
+
+	claims, err := auth.ValidateToken(am.Token, jwtSecret)
 	if err != nil {
 		h.logger.Warn("websocket invalid token", "error", err)
 		conn.Close(websocket.StatusPolicyViolation, "invalid token")
 		return
 	}
 
-	projectKey := am.ProjectKey
-	projectID := projectKey
-	if h.projectManager != nil && projectKey != "" {
-		if proj, err := h.projectManager.GetProjectBySecret(projectKey); err == nil && proj != nil {
-			projectID = proj.ID
-		}
-	}
 	if projectID == "" {
 		projectID = claims.UserID
 	}

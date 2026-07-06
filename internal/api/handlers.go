@@ -858,6 +858,10 @@ func (s *Server) filterDocs(r *http.Request, collection string, docs []map[strin
 
 // publishRealtime sends a realtime event for a data mutation.
 func (s *Server) publishRealtime(eventType realtime.EventType, projectID, collection, docID string, data map[string]interface{}) {
+	if s.cluster != nil {
+		// Events are published via replication OnApplied on all nodes.
+		return
+	}
 	if s.realtimeHub == nil {
 		return
 	}

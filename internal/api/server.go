@@ -29,6 +29,7 @@ type Server struct {
 	config       *Config
 	db           DatabaseService
 	replicatedDB *replication.ReplicatedDB
+	cluster      *replication.ClusterNode
 	auth         AuthService
 	store        StorageService
 	projects     *tenant.ProjectManager
@@ -42,6 +43,7 @@ type Server struct {
 	httpServer   *http.Server // reference for graceful shutdown
 	captchaVerifier *captcha.Verifier
 	triggerService *IntegrationTriggerService
+	adminReplMW  func(http.Handler) http.Handler
 }
 
 // Config holds API-specific configuration.
@@ -233,8 +235,16 @@ func (s *Server) SetReplicatedDB(db *replication.ReplicatedDB) {
 	s.replicatedDB = db
 }
 
+// SetCluster attaches the HA replication node for role-aware routing.
+func (s *Server) SetCluster(cluster *replication.ClusterNode) {
+	s.cluster = cluster
+}
+
 func (s *Server) getDB(r *http.Request) DatabaseService {
 	if env := getProjectEnv(r); env != nil {
+		if env.ReplDB != nil {
+			return env.ReplDB
+		}
 		return env.Engine
 	}
 	if s.replicatedDB != nil {
@@ -292,6 +302,7 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	r.Use(middleware.Timeout(30 * time.Second))
 	// Limit request body size to 10 MB to prevent memory exhaustion attacks
 	r.Use(bodyLimitMiddleware(10 << 20))
+	r.Use(s.replicationRoleMiddleware())
 	r.Use(cors.Handler(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
 			// Check global allowed origins (supports comma-separated list)
@@ -443,10 +454,19 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 	return s
 }
 
+// SetAdminReplicationMiddleware wraps admin routes with HA read-only enforcement.
+func (s *Server) SetAdminReplicationMiddleware(mw func(http.Handler) http.Handler) {
+	s.adminReplMW = mw
+}
+
 // RegisterAdmin attaches admin API routes to the server, wrapped with
 // metering middleware for bandwidth tracking.
 func (s *Server) RegisterAdmin(mux *http.ServeMux) {
 	s.adminMux = mux
+	adminHandler := http.Handler(mux)
+	if s.adminReplMW != nil {
+		adminHandler = s.adminReplMW(adminHandler)
+	}
 	if s.meterStore != nil {
 		adminMW := func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -457,9 +477,9 @@ func (s *Server) RegisterAdmin(mux *http.ServeMux) {
 				}
 			})
 		}
-		s.router.Mount("/admin", adminMW(mux))
+		s.router.Mount("/admin", adminMW(adminHandler))
 	} else {
-		s.router.Mount("/admin", mux)
+		s.router.Mount("/admin", adminHandler)
 	}
 }
 
@@ -508,11 +528,26 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	result := map[string]interface{}{
+		"status": "ok",
+	}
+	if s.cluster != nil {
+		result["replication"] = map[string]interface{}{
+			"role":            s.cluster.Role(),
+			"current_lsn":     s.cluster.CurrentLSN(),
+			"last_applied_lsn": s.cluster.LastAppliedLSN(),
+			"lag_lsn":         s.cluster.ReplicationLag(),
+			"master_epoch":    s.cluster.MasterEpoch(),
+		}
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	SetActiveProjects(s.projects.ProjectCount())
+	if s.cluster != nil {
+		SetReplicationLag(s.cluster.ReplicationLag())
+	}
 	HandleMetrics(w, r)
 }
 

@@ -23,6 +23,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/auth"
 	"github.com/ketsuna-org/sovrabase/internal/config"
 	"github.com/ketsuna-org/sovrabase/internal/db"
+	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 )
 
@@ -57,8 +58,9 @@ type ProjectIntegration struct {
 
 // ProjectEnv holds project-specific database, auth service, and storage driver.
 type ProjectEnv struct {
-	Engine  *db.Engine
-	Auth    *auth.AuthService
+	Engine *db.Engine
+	ReplDB *replication.ReplicatedDB // set when HA replication is active
+	Auth   *auth.AuthService
 	Storage storage.Driver
 }
 
@@ -68,10 +70,49 @@ type ProjectManager struct {
 	db          *pebble.DB
 	baseDir     string
 	cfg         *config.Config
-	projects    map[string]*Project     // in-memory cache
-	envs        map[string]*ProjectEnv // project ID -> active environment cache
-	teamStore   *TeamStore             // lazily initialized
-	secretIndex map[string]*Project    // JWT secret -> project (O(1) lookup)
+	cluster     *replication.ClusterNode
+	projects    map[string]*Project
+	envs        map[string]*ProjectEnv
+	teamStore   *TeamStore
+	secretIndex map[string]*Project
+}
+
+// SetCluster wires the HA replication node and registers tenant applier callbacks.
+func (pm *ProjectManager) SetCluster(cluster *replication.ClusterNode) {
+	pm.mu.Lock()
+	pm.cluster = cluster
+	pm.mu.Unlock()
+
+	cluster.SetTenantApplier(pm)
+	cluster.SetEngineOpener(func(projectID string) (*db.Engine, error) {
+		proj, err := pm.GetProject(projectID)
+		if err != nil {
+			return nil, err
+		}
+		engine, err := db.NewEngine(proj.DataDir)
+		if err != nil {
+			return nil, err
+		}
+		cluster.RegisterEngine(projectID, engine)
+		return engine, nil
+	})
+}
+
+// Cluster returns the active replication node, if any.
+func (pm *ProjectManager) Cluster() *replication.ClusterNode {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	return pm.cluster
+}
+
+// InvalidateEnvCache clears cached project environments (e.g. after failover).
+func (pm *ProjectManager) InvalidateEnvCache() {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	for id, env := range pm.envs {
+		_ = env.Engine.Close()
+		delete(pm.envs, id)
+	}
 }
 
 // NewProjectManager creates a new project manager backed by the master database
@@ -180,6 +221,17 @@ func (pm *ProjectManager) CreateProject(name, ownerID string) (*Project, error) 
 
 	pm.projects[id] = proj
 	pm.secretIndex[jwtSecret] = proj
+
+	if pm.cluster != nil {
+		data, err := json.Marshal(proj)
+		if err != nil {
+			return nil, fmt.Errorf("tenant: marshal project for replication: %w", err)
+		}
+		if err := pm.cluster.WriteTenantOp(replication.OpCreateProject, id, data); err != nil {
+			return nil, fmt.Errorf("tenant: replicate create project: %w", err)
+		}
+	}
+
 	return proj, nil
 }
 
@@ -236,7 +288,20 @@ func (pm *ProjectManager) UpdateProject(proj *Project) error {
 	}
 
 	pm.projects[proj.ID] = proj
-	return pm.saveProject(proj)
+	if err := pm.saveProject(proj); err != nil {
+		return err
+	}
+
+	if pm.cluster != nil {
+		data, err := json.Marshal(proj)
+		if err != nil {
+			return fmt.Errorf("tenant: marshal project for replication: %w", err)
+		}
+		if err := pm.cluster.WriteTenantOp(replication.OpUpdateProject, proj.ID, data); err != nil {
+			return fmt.Errorf("tenant: replicate update project: %w", err)
+		}
+	}
+	return nil
 }
 
 // DeleteProject marks a project as deleted and removes its data.
@@ -279,9 +344,17 @@ func (pm *ProjectManager) DeleteProject(id string) error {
 
 	delete(pm.projects, id)
 	delete(pm.secretIndex, proj.JWTSecret)
-	// Remove from master DB
 	key := projectDBKey(id)
-	return pm.db.Delete(key, pebble.Sync)
+	if err := pm.db.Delete(key, pebble.Sync); err != nil {
+		return err
+	}
+
+	if pm.cluster != nil {
+		if err := pm.cluster.WriteTenantOp(replication.OpDeleteProject, id, nil); err != nil {
+			return fmt.Errorf("tenant: replicate delete project: %w", err)
+		}
+	}
+	return nil
 }
 
 // ProjectCount returns the number of active projects.
@@ -406,8 +479,18 @@ func (pm *ProjectManager) GetProjectEnv(id string) (*ProjectEnv, error) {
 		return nil, fmt.Errorf("tenant: failed to initialize project db: %w", err)
 	}
 
-	// 4. Initialize auth service
-	userStore := auth.NewDBUserStore(engine)
+	// 4. Initialize auth service (use replicated DB for writes when HA is active)
+	var replDB *replication.ReplicatedDB
+	if pm.cluster != nil {
+		pm.cluster.RegisterEngine(id, engine)
+		replDB = replication.NewNamespacedReplicatedDB(engine, pm.cluster, id)
+	}
+	var userStore *auth.DBUserStore
+	if replDB != nil {
+		userStore = auth.NewDBUserStore(replDB)
+	} else {
+		userStore = auth.NewDBUserStore(engine)
+	}
 	authSvc := auth.NewService(proj.JWTSecret, userStore)
 	// Use central config if available, otherwise fall back to env vars.
 	if pm.cfg != nil {
@@ -465,12 +548,92 @@ func (pm *ProjectManager) GetProjectEnv(id string) (*ProjectEnv, error) {
 
 	env := &ProjectEnv{
 		Engine:  engine,
+		ReplDB:  replDB,
 		Auth:    authSvc,
 		Storage: storageDriver,
 	}
 
 	pm.envs[id] = env
 	return env, nil
+}
+
+// ApplyCreateProject implements replication.TenantApplier for follower nodes.
+func (pm *ProjectManager) ApplyCreateProject(data []byte) error {
+	var proj Project
+	if err := json.Unmarshal(data, &proj); err != nil {
+		return fmt.Errorf("tenant: unmarshal project: %w", err)
+	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	if err := os.MkdirAll(proj.DataDir, 0755); err != nil {
+		return fmt.Errorf("tenant: create project db dir: %w", err)
+	}
+	if err := os.MkdirAll(proj.StorageDir, 0755); err != nil {
+		return fmt.Errorf("tenant: create project storage dir: %w", err)
+	}
+	if err := pm.saveProject(&proj); err != nil {
+		return err
+	}
+	pm.projects[proj.ID] = &proj
+	if proj.JWTSecret != "" {
+		pm.secretIndex[proj.JWTSecret] = &proj
+	}
+
+	ts := NewTeamStore(pm.db)
+	if err := ts.AddMember(proj.ID, proj.OwnerID, RoleOwner); err != nil {
+		return fmt.Errorf("tenant: add owner on replicate: %w", err)
+	}
+	return nil
+}
+
+// ApplyUpdateProject implements replication.TenantApplier for follower nodes.
+func (pm *ProjectManager) ApplyUpdateProject(data []byte) error {
+	var proj Project
+	if err := json.Unmarshal(data, &proj); err != nil {
+		return fmt.Errorf("tenant: unmarshal project: %w", err)
+	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	if err := pm.saveProject(&proj); err != nil {
+		return err
+	}
+	pm.projects[proj.ID] = &proj
+	if proj.JWTSecret != "" {
+		pm.secretIndex[proj.JWTSecret] = &proj
+	}
+	if env, ok := pm.envs[proj.ID]; ok {
+		_ = env.Engine.Close()
+		delete(pm.envs, proj.ID)
+	}
+	return nil
+}
+
+// ApplyDeleteProject implements replication.TenantApplier for follower nodes.
+func (pm *ProjectManager) ApplyDeleteProject(projectID string) error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	proj, ok := pm.projects[projectID]
+	if !ok {
+		return nil
+	}
+
+	proj.Status = "deleted"
+	if env, ok := pm.envs[projectID]; ok {
+		_ = env.Engine.Close()
+		delete(pm.envs, projectID)
+	}
+
+	projectDir := filepath.Join(pm.baseDir, "projects", projectID)
+	os.RemoveAll(projectDir)
+
+	delete(pm.projects, projectID)
+	delete(pm.secretIndex, proj.JWTSecret)
+	return pm.db.Delete(projectDBKey(projectID), pebble.Sync)
 }
 
 func projectDBKey(id string) []byte {

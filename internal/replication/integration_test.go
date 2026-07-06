@@ -340,8 +340,8 @@ func TestMasterHeirReaderPipeline(t *testing.T) {
 		t.Fatalf("Heir (new Master) Write update item-2: %v", err)
 	}
 
-	// 3 new entries: 2 inserts + 1 update.
-	receiveAndApply(readerClient2, reader, 3, "reader-reconnect", 10*time.Second)
+	// 4 new entries: master_epoch (fencing) + 2 inserts + 1 update.
+	receiveAndApply(readerClient2, reader, 4, "reader-reconnect", 10*time.Second)
 
 	// Verify Reader now has the new data.
 	t.Log("=== Verifying data after failover ===")

@@ -20,7 +20,7 @@ import (
 //     engine. If Master dies, promotes to Master.
 //   - Reader: connects to Master as a StreamClient, applies entries locally,
 //     stays read-only.
-func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine) (*replication.Node, error) {
+func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine) (*replication.ClusterNode, error) {
 	logger := slog.Default()
 
 	nodeCfg := &replication.NodeConfig{
@@ -38,8 +38,9 @@ func startReplication(ctx context.Context, cfg *config.Config, engine *db.Engine
 		return nil, fmt.Errorf("create WAL: %w", err)
 	}
 
-	// Create the replication node
-	node := replication.NewNode(nodeCfg, engine)
+	// Create the replication node with the global engine registered.
+	node := replication.NewClusterNode(nodeCfg)
+	node.RegisterEngine(replication.NamespaceGlobal, engine)
 	node.SetLog(wal)
 
 	// Determine initial role and start

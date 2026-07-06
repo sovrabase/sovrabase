@@ -28,6 +28,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/emailtemplates"
 	"github.com/ketsuna-org/sovrabase/internal/integrations"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
+	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
 
@@ -40,6 +41,7 @@ type AdminServer struct {
 	dataDir       string
 	cfg           *config.Config
 	replStatus    *ReplicationStatus
+	cluster       *replication.ClusterNode
 	jwtSecret     string
 	adminEmail    string
 	adminPassword string
@@ -150,6 +152,11 @@ func NewAdminServer(pm *tenant.ProjectManager, cfg *config.Config, jwtSecret, ad
 // SetReplicationStatus sets the replication info for the stats endpoint.
 func (a *AdminServer) SetReplicationStatus(status *ReplicationStatus) {
 	a.replStatus = status
+}
+
+// SetCluster attaches the HA replication node for read-only enforcement.
+func (a *AdminServer) SetCluster(cluster *replication.ClusterNode) {
+	a.cluster = cluster
 }
 
 // SetMeterStore attaches a metering store for per-project usage tracking.

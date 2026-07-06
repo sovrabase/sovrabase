@@ -140,6 +140,13 @@ func (w *WAL) Append(entry *LogEntry) (uint64, error) {
 	return lsn, nil
 }
 
+// CurrentLSN returns the highest LSN stored in the WAL.
+func (w *WAL) CurrentLSN() uint64 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.currentLSN
+}
+
 // GetLSN retrieves a single log entry by LSN. Returns pebble.ErrNotFound if
 // the entry does not exist.
 func (w *WAL) GetLSN(lsn uint64) (*LogEntry, error) {
