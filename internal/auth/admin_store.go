@@ -267,6 +267,51 @@ func (as *AdminStore) UpdateLastLogin(id string) error {
 	return as.Update(admin)
 }
 
+// SyncFromEnv updates the primary admin account to match environment-provided
+// credentials. Used when SOVRABASE_ADMIN_EMAIL/PASSWORD are set — those values
+// take precedence over AdminStore on each server start.
+func (as *AdminStore) SyncFromEnv(email, password string, syncEmail, syncPassword bool) error {
+	if !syncEmail && !syncPassword {
+		return nil
+	}
+
+	admins, err := as.List()
+	if err != nil {
+		return err
+	}
+	if len(admins) == 0 {
+		return nil
+	}
+
+	var target *AdminUser
+	for i := range admins {
+		if admins[i].Role == AdminRoleSuper {
+			target = admins[i]
+			break
+		}
+	}
+	if target == nil {
+		target = admins[0]
+	}
+
+	if syncEmail && email != "" && email != target.Email {
+		if existing, err := as.GetByEmail(email); err == nil && existing.ID != target.ID {
+			return fmt.Errorf("admin: env email %q already assigned to another admin", email)
+		}
+		target.Email = email
+	}
+
+	if syncPassword && password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("admin: hash env password: %w", err)
+		}
+		target.PasswordHash = string(hash)
+	}
+
+	return as.Update(target)
+}
+
 // Count returns the number of admin users.
 func (as *AdminStore) Count() (int, error) {
 	prefix := adminUserPrefix()

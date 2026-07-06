@@ -523,3 +523,20 @@ func TestAdminStore_Update_NonExistent(t *testing.T) {
 		t.Fatal("expected error updating nonexistent admin")
 	}
 }
+
+func TestAdminStore_SyncFromEnv(t *testing.T) {
+	store, cleanup := newTestAdminStore(t)
+	defer cleanup()
+
+	if err := store.SyncFromEnv("env-admin@test.com", "envpass999", true, true); err != nil {
+		t.Fatalf("SyncFromEnv: %v", err)
+	}
+
+	admin, err := store.Authenticate("env-admin@test.com", "envpass999")
+	if err != nil {
+		t.Fatalf("authenticate after sync: %v", err)
+	}
+	if admin.Email != "env-admin@test.com" {
+		t.Fatalf("expected env-admin@test.com, got %s", admin.Email)
+	}
+}

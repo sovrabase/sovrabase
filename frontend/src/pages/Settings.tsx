@@ -13,7 +13,7 @@ interface TabDef { key: TabKey; label: string; icon: typeof Shield; }
 interface AuditEntry { timestamp: string; admin: string; action: string; target: string; details: string; }
 
 const tabs: TabDef[] = [
-  { key: 'account', label: 'Admin Account', icon: Shield },
+  { key: 'account', label: 'My Account', icon: Shield },
   { key: 'admins', label: 'Admins', icon: Users },
   { key: 'security', label: 'Security & Rate Limits', icon: Shield },
   { key: 'captcha', label: 'Captcha', icon: Shield },
@@ -28,6 +28,9 @@ const tabs: TabDef[] = [
 const inputCls = 'w-full px-3 py-2 rounded-lg bg-bg-input border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors text-sm';
 const labelCls = 'text-text-secondary text-sm font-medium';
 
+const SMTP_FIELDS = ['email_provider', 'email_api_key', 'email_api_secret', 'smtp_sender', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_password'] as const;
+const SMTP_SECRET_FIELDS = new Set<string>(['email_api_key', 'email_api_secret', 'smtp_password']);
+
 const toggleBtn = (on: boolean) =>
   `w-10 h-5 rounded-full transition-colors ${on ? 'bg-accent' : 'bg-bg-input border border-border'}`;
 const toggleDot = (on: boolean) =>
@@ -37,7 +40,11 @@ export default function Settings() {
   const { showToast } = useToast();
   const [tab, setTab] = useState<TabKey>('account');
   const [form, setForm] = useState<Record<string, string | boolean>>({});
+  const [accountEmail, setAccountEmail] = useState('');
+  const [adminEmailLocked, setAdminEmailLocked] = useState(false);
+  const [adminPasswordLocked, setAdminPasswordLocked] = useState(false);
   const [confirmPw, setConfirmPw] = useState('');
+  const [currentPw, setCurrentPw] = useState('');
   const [systemInfo, setSystemInfo] = useState<Record<string, string> | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,6 +59,8 @@ export default function Settings() {
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ email: '', password: '' });
   const [testingSmtp, setTestingSmtp] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [initialSmtp, setInitialSmtp] = useState<Record<string, string | boolean>>({});
   const [emailLog, setEmailLog] = useState<EmailLogEntry[]>([]);
   const [emailLogTotal, setEmailLogTotal] = useState(0);
   const [emailLogOffset, setEmailLogOffset] = useState(0);
@@ -72,14 +81,27 @@ export default function Settings() {
       // They come back as "••••••••" (secretMask) which would break the password
       // confirmation check in saveConfig if loaded into the form.
       const secretKeys = new Set(['admin_password', 'jwt_secret', 's3_secret_key', 'smtp_password', 'email_api_key', 'email_api_secret', 'captcha_secret']);
+      const metaKeys = new Set(['admin_email_locked', 'admin_password_locked']);
       for (const [k, v] of Object.entries(data)) {
-        if (secretKeys.has(k)) continue;
+        if (secretKeys.has(k) || metaKeys.has(k)) continue;
         if (typeof v === 'boolean' || typeof v === 'string') flat[k] = v;
         else if (typeof v === 'number') flat[k] = String(v);
         else if (Array.isArray(v)) flat[k] = v.join('\n');
       }
       setForm(flat);
+      setAdminEmailLocked(data.admin_email_locked === true);
+      setAdminPasswordLocked(data.admin_password_locked === true);
+      const smtpSnap: Record<string, string | boolean> = {};
+      for (const k of SMTP_FIELDS) {
+        if (flat[k] !== undefined) smtpSnap[k] = flat[k];
+      }
+      setInitialSmtp(smtpSnap);
+      if (typeof flat.admin_email === 'string') {
+        setAccountEmail(flat.admin_email);
+        setTestEmail(flat.admin_email);
+      }
       setConfirmPw('');
+      setCurrentPw('');
     } catch { /* no config yet */ }
   }, []);
 
@@ -184,10 +206,20 @@ export default function Settings() {
 
   // ----- actions -----
   const saveConfig = useCallback(async (): Promise<boolean> => {
-    if (form.admin_password && form.admin_password !== confirmPw) {
+    const newEmail = typeof form.admin_email === 'string' ? form.admin_email : '';
+    const newPassword = typeof form.admin_password === 'string' ? form.admin_password : '';
+    const emailChanging = !adminEmailLocked && newEmail !== '' && newEmail !== accountEmail;
+    const passwordChanging = !adminPasswordLocked && newPassword !== '';
+
+    if (passwordChanging && newPassword !== confirmPw) {
       showToast('Passwords do not match', 'error');
       return false;
     }
+    if ((emailChanging || passwordChanging) && !currentPw) {
+      showToast('Current password is required to change email or password', 'error');
+      return false;
+    }
+
     setSaving(true);
     try {
       const body: Record<string, unknown> = { ...form };
@@ -201,14 +233,34 @@ export default function Settings() {
         }
       }
       if (body.admin_password === '') delete body.admin_password;
+      if (adminEmailLocked) delete body.admin_email;
+      if (adminPasswordLocked) {
+        delete body.admin_password;
+        delete body.admin_current_password;
+      }
+      if (emailChanging || passwordChanging) {
+        body.admin_current_password = currentPw;
+      } else {
+        delete body.admin_current_password;
+      }
       await api('/admin/config', { method: 'POST', body: JSON.stringify(body) });
       showToast('Settings saved', 'success');
+      setCurrentPw('');
+      setConfirmPw('');
+      if (emailChanging) {
+        setAccountEmail(newEmail);
+      }
+      setForm((prev) => {
+        const next = { ...prev };
+        delete next.admin_password;
+        return next;
+      });
       return true;
     } catch (err) {
       showToast((err as Error).message, 'error');
       return false;
     } finally { setSaving(false); }
-  }, [form, confirmPw, showToast]);
+  }, [form, confirmPw, currentPw, accountEmail, adminEmailLocked, adminPasswordLocked, showToast]);
 
   const handleRestart = useCallback(async () => {
     const ok = await saveConfig();
@@ -226,11 +278,58 @@ export default function Settings() {
     }
   }, [showToast]);
 
+  const isSmtpDirty = useCallback(() => {
+    for (const k of SMTP_FIELDS) {
+      if (SMTP_SECRET_FIELDS.has(k)) {
+        const v = form[k];
+        if (typeof v === 'string' && v !== '') return true;
+        continue;
+      }
+      if (form[k] !== initialSmtp[k]) return true;
+    }
+    return false;
+  }, [form, initialSmtp]);
+
+  const buildSmtpTestBody = useCallback((): Record<string, unknown> => {
+    const body: Record<string, unknown> = {};
+    const to = testEmail.trim();
+    if (to) body.to = to;
+
+    if (!isSmtpDirty()) return body;
+
+    const provider = (form.email_provider as string) || 'smtp';
+    body.email_provider = provider;
+    if (form.smtp_sender != null) body.smtp_sender = form.smtp_sender;
+    if (provider === 'smtp') {
+      if (form.smtp_host != null) body.smtp_host = form.smtp_host;
+      if (form.smtp_port != null && form.smtp_port !== '') body.smtp_port = Number(form.smtp_port);
+      if (form.smtp_user != null) body.smtp_user = form.smtp_user;
+      if (typeof form.smtp_password === 'string' && form.smtp_password !== '') {
+        body.smtp_password = form.smtp_password;
+      }
+    } else {
+      if (typeof form.email_api_key === 'string' && form.email_api_key !== '') {
+        body.email_api_key = form.email_api_key;
+      }
+      if (provider === 'mailjet' && typeof form.email_api_secret === 'string' && form.email_api_secret !== '') {
+        body.email_api_secret = form.email_api_secret;
+      }
+    }
+    return body;
+  }, [form, testEmail, isSmtpDirty]);
+
   const handleTestSmtp = async () => {
+    if (!testEmail.trim()) {
+      showToast('Test recipient email is required', 'error');
+      return;
+    }
     setTestingSmtp(true);
     try {
-      await api('/admin/smtp/test', { method: 'POST' });
-      showToast('Test email sent successfully', 'success');
+      const result = await api<{ to?: string }>('/admin/smtp/test', {
+        method: 'POST',
+        body: JSON.stringify(buildSmtpTestBody()),
+      });
+      showToast(`Test email sent to ${result.to ?? testEmail}`, 'success');
     } catch (err) {
       showToast((err as Error).message, 'error');
     } finally {
@@ -272,17 +371,18 @@ export default function Settings() {
   };
 
   // ----- field helpers -----
-  const f = (key: string, label: string, opts?: { type?: string; ph?: string; toggle?: boolean }) => {
+  const f = (key: string, label: string, opts?: { type?: string; ph?: string; toggle?: boolean; disabled?: boolean }) => {
     if (opts?.toggle) {
       return (
         <div key={key} className="flex items-center justify-between py-2">
           <span className={labelCls}>{label}</span>
-          <button onClick={() => setForm((fv) => ({ ...fv, [key]: !fv[key] }))} className={toggleBtn(!!form[key])}>
+          <button onClick={() => setForm((fv) => ({ ...fv, [key]: !fv[key] }))} className={toggleBtn(!!form[key])} disabled={opts?.disabled}>
             <span className={toggleDot(!!form[key])} />
           </button>
         </div>
       );
     }
+    const disabled = opts?.disabled ?? false;
     return (
       <div key={key} className="space-y-1">
         <label className={labelCls}>{label}</label>
@@ -290,8 +390,10 @@ export default function Settings() {
           type={opts?.type || 'text'}
           value={(form[key] as string) ?? ''}
           onChange={(e) => setForm((fv) => ({ ...fv, [key]: e.target.value }))}
-          className={inputCls}
+          className={`${inputCls}${disabled ? ' opacity-60 cursor-not-allowed' : ''}`}
           placeholder={opts?.ph}
+          disabled={disabled}
+          readOnly={disabled}
         />
       </div>
     );
@@ -319,15 +421,62 @@ export default function Settings() {
     switch (tab) {
       case 'account':
         return (
-          <div className="space-y-4 max-w-md">
-            {f('admin_email', 'Email', { type: 'email' })}
-            {f('admin_password', 'New Password', { type: 'password', ph: 'Leave blank to keep current' })}
-            <div className="space-y-1">
-              <label className={labelCls}>Confirm Password</label>
-              <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className={inputCls} placeholder="Re-enter new password" />
+          <div className="space-y-6 max-w-md">
+            <div className="space-y-4">
+              {(adminEmailLocked || adminPasswordLocked) && (
+                <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-text-secondary space-y-2">
+                  <p className="font-medium text-text-primary">Managed by environment variables</p>
+                  <p>These credentials are set at deploy time and cannot be changed from the dashboard.</p>
+                  <ul className="list-disc list-inside text-text-muted space-y-0.5">
+                    {adminEmailLocked && <li><code className="text-xs">SOVRABASE_ADMIN_EMAIL</code></li>}
+                    {adminPasswordLocked && <li><code className="text-xs">SOVRABASE_ADMIN_PASSWORD</code></li>}
+                  </ul>
+                </div>
+              )}
+              <p className="text-text-muted text-sm">
+                {adminEmailLocked && adminPasswordLocked
+                  ? 'View your dashboard login credentials below.'
+                  : 'Update your dashboard login credentials. Changes apply immediately after save.'}
+              </p>
+              {f('admin_email', 'Email', { type: 'email', disabled: adminEmailLocked })}
+              {f('admin_password', 'New Password', { type: 'password', ph: 'Leave blank to keep current', disabled: adminPasswordLocked })}
+              <div className="space-y-1">
+                <label className={labelCls}>Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={(e) => setConfirmPw(e.target.value)}
+                  className={`${inputCls}${adminPasswordLocked ? ' opacity-60 cursor-not-allowed' : ''}`}
+                  placeholder="Re-enter new password"
+                  disabled={adminPasswordLocked}
+                  readOnly={adminPasswordLocked}
+                />
+              </div>
+              {(!adminEmailLocked || !adminPasswordLocked) && (
+                <div className="space-y-1">
+                  <label className={labelCls}>Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPw}
+                    onChange={(e) => setCurrentPw(e.target.value)}
+                    className={inputCls}
+                    placeholder={
+                      adminEmailLocked
+                        ? 'Required when changing password'
+                        : adminPasswordLocked
+                          ? 'Required when changing email'
+                          : 'Required when changing email or password'
+                    }
+                  />
+                </div>
+              )}
             </div>
-            {f('session_duration', 'Session Duration', { ph: '24h' })}
-            {f('backup_interval', 'Backup Interval', { ph: '24h' })}
+            <div className="border-t border-border pt-4 space-y-4">
+              <h4 className="text-text-primary text-sm font-semibold">Server</h4>
+              <p className="text-text-muted text-sm">Session and backup settings are stored in config.yaml. Restart the server to apply backup interval changes.</p>
+              {f('session_duration', 'Session Duration', { ph: '24h' })}
+              {f('backup_interval', 'Backup Interval', { ph: '1h (use 0s to disable)' })}
+            </div>
           </div>
         );
 
@@ -429,11 +578,25 @@ export default function Settings() {
             {isSmtp && f('smtp_port', 'Port', { type: 'number' })}
             {isSmtp && f('smtp_user', 'Username')}
             {isSmtp && f('smtp_password', 'Password', { type: 'password', ph: 'Leave blank to keep current' })}
-            <div className="pt-4 border-t border-border">
+            <div className="pt-4 border-t border-border space-y-3">
+              <div className="space-y-1">
+                <label className={labelCls}>Test Recipient</label>
+                <input
+                  type="email"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  className={inputCls}
+                  placeholder="recipient@example.com"
+                />
+              </div>
               <button onClick={handleTestSmtp} disabled={testingSmtp} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors">
                 {testingSmtp ? <Loader2 className="w-4 h-4 animate-spin" /> : null}{testingSmtp ? 'Sending...' : 'Send Test Email'}
               </button>
-              <p className="text-xs text-text-muted mt-2">Sends a test email to the configured admin email address.</p>
+              <p className="text-xs text-text-muted">
+                {isSmtpDirty()
+                  ? 'Tests the values above without saving. Secrets left blank use the saved server credentials.'
+                  : 'Tests the saved server configuration. Edit a field above to try unsaved changes first.'}
+              </p>
             </div>
           </div>
         );}
@@ -702,7 +865,7 @@ export default function Settings() {
             <p className="text-text-muted text-sm">Config is saved to config.yaml</p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => { loadConfig(); setConfirmPw(''); }} className="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm hover:bg-bg-input transition-colors">Reset</button>
+            <button onClick={() => { loadConfig(); setConfirmPw(''); setCurrentPw(''); }} className="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm hover:bg-bg-input transition-colors">Reset</button>
             <button onClick={saveConfig} disabled={saving} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors">
               <Save className="w-4 h-4" />{saving ? 'Saving...' : 'Save Config'}
             </button>

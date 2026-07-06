@@ -2216,12 +2216,23 @@ func (a *AdminServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		return ""
 	}
+	adminEmail := a.cfg.AdminEmail
+	if a.adminStore != nil && !a.cfg.AdminEmailFromEnv {
+		if claims, ok := r.Context().Value(claimsKey).(*auth.Claims); ok && claims.Role != "member" {
+			if admin, err := a.adminStore.GetByID(claims.UserID); err == nil {
+				adminEmail = admin.Email
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		// Core (read-only display)
 		"listen_addr":      a.cfg.ListenAddr,
 		"data_dir":         a.cfg.DataDir,
 		"config_file":      a.cfg.ConfigFile,
-		"admin_email":      a.cfg.AdminEmail,
+		"admin_email":            adminEmail,
+		"admin_email_locked":     a.cfg.AdminEmailFromEnv,
+		"admin_password_locked":  a.cfg.AdminPasswordFromEnv,
 		"admin_password":   masked(a.cfg.AdminPassword),
 		"jwt_secret":       masked(a.cfg.JWTSecret),
 		"session_duration": a.cfg.SessionDuration.String(),
@@ -2266,6 +2277,106 @@ func (a *AdminServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// applyAdminAccountUpdate syncs admin email/password changes from a config save
+// into AdminStore for the authenticated admin. When adminStore is unavailable,
+// legacy config-only credentials are updated instead.
+func (a *AdminServer) applyAdminAccountUpdate(w http.ResponseWriter, r *http.Request, reqAdminEmail, reqAdminPassword, reqCurrentPassword *string) error {
+	if a.adminStore == nil {
+		emailChange := reqAdminEmail != nil && *reqAdminEmail != "" && *reqAdminEmail != a.cfg.AdminEmail
+		passChange := reqAdminPassword != nil && *reqAdminPassword != "" && *reqAdminPassword != secretMask
+		if !emailChange && !passChange {
+			return nil
+		}
+		if emailChange && a.cfg.AdminEmailFromEnv {
+			writeError(w, http.StatusForbidden, "admin email is managed by SOVRABASE_ADMIN_EMAIL and cannot be changed here")
+			return fmt.Errorf("admin email locked by environment")
+		}
+		if passChange && a.cfg.AdminPasswordFromEnv {
+			writeError(w, http.StatusForbidden, "admin password is managed by SOVRABASE_ADMIN_PASSWORD and cannot be changed here")
+			return fmt.Errorf("admin password locked by environment")
+		}
+		if emailChange {
+			a.cfg.AdminEmail = *reqAdminEmail
+			a.adminEmail = *reqAdminEmail
+		}
+		if passChange {
+			a.cfg.AdminPassword = *reqAdminPassword
+			a.adminPassword = *reqAdminPassword
+		}
+		return nil
+	}
+
+	claims, ok := r.Context().Value(claimsKey).(*auth.Claims)
+	if !ok || claims.Role == "member" {
+		return nil
+	}
+
+	admin, err := a.adminStore.GetByID(claims.UserID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "admin not found")
+		return err
+	}
+
+	emailChange := reqAdminEmail != nil && *reqAdminEmail != "" && *reqAdminEmail != admin.Email
+	passChange := reqAdminPassword != nil && *reqAdminPassword != "" && *reqAdminPassword != secretMask
+	if !emailChange && !passChange {
+		return nil
+	}
+
+	if emailChange && a.cfg.AdminEmailFromEnv {
+		writeError(w, http.StatusForbidden, "admin email is managed by SOVRABASE_ADMIN_EMAIL and cannot be changed here")
+		return fmt.Errorf("admin email locked by environment")
+	}
+	if passChange && a.cfg.AdminPasswordFromEnv {
+		writeError(w, http.StatusForbidden, "admin password is managed by SOVRABASE_ADMIN_PASSWORD and cannot be changed here")
+		return fmt.Errorf("admin password locked by environment")
+	}
+
+	currentPw := ""
+	if reqCurrentPassword != nil {
+		currentPw = *reqCurrentPassword
+	}
+	if currentPw == "" {
+		writeError(w, http.StatusBadRequest, "current password is required to change email or password")
+		return fmt.Errorf("current password required")
+	}
+	if err := auth.CheckPassword(admin.PasswordHash, currentPw); err != nil {
+		writeError(w, http.StatusUnauthorized, "current password is incorrect")
+		return err
+	}
+
+	if emailChange {
+		if existing, err := a.adminStore.GetByEmail(*reqAdminEmail); err == nil && existing.ID != admin.ID {
+			writeError(w, http.StatusConflict, "email already in use")
+			return fmt.Errorf("email already in use")
+		}
+		if admin.Email == a.cfg.AdminEmail {
+			a.cfg.AdminEmail = *reqAdminEmail
+			a.adminEmail = *reqAdminEmail
+		}
+		admin.Email = *reqAdminEmail
+	}
+
+	if passChange {
+		hash, err := auth.HashPassword(*reqAdminPassword)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to hash password")
+			return err
+		}
+		admin.PasswordHash = hash
+		if admin.Email == a.cfg.AdminEmail {
+			a.cfg.AdminPassword = *reqAdminPassword
+			a.adminPassword = *reqAdminPassword
+		}
+	}
+
+	if err := a.adminStore.Update(admin); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update admin account: "+err.Error())
+		return err
+	}
+	return nil
+}
+
 // handleSaveConfig updates mutable fields in the config and persists to config.yaml.
 func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	if a.cfg == nil {
@@ -2274,10 +2385,11 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		// Admin account
-		AdminEmail      *string `json:"admin_email"`
-		AdminPassword   *string `json:"admin_password"`   // ignored if == secretMask or empty
-		SessionDuration *string `json:"session_duration"` // e.g. "24h", "168h"
-		BackupInterval  *string `json:"backup_interval"`  // e.g. "1h", "12h"
+		AdminEmail           *string `json:"admin_email"`
+		AdminPassword        *string `json:"admin_password"`         // ignored if == secretMask or empty
+		AdminCurrentPassword *string `json:"admin_current_password"` // required when changing email or password
+		SessionDuration      *string `json:"session_duration"`       // e.g. "24h", "168h"
+		BackupInterval       *string `json:"backup_interval"`        // e.g. "1h", "12h"
 		// Security / HTTPS
 		JWTSecret *string `json:"jwt_secret"` // ignored if == secretMask
 		CertFile  *string `json:"cert_file"`
@@ -2322,15 +2434,11 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := a.applyAdminAccountUpdate(w, r, req.AdminEmail, req.AdminPassword, req.AdminCurrentPassword); err != nil {
+		return
+	}
+
 	// Apply mutable fields — secrets only updated if not the mask placeholder
-	if req.AdminEmail != nil && *req.AdminEmail != "" {
-		a.cfg.AdminEmail = *req.AdminEmail
-		a.adminEmail = *req.AdminEmail
-	}
-	if req.AdminPassword != nil && *req.AdminPassword != "" && *req.AdminPassword != secretMask {
-		a.cfg.AdminPassword = *req.AdminPassword
-		a.adminPassword = *req.AdminPassword
-	}
 	if req.SessionDuration != nil && *req.SessionDuration != "" {
 		if d, err := time.ParseDuration(*req.SessionDuration); err == nil && d > 0 {
 			a.cfg.SessionDuration = d
@@ -2470,10 +2578,29 @@ func (a *AdminServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleSmtpTest sends a test email to the configured admin email.
+// handleSmtpTest sends a test email using saved server config, optionally overridden
+// by unsaved form values from the dashboard. The request body is optional.
 func (a *AdminServer) handleSmtpTest(w http.ResponseWriter, r *http.Request) {
-	if a.mailer == nil || !a.mailer.IsConfigured() {
-		provider := a.cfg.EmailProvider
+	var req struct {
+		To             *string `json:"to"`
+		EmailProvider  *string `json:"email_provider"`
+		EmailAPIKey    *string `json:"email_api_key"`
+		EmailAPISecret *string `json:"email_api_secret"`
+		SMTPSender     *string `json:"smtp_sender"`
+		SMTPHost       *string `json:"smtp_host"`
+		SMTPPort       *int    `json:"smtp_port"`
+		SMTPUser       *string `json:"smtp_user"`
+		SMTPPassword   *string `json:"smtp_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	mailCfg := a.emailConfigForTest(&req)
+	mailer := email.NewMailer(mailCfg)
+	if !mailer.IsConfigured() {
+		provider := string(mailCfg.Provider)
 		if provider == "" {
 			provider = "smtp"
 		}
@@ -2482,22 +2609,25 @@ func (a *AdminServer) handleSmtpTest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	to := a.cfg.AdminEmail
+	if req.To != nil && strings.TrimSpace(*req.To) != "" {
+		to = strings.TrimSpace(*req.To)
+	}
 	if to == "" {
-		writeError(w, http.StatusBadRequest, "admin email not configured")
+		writeError(w, http.StatusBadRequest, "test recipient email is required")
 		return
 	}
 
 	msg := email.Message{
-		Text: "This is a test email from your Sovrabase server.\n\nIf you received this, your SMTP configuration is working correctly.\n\n— Sovrabase",
-		HTML: "<p>This is a test email from your Sovrabase server.</p><p>If you received this, your SMTP configuration is working correctly.</p><p>— Sovrabase</p>",
+		Text: "This is a test email from your Sovrabase server.\n\nIf you received this, your email configuration is working correctly.\n\n— Sovrabase",
+		HTML: "<p>This is a test email from your Sovrabase server.</p><p>If you received this, your email configuration is working correctly.</p><p>— Sovrabase</p>",
 	}
 
-	if err := a.mailer.SendMail([]string{to}, "Sovrabase SMTP Test", msg); err != nil {
-		writeError(w, http.StatusInternalServerError, "SMTP test failed: "+err.Error())
+	if err := mailer.SendMail([]string{to}, "Sovrabase Email Test", msg); err != nil {
+		writeError(w, http.StatusInternalServerError, "email test failed: "+err.Error())
 		return
 	}
 
-	provider := a.cfg.EmailProvider
+	provider := string(mailCfg.Provider)
 	if provider == "" {
 		provider = "smtp"
 	}
@@ -2508,6 +2638,63 @@ func (a *AdminServer) handleSmtpTest(w http.ResponseWriter, r *http.Request) {
 		"provider":  provider,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
+}
+
+// emailConfigForTest builds an email.Config from saved server settings, applying
+// any non-empty override fields from an SMTP test request (unsaved form values).
+func (a *AdminServer) emailConfigForTest(req *struct {
+	To             *string `json:"to"`
+	EmailProvider  *string `json:"email_provider"`
+	EmailAPIKey    *string `json:"email_api_key"`
+	EmailAPISecret *string `json:"email_api_secret"`
+	SMTPSender     *string `json:"smtp_sender"`
+	SMTPHost       *string `json:"smtp_host"`
+	SMTPPort       *int    `json:"smtp_port"`
+	SMTPUser       *string `json:"smtp_user"`
+	SMTPPassword   *string `json:"smtp_password"`
+}) email.Config {
+	provider := a.cfg.EmailProvider
+	if provider == "" {
+		provider = "smtp"
+	}
+	cfg := email.Config{
+		Provider:  email.Provider(provider),
+		Sender:    a.cfg.SMTPSender,
+		SMTPHost:  a.cfg.SMTPHost,
+		SMTPPort:  a.cfg.SMTPPort,
+		SMTPUser:  a.cfg.SMTPUser,
+		SMTPPass:  a.cfg.SMTPPassword,
+		APIKey:    a.cfg.EmailAPIKey,
+		APISecret: a.cfg.EmailAPISecret,
+	}
+	if req == nil {
+		return cfg
+	}
+	if req.EmailProvider != nil && *req.EmailProvider != "" {
+		cfg.Provider = email.Provider(*req.EmailProvider)
+	}
+	if req.SMTPSender != nil {
+		cfg.Sender = *req.SMTPSender
+	}
+	if req.SMTPHost != nil {
+		cfg.SMTPHost = *req.SMTPHost
+	}
+	if req.SMTPPort != nil && *req.SMTPPort > 0 {
+		cfg.SMTPPort = *req.SMTPPort
+	}
+	if req.SMTPUser != nil {
+		cfg.SMTPUser = *req.SMTPUser
+	}
+	if req.EmailAPIKey != nil && *req.EmailAPIKey != "" && *req.EmailAPIKey != secretMask {
+		cfg.APIKey = *req.EmailAPIKey
+	}
+	if req.EmailAPISecret != nil && *req.EmailAPISecret != "" && *req.EmailAPISecret != secretMask {
+		cfg.APISecret = *req.EmailAPISecret
+	}
+	if req.SMTPPassword != nil && *req.SMTPPassword != "" && *req.SMTPPassword != secretMask {
+		cfg.SMTPPass = *req.SMTPPassword
+	}
+	return cfg
 }
 
 // handleListEmailLog returns paginated email log entries.
@@ -3314,6 +3501,10 @@ func (a *AdminServer) handleUpdateMyProfile(w http.ResponseWriter, r *http.Reque
 
 	// For admin users — update via AdminStore
 	if claims.Role != "member" {
+		if req.NewPassword != "" && a.cfg != nil && a.cfg.AdminPasswordFromEnv {
+			writeError(w, http.StatusForbidden, "admin password is managed by SOVRABASE_ADMIN_PASSWORD and cannot be changed here")
+			return
+		}
 		if a.adminStore == nil {
 			writeError(w, http.StatusBadRequest, "admin store not available for profile updates")
 			return

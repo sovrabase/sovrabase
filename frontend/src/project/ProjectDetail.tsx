@@ -109,23 +109,24 @@ export default function ProjectDetail() {
   }
 
   const renderTab = () => {
-    const props = { projectId: id!, apiKey: project.api_key };
+    const projectId = id!;
+    const apiKey = project.api_key;
     switch (activeTab) {
-      case 'Overview': return <OverviewTab {...props} />;
-      case 'Team': return <TeamTab {...props} />;
-      case 'Database': return <DatabaseTab {...props} />;
-      case 'Auth': return <AuthTab {...props} />;
-      case 'Storage': return <StorageTab {...props} />;
-      case 'Config': return <ConfigTab {...props} />;
-      case 'Cron': return <CronTab {...props} />;
-      case 'Functions': return <FunctionsTab {...props} />;
-      case 'Webhooks': return <WebhooksTab {...props} />;
-      case 'Queues': return <QueuesTab {...props} />;
-      case 'Integrations': return <IntegrationsTab {...props} />;
-      case 'EmailTemplates': return <EmailTemplatesTab {...props} />;
-      case 'Analytics': return <AnalyticsTab {...props} />;
-      case 'API': return <ApiTab {...props} />;
-      case 'Logs': return <LogsTab {...props} />;
+      case 'Overview': return <OverviewTab projectId={projectId} />;
+      case 'Team': return <TeamTab projectId={projectId} />;
+      case 'Database': return <DatabaseTab projectId={projectId} />;
+      case 'Auth': return <AuthTab projectId={projectId} />;
+      case 'Storage': return <StorageTab projectId={projectId} />;
+      case 'Config': return <ConfigTab projectId={projectId} />;
+      case 'Cron': return <CronTab projectId={projectId} apiKey={apiKey} />;
+      case 'Functions': return <FunctionsTab projectId={projectId} apiKey={apiKey} />;
+      case 'Webhooks': return <WebhooksTab projectId={projectId} />;
+      case 'Queues': return <QueuesTab projectId={projectId} />;
+      case 'Integrations': return <IntegrationsTab projectId={projectId} />;
+      case 'EmailTemplates': return <EmailTemplatesTab projectId={projectId} />;
+      case 'Analytics': return <AnalyticsTab projectId={projectId} />;
+      case 'API': return <ApiTab projectId={projectId} apiKey={apiKey} />;
+      case 'Logs': return <LogsTab projectId={projectId} />;
     }
   };
 

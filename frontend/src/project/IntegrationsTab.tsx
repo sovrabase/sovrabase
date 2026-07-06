@@ -48,9 +48,9 @@ export default function IntegrationsTab({ projectId }: Props) {
     setEditing(def);
     const existing = getEnabled(def.id);
     const cfg: Record<string, string> = {};
-    if (existing) {
+    if (existing?.config) {
       for (const [k, v] of Object.entries(existing.config)) {
-        cfg[k] = typeof v === 'boolean' ? String(v) : String(v ?? '');
+        cfg[k] = String(v ?? '');
       }
     }
     setEditConfig(cfg);
@@ -118,32 +118,32 @@ export default function IntegrationsTab({ projectId }: Props) {
 
   // Build code snippet for a configured integration
   const snippetFor = (def: IntegrationDef): string => {
+    const origin = window.location.origin;
     if (def.id === 'paypal') {
       return `// 1. Read public config from Sovrabase
-const res = await fetch('${window.location.origin}/api/v1/integrations', {
+const res = await fetch('${origin}/api/v1/integrations', {
   headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token }
 });
 const { integrations } = await res.json();
 const paypal = integrations.find(i => i.id === 'paypal');
 
 // 2. Create an order (server-side, uses your secret)
-const order = await fetch('${window.location.origin}/api/v1/integrations/paypal/action', {
+const order = await fetch('${origin}/api/v1/integrations/paypal/action', {
   method: 'POST',
   headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
   body: JSON.stringify({ action: 'create_order', data: { amount: '10.00', currency: 'USD' } })
 }).then(r => r.json());
 
 // 3. Capture after approval
-await fetch('${window.location.origin}/api/v1/integrations/paypal/action', {
+await fetch('${origin}/api/v1/integrations/paypal/action', {
   method: 'POST',
   headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
   body: JSON.stringify({ action: 'capture_order', data: { order_id: order.id } })
 });
 
 // Webhook URL for PayPal dashboard:
-//   ${window.location.origin}/api/v1/integrations/paypal/webhook?project_key=PROJECT_KEY`;
-    }
-    if (def.category === 'notifications') {
+//   ${origin}/api/v1/integrations/paypal/webhook?project_key=PROJECT_KEY`;
+    } else if (def.category === 'notifications') {
       return `// AUTOMATIC: Notification webhooks fire on DB/API events.
 // You do NOT need to call the action API manually. As soon as this
 // integration is enabled, the server sends a message on:
@@ -159,32 +159,30 @@ await fetch('${window.location.origin}/api/v1/integrations/paypal/action', {
 // fire on everything; leave collections empty for all collections.
 //
 // Manual send (optional — for custom messages):
-await fetch('${window.location.origin}/api/v1/integrations/${def.id}/action', {
+await fetch('${origin}/api/v1/integrations/${def.id}/action', {
   method: 'POST',
   headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
   body: JSON.stringify({ action: 'send_message', data: { content: 'Custom message!' } })
 });
 `;
-    }
-    if (def.id === 'sendgrid' || def.id === 'twilio') {
+    } else if (def.id === 'sendgrid' || def.id === 'twilio') {
       return `// Server-side send
-await fetch('${window.location.origin}/api/v1/integrations/${def.id}/action', {
+await fetch('${origin}/api/v1/integrations/${def.id}/action', {
   method: 'POST',
   headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
   body: JSON.stringify({ action: '${def.id === 'sendgrid' ? 'send_email' : 'send_sms'}', data: { ... } })
 });
 `;
-    }
-    if (def.id === 'algolia') {
+    } else if (def.id === 'algolia') {
       return `// Index a document
-await fetch('${window.location.origin}/api/v1/integrations/algolia/action', {
+await fetch('${origin}/api/v1/integrations/algolia/action', {
   method: 'POST',
   headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
   body: JSON.stringify({ action: 'save_object', data: { index: 'products', object: { objectID: '1', name: 'Widget', price: 9.99 } } })
 });
 
 // Search
-const results = await fetch('${window.location.origin}/api/v1/integrations/algolia/action', {
+const results = await fetch('${origin}/api/v1/integrations/algolia/action', {
   method: 'POST',
   headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
   body: JSON.stringify({ action: 'search', data: { index: 'products', query: 'widget' } })
@@ -194,14 +192,14 @@ const results = await fetch('${window.location.origin}/api/v1/integrations/algol
 //   delete_object, set_settings, list_indexes`;
     }
     return `// Server-side action
-await fetch('${window.location.origin}/api/v1/integrations/${def.id}/action', {
+await fetch('${origin}/api/v1/integrations/${def.id}/action', {
   method: 'POST',
   headers: { 'X-Project-Key': PROJECT_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
   body: JSON.stringify({ action: '...', data: { ... } })
 });
 
 // Webhook URL for ${def.name} dashboard:
-//   ${window.location.origin}/api/v1/integrations/${def.id}/webhook?project_key=PROJECT_KEY`;
+//   ${origin}/api/v1/integrations/${def.id}/webhook?project_key=PROJECT_KEY`;
   };
 
   if (loading) return <div className="flex items-center gap-2 py-10 text-text-muted"><Loader2 className="w-4 h-4 animate-spin" /> Loading integrations...</div>;

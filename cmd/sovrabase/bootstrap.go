@@ -116,6 +116,13 @@ func runSovrabase(logger *slog.Logger, cfg *config.Config) {
 	adminServer := api.NewAdminServer(projectMgr, cfg, cfg.JWTSecret, cfg.AdminEmail, cfg.AdminPassword)
 
 	adminStore := auth.NewAdminStore(engine.DB(), cfg.AdminEmail, cfg.AdminPassword)
+	if cfg.AdminEmailFromEnv || cfg.AdminPasswordFromEnv {
+		if err := adminStore.SyncFromEnv(cfg.AdminEmail, cfg.AdminPassword, cfg.AdminEmailFromEnv, cfg.AdminPasswordFromEnv); err != nil {
+			logger.Warn("Failed to sync admin credentials from environment", "error", err)
+		} else if cfg.AdminEmailFromEnv || cfg.AdminPasswordFromEnv {
+			logger.Info("Admin credentials managed by environment variables")
+		}
+	}
 	adminServer.SetAdminStore(adminStore)
 
 	auditStore := auth.NewAuditStore(engine.DB())

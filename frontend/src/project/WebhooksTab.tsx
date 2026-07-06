@@ -5,7 +5,7 @@ import type { Webhook as WebhookType } from '../types';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
-interface Props { projectId: string; apiKey?: string; }
+interface Props { projectId: string; }
 
 export default function WebhooksTab({ projectId }: Props) {
   const [webhooks, setWebhooks] = useState<WebhookType[]>([]);

@@ -191,7 +191,7 @@ const renderProviderIcon = (name: string, className: string = "w-4 h-4") => {
   );
 };
 
-function ProviderBadge({ templateKey }: { templateKey: string; name?: string }) {
+function ProviderBadge({ templateKey }: { templateKey: string }) {
   return (
     <span className="w-8 h-8 flex items-center justify-center rounded-lg border border-border bg-bg-card text-text-secondary shrink-0 select-none">
       {renderProviderIcon(templateKey, "w-4 h-4")}
@@ -461,7 +461,7 @@ export default function AuthTab({ projectId }: Props) {
                 <div key={p.name} className="bg-bg-card border border-border rounded-lg p-4 flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <ProviderBadge templateKey={tplKey} name={p.name} />
+                      <ProviderBadge templateKey={tplKey} />
                       <div className="min-w-0">
                         <h3 className="text-text-primary font-medium text-sm truncate">{p.name}</h3>
                         {cid && <p className="text-text-muted text-xs font-mono truncate">Client: {cid.length > 24 ? cid.slice(0, 24) + '…' : cid}</p>}
@@ -538,7 +538,7 @@ export default function AuthTab({ projectId }: Props) {
                   const tpl = PROVIDER_TEMPLATES[key];
                   return (
                     <button key={key} onClick={() => pickTemplate(key)} className="flex flex-col items-center gap-2 p-3 bg-bg-input border border-border rounded-lg hover:border-accent transition-colors">
-                      <ProviderBadge templateKey={key} name={tpl.label} />
+                      <ProviderBadge templateKey={key} />
                       <span className="text-text-primary text-xs font-medium">{tpl.label}</span>
                     </button>
                   );

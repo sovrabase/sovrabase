@@ -8,7 +8,6 @@ import { useToast } from '../components/Toast';
 
 interface Props {
   projectId: string;
-  apiKey?: string;
 }
 
 const TEMPLATE_INFO: Record<string, { label: string; variables: string[] }> = {

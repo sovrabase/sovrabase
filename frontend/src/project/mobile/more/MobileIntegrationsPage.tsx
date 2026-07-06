@@ -145,9 +145,9 @@ export default function MobileIntegrationsPage() {
                                   onClick={() => {
                                     setEditingIntegration(plugin);
                                     const cfg: Record<string, string> = {};
-                                    if (config) {
-                                      for (const [k, v] of Object.entries(config.config || {})) {
-                                        cfg[k] = typeof v === 'boolean' ? String(v) : String(v ?? '');
+                                    if (config?.config) {
+                                      for (const [k, v] of Object.entries(config.config)) {
+                                        cfg[k] = String(v ?? '');
                                       }
                                     }
                                     setIntegrationConfig(cfg);

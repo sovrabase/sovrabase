@@ -8,7 +8,6 @@ import { useToast } from '../components/Toast';
 
 interface Props {
   projectId: string;
-  apiKey?: string;
 }
 
 const ROLES = ['owner', 'admin', 'developer', 'viewer'] as const;

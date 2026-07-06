@@ -20,6 +20,8 @@ type Config struct {
 	AllowOrigins    string        `yaml:"allow_origins"  json:"allow_origins"`
 	AdminEmail      string        `yaml:"admin_email"    json:"admin_email"`
 	AdminPassword   string        `yaml:"admin_password" json:"admin_password"`
+	AdminEmailFromEnv    bool `yaml:"-" json:"-"` // set when SOVRABASE_ADMIN_EMAIL is present
+	AdminPasswordFromEnv bool `yaml:"-" json:"-"` // set when SOVRABASE_ADMIN_PASSWORD is present
 	SessionDuration time.Duration `yaml:"session_duration" json:"session_duration"`
 	BackupInterval  time.Duration `yaml:"backup_interval"  json:"backup_interval"`
 
@@ -199,8 +201,14 @@ func applyEnvOverrides(cfg *Config) {
 	setStr("SOVRABASE_JWT_SECRET", &cfg.JWTSecret)
 	setStr("SOVRABASE_STORAGE_DIR", &cfg.StorageDir)
 	setStr("SOVRABASE_ALLOW_ORIGINS", &cfg.AllowOrigins)
-	setStr("SOVRABASE_ADMIN_EMAIL", &cfg.AdminEmail)
-	setStr("SOVRABASE_ADMIN_PASSWORD", &cfg.AdminPassword)
+	if v := os.Getenv("SOVRABASE_ADMIN_EMAIL"); v != "" {
+		cfg.AdminEmail = v
+		cfg.AdminEmailFromEnv = true
+	}
+	if v := os.Getenv("SOVRABASE_ADMIN_PASSWORD"); v != "" {
+		cfg.AdminPassword = v
+		cfg.AdminPasswordFromEnv = true
+	}
 	setStr("SOVRABASE_ROLE", &cfg.Role)
 	setStr("SOVRABASE_NODE_ID", &cfg.NodeID)
 	setStr("SOVRABASE_REPL_ADDR", &cfg.ReplAddr)

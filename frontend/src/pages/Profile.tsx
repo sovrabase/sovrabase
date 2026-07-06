@@ -21,13 +21,18 @@ export default function Profile() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLocked, setPasswordLocked] = useState(false);
 
   const loadProfile = async () => {
     setLoading(true);
     try {
-      const data = await api<MyProfile>('/admin/members/me');
+      const [data, config] = await Promise.all([
+        api<MyProfile>('/admin/members/me'),
+        api<{ admin_password_locked?: boolean }>('/admin/config').catch(() => ({})),
+      ]);
       setProfile(data);
       setName(data.name || '');
+      setPasswordLocked(config.admin_password_locked === true);
     } catch (e) {
       showToast((e as Error).message, 'error');
     } finally {
@@ -151,41 +156,49 @@ export default function Profile() {
 
         <hr className="border-border" />
 
-        <div>
-          <label className={`${labelCls} block mb-1`}>Current Password</label>
-          <input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Required to change password"
-            className={inputCls}
-            autoComplete="current-password"
-          />
-        </div>
+        {passwordLocked && profile.role === 'admin' ? (
+          <p className="text-text-muted text-sm">
+            Password is managed by <code className="text-xs">SOVRABASE_ADMIN_PASSWORD</code> and cannot be changed here.
+          </p>
+        ) : (
+          <>
+            <div>
+              <label className={`${labelCls} block mb-1`}>Current Password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Required to change password"
+                className={inputCls}
+                autoComplete="current-password"
+              />
+            </div>
 
-        <div>
-          <label className={`${labelCls} block mb-1`}>New Password</label>
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Leave blank to keep current"
-            className={inputCls}
-            autoComplete="new-password"
-          />
-        </div>
+            <div>
+              <label className={`${labelCls} block mb-1`}>New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Leave blank to keep current"
+                className={inputCls}
+                autoComplete="new-password"
+              />
+            </div>
 
-        <div>
-          <label className={`${labelCls} block mb-1`}>Confirm New Password</label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Repeat new password"
-            className={inputCls}
-            autoComplete="new-password"
-          />
-        </div>
+            <div>
+              <label className={`${labelCls} block mb-1`}>Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repeat new password"
+                className={inputCls}
+                autoComplete="new-password"
+              />
+            </div>
+          </>
+        )}
 
         <div className="flex justify-end pt-2">
           <button

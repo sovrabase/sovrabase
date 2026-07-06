@@ -8,7 +8,6 @@ import { useToast } from '../components/Toast';
 
 interface Props {
   projectId: string;
-  apiKey?: string;
 }
 
 const TYPES = ['string', 'number', 'boolean', 'json'] as const;
