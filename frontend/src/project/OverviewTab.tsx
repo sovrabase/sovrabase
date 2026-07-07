@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Copy, Eye, EyeOff, Save, Database, Globe, Settings, Check } from 'lucide-react';
-import { api, adminProjectPath, formatBytes, formatDate } from '../api';
+import { api, formatBytes, formatDate } from '../api';
 import { useToast } from '../components/Toast';
+import { useProjectUsage } from './hooks/useProjectUsage';
 import type { Project } from '../types';
 
 interface Props {
@@ -21,18 +22,6 @@ interface DbAnalysis {
   metadata_size: number;
   index_size: number;
   collections: Record<string, { document_count: number; document_size: number; index_size: number }>;
-}
-
-interface UsageData {
-  enabled: boolean;
-  api_requests?: number;
-  db_reads_total?: number;
-  db_writes_total?: number;
-  bandwidth_up?: number;
-  bandwidth_down?: number;
-  total_storage_bytes?: number;
-  realtime_connections?: number;
-  requests_by_method?: Record<string, number>;
 }
 
 const UNIT_MULTIPLIERS: Record<string, number> = {
@@ -71,8 +60,8 @@ export default function OverviewTab({ projectId }: Props) {
   const [analyzing, setAnalyzing] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
 
-  // Usage stats
-  const [usage, setUsage] = useState<UsageData | null>(null);
+  // Usage stats (polled every 3s)
+  const { usage } = useProjectUsage(projectId);
 
   const fetchDetail = () => {
     setLoading(true);
@@ -91,7 +80,6 @@ export default function OverviewTab({ projectId }: Props) {
 
   useEffect(() => {
     fetchDetail();
-    api<UsageData>(adminProjectPath(projectId, '/usage')).then(setUsage).catch(() => setUsage(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 

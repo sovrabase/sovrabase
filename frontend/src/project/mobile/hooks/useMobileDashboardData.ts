@@ -376,6 +376,12 @@ export function useMobileDashboardData({
     loadIntegrations();
   }, [projectId, loadCollections, loadUsers, loadInitialLogs, loadCronJobs, loadBuckets, loadMembers, loadWebhooks, loadQueues, loadAuthProviders, loadProjectConfig, loadConfigEntries, loadProjectUsage, loadIntegrations]);
 
+  // Poll usage metrics (incl. live WebSocket count) every 3s
+  useEffect(() => {
+    const timer = setInterval(loadProjectUsage, 3000);
+    return () => clearInterval(timer);
+  }, [loadProjectUsage]);
+
   // Load analytics when user enters analytics sub-page
   useEffect(() => {
     if (activeSubPage === 'analytics') {

@@ -28,6 +28,7 @@ import (
 	"github.com/ketsuna-org/sovrabase/internal/emailtemplates"
 	"github.com/ketsuna-org/sovrabase/internal/integrations"
 	"github.com/ketsuna-org/sovrabase/internal/metering"
+	"github.com/ketsuna-org/sovrabase/internal/realtime"
 	"github.com/ketsuna-org/sovrabase/internal/replication"
 	"github.com/ketsuna-org/sovrabase/internal/storage"
 	"github.com/ketsuna-org/sovrabase/internal/tenant"
@@ -46,6 +47,7 @@ type AdminServer struct {
 	adminEmail    string
 	adminPassword string
 	meterStore    *metering.MeterStore
+	realtimeHub   *realtime.Hub
 	teamStore     *tenant.TeamStore
 	adminStore    *auth.AdminStore
 	auditStore    *auth.AuditStore
@@ -162,6 +164,11 @@ func (a *AdminServer) SetCluster(cluster *replication.ClusterNode) {
 // SetMeterStore attaches a metering store for per-project usage tracking.
 func (a *AdminServer) SetMeterStore(ms *metering.MeterStore) {
 	a.meterStore = ms
+}
+
+// SetRealtimeHub attaches the realtime hub for live connection counts.
+func (a *AdminServer) SetRealtimeHub(hub *realtime.Hub) {
+	a.realtimeHub = hub
 }
 
 // SetTeamStore attaches a team store for project team management.
@@ -1335,6 +1342,11 @@ func (a *AdminServer) handleProjectUsage(w http.ResponseWriter, r *http.Request)
 	}
 	totalStorageBytes := dbBytes + fileStorageBytes
 
+	realtimeConns := rec.RealtimeConnections
+	if a.realtimeHub != nil {
+		realtimeConns = int64(a.realtimeHub.ClientCountForProject(id))
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"enabled":               true,
 		"project_id":            rec.ProjectID,
@@ -1348,7 +1360,7 @@ func (a *AdminServer) handleProjectUsage(w http.ResponseWriter, r *http.Request)
 		"total_storage_bytes":   totalStorageBytes,
 		"db_reads_total":        rec.DBReadsTotal,
 		"db_writes_total":       rec.DBWritesTotal,
-		"realtime_connections":  rec.RealtimeConnections,
+		"realtime_connections":  realtimeConns,
 		"last_updated":          rec.LastUpdated,
 		"requests_by_method":    rec.APIRequestsByMethod,
 	})

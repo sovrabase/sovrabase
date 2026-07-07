@@ -254,6 +254,19 @@ func (h *Hub) ClientCount() int {
 	return len(h.clients)
 }
 
+// ClientCountForProject returns the number of connected clients for a project.
+func (h *Hub) ClientCountForProject(projectID string) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	count := 0
+	for _, client := range h.clients {
+		if client.ProjectID == projectID {
+			count++
+		}
+	}
+	return count
+}
+
 // SubscriptionCount returns the number of active subscriptions.
 func (h *Hub) SubscriptionCount() int {
 	h.mu.RLock()

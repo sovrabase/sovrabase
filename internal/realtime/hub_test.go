@@ -186,3 +186,23 @@ func TestHub_MultiClientProjectIsolation(t *testing.T) {
 		// OK.
 	}
 }
+
+func TestHub_ClientCountForProject(t *testing.T) {
+	hub := NewHub()
+	hub.Start()
+	defer hub.Stop()
+
+	hub.Register(newClient("a1", "project-a"))
+	hub.Register(newClient("a2", "project-a"))
+	hub.Register(newClient("b1", "project-b"))
+
+	if got := hub.ClientCountForProject("project-a"); got != 2 {
+		t.Fatalf("project-a count = %d, want 2", got)
+	}
+	if got := hub.ClientCountForProject("project-b"); got != 1 {
+		t.Fatalf("project-b count = %d, want 1", got)
+	}
+	if got := hub.ClientCountForProject("missing"); got != 0 {
+		t.Fatalf("missing project count = %d, want 0", got)
+	}
+}

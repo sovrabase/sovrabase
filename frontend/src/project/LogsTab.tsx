@@ -2,16 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Trash2, Loader2, Activity, Cloud, HardDrive, Database } from 'lucide-react';
 import { api, adminProjectPath, formatBytes, formatDate } from '../api';
 import { useToast } from '../components/Toast';
+import { useProjectUsage } from './hooks/useProjectUsage';
 
 interface LogEntry { timestamp: string; method: string; path: string; status: number; duration: string; ip?: string; }
-interface UsageMetrics {
-  db_reads_total?: number;
-  db_writes_total?: number;
-  database_bytes?: number;
-  file_storage_bytes?: number;
-  total_storage_bytes?: number;
-  realtime_connections?: number;
-}
 
 interface Props { projectId: string; }
 
@@ -24,7 +17,7 @@ const METHOD_COLORS: Record<string, string> = {
 export default function LogsTab({ projectId }: Props) {
   const { showToast } = useToast();
   const [entries, setEntries] = useState<LogEntry[]>([]);
-  const [usage, setUsage] = useState<UsageMetrics>({});
+  const { usage, refresh: refreshUsage } = useProjectUsage(projectId);
   const [loading, setLoading] = useState(true);
   const [logTotal, setLogTotal] = useState(0);
   const LOG_PAGE_SIZE = 200;
@@ -35,13 +28,12 @@ export default function LogsTab({ projectId }: Props) {
       api<{ entries: LogEntry[]; total: number; limit: number; offset: number }>(
         adminProjectPath(projectId, `/logs?limit=${LOG_PAGE_SIZE}`),
       ).catch(() => ({ entries: [], total: 0, limit: LOG_PAGE_SIZE, offset: 0 })),
-      api<UsageMetrics>(adminProjectPath(projectId, '/usage')).catch((): UsageMetrics => ({})),
-    ]).then(([logsResp, usageData]) => {
+      refreshUsage(),
+    ]).then(([logsResp]) => {
       setEntries(logsResp.entries || []);
       setLogTotal(logsResp.total || 0);
-      setUsage(usageData || {});
     }).finally(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, refreshUsage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -87,7 +79,7 @@ export default function LogsTab({ projectId }: Props) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Total Requests', value: totalRequests.toLocaleString(), icon: Activity },
-            { label: 'Realtime Connections', value: (usage.realtime_connections ?? 0).toLocaleString(), icon: Cloud },
+            { label: 'Realtime Connections', value: (usage?.realtime_connections ?? 0).toLocaleString(), icon: Cloud },
             { label: 'Success Rate', value: `${successRate}%`, color: 'text-success', icon: Activity },
             { label: 'Error Rate', value: `${errorRate}%`, color: 'text-danger', icon: Activity },
           ].map((m) => {
@@ -109,11 +101,11 @@ export default function LogsTab({ projectId }: Props) {
         <h3 className="text-xs font-bold text-accent uppercase tracking-wider mb-3">Database & Storage</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
-            { label: 'DB Reads', value: (usage.db_reads_total ?? 0).toLocaleString(), icon: Database },
-            { label: 'DB Writes', value: (usage.db_writes_total ?? 0).toLocaleString(), icon: Database },
-            { label: 'Database Size', value: formatBytes(usage.database_bytes || 0), icon: HardDrive },
-            { label: 'File Storage', value: formatBytes(usage.file_storage_bytes || 0), icon: HardDrive },
-            { label: 'Total Storage', value: formatBytes(usage.total_storage_bytes || 0), color: 'text-accent', icon: HardDrive },
+            { label: 'DB Reads', value: (usage?.db_reads_total ?? 0).toLocaleString(), icon: Database },
+            { label: 'DB Writes', value: (usage?.db_writes_total ?? 0).toLocaleString(), icon: Database },
+            { label: 'Database Size', value: formatBytes(usage?.database_bytes || 0), icon: HardDrive },
+            { label: 'File Storage', value: formatBytes(usage?.file_storage_bytes || 0), icon: HardDrive },
+            { label: 'Total Storage', value: formatBytes(usage?.total_storage_bytes || 0), color: 'text-accent', icon: HardDrive },
           ].map((m) => {
             const Icon = m.icon;
             return (

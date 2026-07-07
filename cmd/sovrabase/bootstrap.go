@@ -140,6 +140,7 @@ func runSovrabase(logger *slog.Logger, cfg *config.Config) {
 
 	server.SetMeterStore(meterStore)
 	adminServer.SetMeterStore(meterStore)
+	adminServer.SetRealtimeHub(realtimeHub)
 
 	if cfg.CaptchaEnabled && cfg.CaptchaSecret != "" {
 		verifier := captcha.NewVerifier(captcha.Config{
