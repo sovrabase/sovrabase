@@ -63,21 +63,27 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.logger.Warn("websocket upgrade failed", "error", err)
 		return
 	}
-	// Close the connection FIRST on exit, before waiting for writeLoop.
-	// This unblocks any pending write immediately.
-	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	closeStatus := websocket.StatusNormalClosure
+	closeReason := ""
+	defer func() {
+		// Close once on exit so auth failures don't send a second close frame.
+		conn.Close(closeStatus, closeReason)
+	}()
 
 	// Read auth message.
 	var am authMessage
 	ctx := r.Context()
 	if err := wsjson.Read(ctx, conn, &am); err != nil {
 		h.logger.Warn("websocket auth read failed", "error", err)
-		conn.Close(websocket.StatusPolicyViolation, "auth required")
+		closeStatus = websocket.StatusPolicyViolation
+		closeReason = "auth required"
 		return
 	}
 
 	if am.Token == "" {
-		conn.Close(websocket.StatusPolicyViolation, "missing token")
+		closeStatus = websocket.StatusPolicyViolation
+		closeReason = "missing token"
 		return
 	}
 
@@ -94,7 +100,8 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	claims, err := auth.ValidateToken(am.Token, jwtSecret)
 	if err != nil {
 		h.logger.Warn("websocket invalid token", "error", err)
-		conn.Close(websocket.StatusPolicyViolation, "invalid token")
+		closeStatus = websocket.StatusPolicyViolation
+		closeReason = "invalid token"
 		return
 	}
 
