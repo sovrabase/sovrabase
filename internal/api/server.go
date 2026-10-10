@@ -442,6 +442,12 @@ func NewServer(cfg *Config, db DatabaseService, authSvc AuthService, store Stora
 		r.Post("/integrations/{provider}/action", s.handleIntegrationAction)
 		})
 
+	// MCP (Model Context Protocol) endpoint for AI clients. Auth is a
+	// per-project MCP access token, so it sits outside the /api/v1 group.
+	if pm != nil {
+		r.Handle("/mcp", mcpServerFor(pm, cfg.DataDir))
+	}
+
 	// Remote config routes — registered on the chi router.
 	s.router = r
 	s.RegisterConfigMapsRoutes()
