@@ -3140,6 +3140,19 @@ func (a *AdminServer) handleSetOAuthProviders(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	// The list endpoint returns secrets masked ("abcd••••"). When the client
+	// sends one back unchanged, or leaves it empty, keep the stored secret
+	// instead of overwriting it with the mask.
+	existing := make(map[string]string, len(proj.OAuthProviders))
+	for _, p := range proj.OAuthProviders {
+		existing[p.Name] = p.ClientSecret
+	}
+	for i, p := range req.Providers {
+		if p.ClientSecret == "" || strings.Contains(p.ClientSecret, "••••") {
+			req.Providers[i].ClientSecret = existing[p.Name]
+		}
+	}
+
 	proj.OAuthProviders = req.Providers
 	if proj.OAuthProviders == nil {
 		proj.OAuthProviders = []auth.OAuthProviderConfig{}

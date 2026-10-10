@@ -47,6 +47,9 @@ export async function api<T = unknown>(
     throw new ApiError(message, res.status);
   }
 
+  if (res.status === 204 || res.headers.get('Content-Length') === '0') {
+    return undefined as T;
+  }
   return res.json();
 }
 

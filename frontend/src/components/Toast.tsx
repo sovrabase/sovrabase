@@ -28,10 +28,10 @@ const iconMap: Record<ToastType, typeof CheckCircle> = {
 };
 
 const colorMap: Record<ToastType, string> = {
-  success: 'border-success/40 bg-success/10 text-success',
-  error: 'border-danger/40 bg-danger/10 text-danger',
-  info: 'border-accent/40 bg-accent/10 text-accent',
-  warning: 'border-yellow-500/40 bg-yellow-500/10 text-yellow-500',
+  success: 'text-ok',
+  error: 'text-danger',
+  info: 'text-accent',
+  warning: 'text-warn',
 };
 
 let toastId = 0;
@@ -53,19 +53,19 @@ export const ToastProvider: FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 left-4 md:left-auto z-[9999] flex flex-col items-end gap-2 pointer-events-none" role="status" aria-live="polite">
         {toasts.map((t) => {
           const Icon = iconMap[t.type];
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${colorMap[t.type]} ${t.exiting ? 'animate-modal-out' : 'animate-fade-slide'}`}
+              className={`pointer-events-auto flex items-center gap-3 pl-3.5 pr-2 py-2.5 rounded-[10px] bg-ink text-bg shadow-pop max-w-[420px] transition-opacity ${t.exiting ? 'opacity-0' : 'animate-fade'}`}
             >
-              <Icon className="w-5 h-5 shrink-0" />
+              <Icon className={`w-[18px] h-[18px] shrink-0 ${colorMap[t.type]}`} aria-hidden />
               <span className="text-sm font-medium flex-1">{t.message}</span>
               <button
                 onClick={() => removeToast(t.id)}
-                className="p-0.5 rounded hover:bg-white/10 transition-colors"
+                className="p-1 rounded-md opacity-70 hover:opacity-100 hover:bg-white/10"
                 aria-label="Dismiss"
               >
                 <X className="w-4 h-4" />
