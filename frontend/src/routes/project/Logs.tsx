@@ -26,7 +26,7 @@ import { api, adminProjectPath, formatDate } from '../../api';
 import { useProject } from '../../shell/ProjectContext';
 import { projectPath } from '../../shell/nav';
 import { useProjectUsage } from '../../hooks/useProjectUsage';
-import { SOURCES, clock, dayOf, levelOf, sourceLabel, sourceOf, summary, type Level, type RequestLog, type Source } from './logs/model';
+import { SOURCES, clock, dayOf, levelOf, sourceLabel, sourceOf, summary, type Level, type RequestLog, type Source } from './log-view/model';
 
 const PAGE = 200;
 const LIVE_MS = 5000;
