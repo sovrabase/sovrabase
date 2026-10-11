@@ -618,6 +618,14 @@ func (a *AdminServer) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /admin/projects/{id}/functions/{functionId}/executions/{execId}", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminGetFunctionExecution))))
 	mux.Handle("GET /admin/projects/{id}/functions/{functionId}/metrics", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminFunctionMetrics))))
 	mux.Handle("GET /admin/projects/{id}/functions/metrics/summary", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminFunctionsMetricsSummary))))
+
+	// MCP server (per-project config, access tokens, call log)
+	mux.Handle("GET /admin/projects/{id}/mcp", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminGetMCP))))
+	mux.Handle("PUT /admin/projects/{id}/mcp", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminSetMCP))))
+	mux.Handle("GET /admin/projects/{id}/mcp/tokens", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListMCPTokens))))
+	mux.Handle("POST /admin/projects/{id}/mcp/tokens", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminCreateMCPToken))))
+	mux.Handle("DELETE /admin/projects/{id}/mcp/tokens/{tokenId}", a.adminAuthMiddleware(a.adminLogger(http.HandlerFunc(a.handleAdminDeleteMCPToken))))
+	mux.Handle("GET /admin/projects/{id}/mcp/calls", a.adminAuthMiddleware(a.projectLogger(http.HandlerFunc(a.handleAdminListMCPCalls))))
 }
 
 // ─── Admin CRUD Handlers ─────────────────────────────────────────────────────
@@ -1171,6 +1179,7 @@ func (a *AdminServer) handleDeleteProject(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	a.mcp().ForgetProject(id)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -3128,6 +3137,19 @@ func (a *AdminServer) handleSetOAuthProviders(w http.ResponseWriter, r *http.Req
 		if p.ClientID == "" {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("providers[%d] (%s): client_id is required", i, p.Name))
 			return
+		}
+	}
+
+	// The list endpoint returns secrets masked ("abcd••••"). When the client
+	// sends one back unchanged, or leaves it empty, keep the stored secret
+	// instead of overwriting it with the mask.
+	existing := make(map[string]string, len(proj.OAuthProviders))
+	for _, p := range proj.OAuthProviders {
+		existing[p.Name] = p.ClientSecret
+	}
+	for i, p := range req.Providers {
+		if p.ClientSecret == "" || strings.Contains(p.ClientSecret, "••••") {
+			req.Providers[i].ClientSecret = existing[p.Name]
 		}
 	}
 

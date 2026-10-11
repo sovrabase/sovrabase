@@ -31,12 +31,14 @@ export const useAuth = create<AuthState>((set) => ({
     setToken(data.token);
     if (data.role) setRole(data.role);
     if (data.user_id) localStorage.setItem('sovrabase_admin_user_id', data.user_id);
+    localStorage.setItem('sovrabase_admin_email', email);
     set({ isAuthenticated: true, role: data.role || null });
   },
   logout: () => {
     clearToken();
     localStorage.removeItem('sovrabase_admin_role');
     localStorage.removeItem('sovrabase_admin_user_id');
+    localStorage.removeItem('sovrabase_admin_email');
     set({ isAuthenticated: false, role: null });
   },
   checkAuth: () => {

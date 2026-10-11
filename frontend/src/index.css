@@ -1,215 +1,119 @@
 @import "tailwindcss";
 
+/* Sovrabase design tokens. Light is the default; dark comes from the OS
+   or from the theme switch in Account (html[data-theme]). */
+:root {
+  --sv-bg: #F5F6F8;
+  --sv-surface: #FFFFFF;
+  --sv-sunken: #EEF0F4;
+  --sv-hover: #FAFBFC;
+  --sv-line: #E2E5EA;
+  --sv-line-2: #CDD2DA;
+  --sv-ink: #0D1017;
+  --sv-ink-2: #3E4452;
+  --sv-ink-3: #5E6573;
+  --sv-accent: #2B45D8;
+  --sv-accent-2: #1F36B8;
+  --sv-accent-soft: #E9EDFF;
+  --sv-on-accent: #FFFFFF;
+  --sv-ok: #0D7A4B;
+  --sv-ok-soft: #E2F4EA;
+  --sv-warn: #8A5A00;
+  --sv-warn-soft: #FFF3D1;
+  --sv-danger: #B42318;
+  --sv-danger-2: #912018;
+  --sv-danger-soft: #FDECEA;
+  --sv-code: #0D1017;
+  --sv-code-ink: #D9DEE8;
+  --sv-shadow: 0 1px 2px rgba(13, 16, 23, .06), 0 8px 24px rgba(13, 16, 23, .08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sv-bg: #0B0D11; --sv-surface: #13161C; --sv-sunken: #1B1F27; --sv-hover: #171A21;
+    --sv-line: #262B35; --sv-line-2: #343A46;
+    --sv-ink: #ECEEF2; --sv-ink-2: #C3C8D1; --sv-ink-3: #9AA1AE;
+    --sv-accent: #7086FF; --sv-accent-2: #93A3FF; --sv-accent-soft: #1D2448; --sv-on-accent: #0B0D11;
+    --sv-ok: #3DD68C; --sv-ok-soft: #10291D; --sv-warn: #F2C14E; --sv-warn-soft: #2B2310;
+    --sv-danger: #FF7A6B; --sv-danger-2: #FF9A8E; --sv-danger-soft: #2E1614;
+    --sv-code: #07080B; --sv-code-ink: #D9DEE8;
+    --sv-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --sv-bg: #0B0D11; --sv-surface: #13161C; --sv-sunken: #1B1F27; --sv-hover: #171A21;
+  --sv-line: #262B35; --sv-line-2: #343A46;
+  --sv-ink: #ECEEF2; --sv-ink-2: #C3C8D1; --sv-ink-3: #9AA1AE;
+  --sv-accent: #7086FF; --sv-accent-2: #93A3FF; --sv-accent-soft: #1D2448; --sv-on-accent: #0B0D11;
+  --sv-ok: #3DD68C; --sv-ok-soft: #10291D; --sv-warn: #F2C14E; --sv-warn-soft: #2B2310;
+  --sv-danger: #FF7A6B; --sv-danger-2: #FF9A8E; --sv-danger-soft: #2E1614;
+  --sv-code: #07080B; --sv-code-ink: #D9DEE8;
+  --sv-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+
 @theme {
-  --color-bg-app: #12131a;
-  --color-bg-card: #1a1b22;
-  --color-bg-input: #1e1f26;
-  --color-border: #27272a;
-  --color-text-primary: #e2e1eb;
-  --color-text-secondary: #a1a1aa;
-  --color-text-muted: #71717a;
-  --color-accent: #00d2ff;
-  --color-accent-hover: #33deff;
-  --color-success: #10b981;
-  --color-danger: #ffb4ab;
-  --color-danger-hover: #93000a;
-  --font-sans: 'Geist', -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --radius-sm: 0.125rem;
-  --radius-md: 0.25rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
+  /* Semantic names: use these in new code. */
+  --color-bg: var(--sv-bg);
+  --color-surface: var(--sv-surface);
+  --color-sunken: var(--sv-sunken);
+  --color-hover: var(--sv-hover);
+  --color-line: var(--sv-line);
+  --color-line-2: var(--sv-line-2);
+  --color-ink: var(--sv-ink);
+  --color-ink-2: var(--sv-ink-2);
+  --color-ink-3: var(--sv-ink-3);
+  --color-accent: var(--sv-accent);
+  --color-accent-2: var(--sv-accent-2);
+  --color-accent-soft: var(--sv-accent-soft);
+  --color-on-accent: var(--sv-on-accent);
+  --color-ok: var(--sv-ok);
+  --color-ok-soft: var(--sv-ok-soft);
+  --color-warn: var(--sv-warn);
+  --color-warn-soft: var(--sv-warn-soft);
+  --color-danger: var(--sv-danger);
+  --color-danger-2: var(--sv-danger-2);
+  --color-danger-soft: var(--sv-danger-soft);
+  --color-code: var(--sv-code);
+  --color-code-ink: var(--sv-code-ink);
+  --color-gold: #F2B705;
 
-  /* SupraBase Specific Design Tokens */
-  --color-primary-container: #00d2ff;
-  --color-surface: #12131a;
-  --color-primary-fixed-dim: #33deff;
-  --color-on-secondary-fixed-variant: #5516be;
-  --color-on-surface: #e2e1eb;
-  --color-surface-container: #1e1f26;
-  --color-on-primary-container: #002d38;
-  --color-secondary-fixed-dim: #d0bcff;
-  --color-surface-container-lowest: #0c0e14;
-  --color-error-container: #93000a;
-  --color-inverse-surface: #e2e1eb;
-  --color-on-error: #690005;
-  --color-on-primary: #002029;
-  --color-surface-tint: #00d2ff;
-  --color-primary: #00d2ff;
-  --color-on-tertiary-fixed-variant: #842225;
-  --color-error: #ffb4ab;
-  --color-tertiary-fixed: #ffdad7;
-  --color-background: #12131a;
-  --color-tertiary-fixed-dim: #ffb3af;
-  --color-on-secondary: #3c0091;
-  --color-secondary-container: #571bc1;
-  --color-surface-container-low: #1a1b22;
-  --color-surface-container-highest: #33343c;
-  --color-on-tertiary: #650911;
-  --color-primary-fixed: #80ebff;
-  --color-outline: #52525b;
-  --color-on-primary-fixed: #001217;
-  --color-outline-variant: #27272a;
-  --color-secondary-fixed: #e9ddff;
-  --color-on-tertiary-container: #711419;
-  --color-on-error-container: #ffdad6;
-  --color-on-background: #e2e1eb;
-  --color-on-surface-variant: #a1a1aa;
-  --color-tertiary: #ffb3af;
-  --color-secondary: #d0bcff;
-  --color-inverse-primary: #005f73;
-  --color-surface-container-high: #282a31;
-  --color-tertiary-container: #fc7c78;
-  --color-inverse-on-surface: #2f3037;
-  --color-surface-bright: #383940;
-  --color-on-secondary-container: #c4abff;
-  --color-surface-dim: #12131a;
-  --color-on-secondary-fixed: #23005c;
-  --color-surface-variant: #33343c;
-  --color-on-primary-fixed-variant: #003a47;
-  --color-on-tertiary-fixed: #410005;
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --spacing-stack-lg: 24px;
-  --spacing-container-padding: 16px;
-  --spacing-base: 4px;
-  --spacing-stack-sm: 8px;
-  --spacing-gutter: 12px;
-  --spacing-stack-md: 16px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
 
-  --font-body-md: 'Geist', sans-serif;
-  --font-headline-lg: 'Geist', sans-serif;
-  --font-label-caps: 'Geist', sans-serif;
-  --font-code-xs: 'JetBrains Mono', monospace;
-  --font-headline-md: 'Geist', sans-serif;
-  --font-code-sm: 'JetBrains Mono', monospace;
-  --font-body-lg: 'Geist', sans-serif;
+  --shadow-pop: var(--sv-shadow);
 }
 
-/* Discreet horizontal scrollbar for tab bars */
-.tabbar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
-}
-.tabbar-scroll::-webkit-scrollbar {
-  height: 3px;
-}
-.tabbar-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.tabbar-scroll::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
-}
-.tabbar-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
-}
-
-/* Base */
+html, body { background: var(--sv-bg); }
 body {
-  background: var(--color-bg-app);
-  color: var(--color-text-primary);
+  color: var(--sv-ink);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
   margin: 0;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible { outline: 2px solid var(--sv-accent); outline-offset: 2px; }
+::selection { background: var(--sv-accent-soft); }
+
+@keyframes sv-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes sv-sheet { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sv-pop { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
+.animate-fade { animation: sv-fade .18s ease; }
+.animate-sheet { animation: sv-sheet .2s ease; }
+.animate-pop { animation: sv-pop .15s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade, .animate-sheet, .animate-pop { animation: none; }
 }
 
-/* Animations */
-@keyframes fadeSlideIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes modalIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes modalOut {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(0.95); }
-}
-
-.animate-fade-slide {
-  animation: fadeSlideIn 0.3s ease;
-}
-
-.animate-modal-in {
-  animation: modalIn 0.2s ease;
-}
-
-.animate-modal-out {
-  animation: modalOut 0.18s ease;
-}
-
-/* Glassmorphism */
-.glass {
-  background: rgba(20, 20, 22, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #555; }
-
-/* Utility */
-.text-gradient {
-  background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* SupraBase Specific Styles */
-.glass-header {
-  backdrop-filter: blur(12px);
-}
-.function-card-border {
-  border: 1px solid #27272A;
-}
-.emerald-glow {
-  box-shadow: 0 0 15px -3px rgba(78, 222, 163, 0.2);
-}
-.log-accent-info {
-  border-left: 2px solid #10b981;
-}
-.log-accent-idle {
-  border-left: 2px solid #86948a;
-}
-@keyframes pulse-emerald {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-.status-pulse {
-  animation: pulse-emerald 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-.log-gradient-overlay {
-  background: linear-gradient(to bottom, transparent 90%, #12131a 100%);
-  pointer-events: none;
-}
-.bento-glow {
-  box-shadow: 0 0 40px -10px rgba(78, 222, 163, 0.1);
-}
-.glass-card {
-  background: rgba(24, 24, 27, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid #27272A;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.swipe-container {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.active-tab-indicator {
-  height: 2px;
-  background: #4edea3;
-  box-shadow: 0 0 8px #4edea3;
-}
-
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+* { scrollbar-width: thin; scrollbar-color: var(--sv-line-2) transparent; }
